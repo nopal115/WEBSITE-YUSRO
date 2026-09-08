@@ -1,0 +1,38 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+      - ml
+
+  api:
+    build: ./backend
+    expose:
+      - "3000"
+    depends_on:
+      - db
+
+  ml:
+    build: ./ml-service
+    expose:
+      - "8000"
+
+  db:
+    image: postgres:16-alpine
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_DB: yusro
+      POSTGRES_USER: yusro
+      POSTGRES_PASSWORD: change-me
+    volumes:
+      - postgres-prod-data:/var/lib/postgresql/data
+
+  certbot:
+    image: certbot/certbot
+
+volumes:
+  postgres-prod-data:

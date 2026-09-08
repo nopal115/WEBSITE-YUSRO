@@ -1,1 +1,3 @@
-export function AudioPlayer({ src }: { src?: string }) { return <audio controls src={src} /> }
+export function AudioPlayer() {
+  return null
+}
