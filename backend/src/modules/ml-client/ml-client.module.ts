@@ -1,5 +1,6 @@
-// SDD 3.12 — ML Client Module
-import { Module } from '@nestjs/common'
-
-@Module({})
+import { Module } from '@nestjs/common';
+import { MlClientController } from './ml-client.controller';
+import { MlClientService } from './ml-client.service';
+// SDD 3.12 - ML Client Module
+@Module({ controllers: [MlClientController], providers: [MlClientService] })
 export class MlClientModule {}

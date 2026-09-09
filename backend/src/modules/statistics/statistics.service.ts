@@ -1,6 +1,3 @@
-import { Injectable } from '@nestjs/common'
-
+import { Injectable } from '@nestjs/common';
 @Injectable()
-export class StatisticsService {
-  // TODO: Add statistics application services.
-}
+export class StatisticsService { /* TODO: Implement statistics use cases. */ }

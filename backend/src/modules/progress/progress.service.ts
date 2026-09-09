@@ -1,6 +1,3 @@
-import { Injectable } from '@nestjs/common'
-
+import { Injectable } from '@nestjs/common';
 @Injectable()
-export class ProgressService {
-  // TODO: Add progress application services.
-}
+export class ProgressService { /* TODO: Implement progress use cases. */ }

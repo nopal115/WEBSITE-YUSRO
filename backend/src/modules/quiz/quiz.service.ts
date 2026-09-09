@@ -1,6 +1,3 @@
-import { Injectable } from '@nestjs/common'
-
+import { Injectable } from '@nestjs/common';
 @Injectable()
-export class QuizService {
-  // TODO: Add quiz application services.
-}
+export class QuizService { /* TODO: Implement quiz use cases. */ }

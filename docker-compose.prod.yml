@@ -1,38 +1,35 @@
 services:
   nginx:
-    image: nginx:1.27-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      - api
-      - ml
-
+    image: nginx:1.25-alpine
+    ports: ["80:80", "443:443"]
+    volumes: [frontend-dist:/usr/share/nginx/html:ro, certbot-conf:/etc/letsencrypt:ro]
+    depends_on: [api]
+    restart: unless-stopped
   api:
     build: ./backend
-    expose:
-      - "3000"
+    env_file: .env.production
     depends_on:
-      - db
-
+      db: { condition: service_healthy }
+      ml: { condition: service_started }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/v1/health"]
+      interval: 30s
   ml:
     build: ./ml-service
-    expose:
-      - "8000"
-
+    volumes: [model-artifacts:/app/models:ro]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      start_period: 120s
   db:
     image: postgres:16-alpine
-    expose:
-      - "5432"
-    environment:
-      POSTGRES_DB: yusro
-      POSTGRES_USER: yusro
-      POSTGRES_PASSWORD: change-me
-    volumes:
-      - postgres-prod-data:/var/lib/postgresql/data
-
-  certbot:
-    image: certbot/certbot
-
-volumes:
-  postgres-prod-data:
+    env_file: .env.production
+    volumes: [pgdata:/var/lib/postgresql/data]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 10s
+volumes: { pgdata: , frontend-dist: , model-artifacts: , certbot-conf: }
+networks: { default: { name: yusro-net } }

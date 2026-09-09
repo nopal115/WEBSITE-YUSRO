@@ -1,6 +1,3 @@
-import { Injectable } from '@nestjs/common'
-
+import { Injectable } from '@nestjs/common';
 @Injectable()
-export class StudentAdminService {
-  // TODO: Add student administration application services.
-}
+export class StudentAdminService { /* TODO: Implement student administration use cases. */ }

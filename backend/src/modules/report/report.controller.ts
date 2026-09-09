@@ -1,9 +1,3 @@
-import { Controller, HttpCode, HttpStatus } from '@nestjs/common'
-
+import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 @Controller('report')
-export class ReportController {
-  @HttpCode(HttpStatus.NOT_IMPLEMENTED)
-  stub(): void {
-    // TODO: Add report routes.
-  }
-}
+export class ReportController { @Get() stub(): never { throw new HttpException('Not Implemented', HttpStatus.NOT_IMPLEMENTED); } }

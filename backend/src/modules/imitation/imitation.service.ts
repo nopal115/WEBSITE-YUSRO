@@ -1,6 +1,3 @@
-import { Injectable } from '@nestjs/common'
-
+import { Injectable } from '@nestjs/common';
 @Injectable()
-export class ImitationService {
-  // TODO: Add imitation application services.
-}
+export class ImitationService { /* TODO: Implement recording submission use cases. */ }

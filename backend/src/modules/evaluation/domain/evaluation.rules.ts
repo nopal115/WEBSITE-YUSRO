@@ -1,1 +1,1 @@
-// Aturan bisnis murni, tanpa dependensi luar.
+// Pure business rules without external dependencies.

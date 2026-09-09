@@ -1,1 +1,1 @@
-// TODO: Add the administrative user creation command.
+// TODO: Implement the administrative CLI after the user schema is approved.

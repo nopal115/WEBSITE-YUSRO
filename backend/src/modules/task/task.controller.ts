@@ -1,9 +1,3 @@
-import { Controller, HttpCode, HttpStatus } from '@nestjs/common'
-
+import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 @Controller('task')
-export class TaskController {
-  @HttpCode(HttpStatus.NOT_IMPLEMENTED)
-  stub(): void {
-    // TODO: Add task routes.
-  }
-}
+export class TaskController { @Get() stub(): never { throw new HttpException('Not Implemented', HttpStatus.NOT_IMPLEMENTED); } }

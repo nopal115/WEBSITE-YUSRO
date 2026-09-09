@@ -1,1 +1,1 @@
-// TODO: Import Yusro materials after the content schema is defined.
+// TODO: Import Yusro materials after the content model is approved.

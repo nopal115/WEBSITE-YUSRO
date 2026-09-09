@@ -1,1 +1,1 @@
-// TODO: Define ML client domain types.
+// TODO: Define ML client contract types.

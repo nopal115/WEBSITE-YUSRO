@@ -1,9 +1,7 @@
-import { Controller, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 
 @Controller('profile')
 export class ProfileController {
-  @HttpCode(HttpStatus.NOT_IMPLEMENTED)
-  stub(): void {
-    // TODO: Add profile routes.
-  }
+  @Get()
+  stub(): never { throw new HttpException('Not Implemented', HttpStatus.NOT_IMPLEMENTED); }
 }

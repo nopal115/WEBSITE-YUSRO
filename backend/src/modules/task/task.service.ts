@@ -1,6 +1,3 @@
-import { Injectable } from '@nestjs/common'
-
+import { Injectable } from '@nestjs/common';
 @Injectable()
-export class TaskService {
-  // TODO: Add task application services.
-}
+export class TaskService { /* TODO: Implement task use cases. */ }

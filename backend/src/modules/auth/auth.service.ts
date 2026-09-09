@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AuthService {
-  // TODO: Add authentication application services.
+  // TODO: Implement authentication use cases.
 }

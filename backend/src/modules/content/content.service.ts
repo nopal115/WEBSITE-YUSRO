@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class ContentService {
-  // TODO: Add content application services.
+  // TODO: Implement learning content use cases.
 }

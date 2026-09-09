@@ -1,1 +1,1 @@
-# TODO: Add MLP inference pipeline.
+# TODO: Define the MLP inference boundary.

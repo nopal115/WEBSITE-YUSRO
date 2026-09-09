@@ -1,6 +1,3 @@
-import { Injectable } from '@nestjs/common'
-
+import { Injectable } from '@nestjs/common';
 @Injectable()
-export class LearningService {
-  // TODO: Add learning application services.
-}
+export class LearningService { /* TODO: Implement learning use cases. */ }

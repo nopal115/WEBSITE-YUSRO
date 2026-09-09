@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class UserService {
-  // TODO: Add user application services.
+  // TODO: Implement user account use cases.
 }

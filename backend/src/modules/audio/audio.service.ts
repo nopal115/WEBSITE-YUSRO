@@ -1,6 +1,3 @@
-import { Injectable } from '@nestjs/common'
-
+import { Injectable } from '@nestjs/common';
 @Injectable()
-export class AudioService {
-  // TODO: Add audio application services.
-}
+export class AudioService { /* TODO: Implement audio use cases. */ }

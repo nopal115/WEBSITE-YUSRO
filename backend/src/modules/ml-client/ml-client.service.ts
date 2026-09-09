@@ -1,6 +1,3 @@
-import { Injectable } from '@nestjs/common'
-
+import { Injectable } from '@nestjs/common';
 @Injectable()
-export class MlClientService {
-  // TODO: Add ML service client integration.
-}
+export class MlClientService { /* TODO: Implement the ML service contract. */ }

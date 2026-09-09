@@ -1,5 +1,7 @@
-// SDD 3.5 — Content Module
-import { Module } from '@nestjs/common'
+import { Module } from '@nestjs/common';
+import { ContentController } from './content.controller';
+import { ContentService } from './content.service';
 
-@Module({})
+// SDD 3.5 - Content Module
+@Module({ controllers: [ContentController], providers: [ContentService] })
 export class ContentModule {}

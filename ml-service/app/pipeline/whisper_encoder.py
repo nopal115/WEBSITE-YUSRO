@@ -1,1 +1,1 @@
-# TODO: Add Whisper encoder integration.
+# TODO: Integrate Whisper without downloading a model during scaffolding.
