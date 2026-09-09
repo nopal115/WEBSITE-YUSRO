@@ -21,10 +21,3 @@ import { UserModule } from './modules/user/user.module';
   imports: [AuthModule, UserModule, ProfileModule, ContentModule, AudioModule, TaskModule, LearningModule, QuizModule, ImitationModule, EvaluationModule, MlClientModule, ProgressModule, StatisticsModule, ReportModule, StudentAdminModule, MonitoringModule, HealthModule],
 })
 export class AppModule {}
-import { Module } from '@nestjs/common';
-import { HealthModule } from './health/health.module';
-
-@Module({
-  imports: [HealthModule],
-})
-export class AppModule {}
