@@ -1,3 +1,12 @@
-import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
+import { EvaluationService } from './evaluation.service';
+
 @Controller('evaluation')
-export class EvaluationController { @Get() stub(): never { throw new HttpException('Not Implemented', HttpStatus.NOT_IMPLEMENTED); } }
+export class EvaluationController {
+	constructor(private readonly evaluationService: EvaluationService) {}
+
+	@Get()
+	getReadiness() {
+		return this.evaluationService.getReadiness();
+	}
+}

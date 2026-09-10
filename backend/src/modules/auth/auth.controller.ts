@@ -1,7 +1,18 @@
-import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Post } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { LoginDto, RegisterDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
-  @Get()
-  stub(): never { throw new HttpException('Not Implemented', HttpStatus.NOT_IMPLEMENTED); }
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  register(@Body() input: RegisterDto) {
+    return this.authService.register(input);
+  }
+
+  @Post('login')
+  login(@Body() input: LoginDto) {
+    return this.authService.login(input);
+  }
 }

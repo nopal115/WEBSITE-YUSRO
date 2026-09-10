@@ -1,3 +1,37 @@
-import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ImitationService } from './imitation.service';
+
 @Controller('imitation')
-export class ImitationController { @Get() stub(): never { throw new HttpException('Not Implemented', HttpStatus.NOT_IMPLEMENTED); } }
+@UseGuards(JwtAuthGuard)
+export class ImitationController {
+	constructor(private readonly imitationService: ImitationService) {}
+
+	@Post('tasks/:taskId/submissions')
+	@UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 5 * 1024 * 1024 } }))
+	submitRecording(
+		@Req() request: Request & { user: { id: string } },
+		@Param('taskId', ParseUUIDPipe) taskId: string,
+		@UploadedFile() file: Express.Multer.File,
+	) {
+		return this.imitationService.submitRecording(request.user.id, taskId, file);
+	}
+
+	@Get('submissions/:submissionId')
+	getSubmission(
+		@Req() request: Request & { user: { id: string } },
+		@Param('submissionId', ParseUUIDPipe) submissionId: string,
+	) {
+		return this.imitationService.getSubmission(request.user.id, submissionId);
+	}
+
+	@Post('submissions/:submissionId/retry')
+	retryEvaluation(
+		@Req() request: Request & { user: { id: string } },
+		@Param('submissionId', ParseUUIDPipe) submissionId: string,
+	) {
+		return this.imitationService.retryEvaluation(request.user.id, submissionId);
+	}
+}

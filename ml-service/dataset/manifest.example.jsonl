@@ -1,0 +1,3 @@
+{"id":"sample-0001","group_id":"student-001","recording_path":"recordings/sample-0001.webm","reference_path":"reference/task-001-v1.wav","score":85.0,"source":"teacher_review","task_id":"task-001","reference_version":1}
+{"id":"sample-0002","group_id":"student-002","recording_path":"recordings/sample-0002.webm","reference_path":"reference/task-001-v1.wav","score":72.0,"source":"teacher_review","task_id":"task-001","reference_version":1}
+{"id":"sample-0003","group_id":"student-003","recording_path":"recordings/sample-0003.webm","reference_path":"reference/task-002-v1.wav","score":94.0,"source":"teacher_review","task_id":"task-002","reference_version":1}

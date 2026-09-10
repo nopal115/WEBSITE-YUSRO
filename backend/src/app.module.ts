@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AudioModule } from './modules/audio/audio.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import { ContentModule } from './modules/content/content.module';
 import { EvaluationModule } from './modules/evaluation/evaluation.module';
 import { HealthModule } from './health/health.module';
@@ -16,8 +18,36 @@ import { StatisticsModule } from './modules/statistics/statistics.module';
 import { StudentAdminModule } from './modules/student-admin/student-admin.module';
 import { TaskModule } from './modules/task/task.module';
 import { UserModule } from './modules/user/user.module';
+import { AudioProcessingModule } from './shared/audio/audio-processing.module';
+import { BrowserModule } from './shared/browser/browser.module';
+import { DatabaseModule } from './shared/database/database.module';
+import { StorageModule } from './shared/storage/storage.module';
 
 @Module({
-  imports: [AuthModule, UserModule, ProfileModule, ContentModule, AudioModule, TaskModule, LearningModule, QuizModule, ImitationModule, EvaluationModule, MlClientModule, ProgressModule, StatisticsModule, ReportModule, StudentAdminModule, MonitoringModule, HealthModule],
+  imports: [
+    DatabaseModule,
+    StorageModule,
+    AudioProcessingModule,
+    BrowserModule,
+    AuthModule,
+    UserModule,
+    ProfileModule,
+    ContentModule,
+    AudioModule,
+    TaskModule,
+    LearningModule,
+    QuizModule,
+    ImitationModule,
+    EvaluationModule,
+    MlClientModule,
+    ProgressModule,
+    StatisticsModule,
+    ReportModule,
+    StudentAdminModule,
+    MonitoringModule,
+    HealthModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

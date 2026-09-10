@@ -1,3 +1,12 @@
-import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
+import { MlClientService } from './ml-client.service';
+
 @Controller('ml-client')
-export class MlClientController { @Get() stub(): never { throw new HttpException('Not Implemented', HttpStatus.NOT_IMPLEMENTED); } }
+export class MlClientController {
+	constructor(private readonly mlClientService: MlClientService) {}
+
+	@Get('health')
+	getHealth() {
+		return this.mlClientService.getHealth();
+	}
+}

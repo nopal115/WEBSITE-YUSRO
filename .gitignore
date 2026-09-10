@@ -4,5 +4,7 @@ dist/
 .env.production
 __pycache__/
 venv/
+.venv/
 models/*.pt
 models/*.pkl
+ml-service/dataset/splits/

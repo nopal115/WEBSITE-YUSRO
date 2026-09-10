@@ -6,3 +6,257 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum UserRole {
+  SANTRI
+  ADMIN_PENGAJAR
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ContentStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum AudioType {
+  LEARNING
+  REFERENCE
+  RECORDING
+  ML_DATASET
+}
+
+enum AudioStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TaskType {
+  LISTEN_SELECT
+  LISTEN_REPEAT
+}
+
+enum EvaluationStatus {
+  SUBMITTED
+  PROCESSING
+  EVALUATED
+  FAILED
+}
+
+model User {
+  id               String             @id @default(uuid())
+  studentId        String?            @unique
+  email            String             @unique
+  password         String
+  name             String
+  role             UserRole           @default(SANTRI)
+  status           AccountStatus      @default(ACTIVE)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  materialProgress MaterialProgress[]
+  taskProgress     TaskProgress[]
+  quizAttempts     QuizAttempt[]
+  submissions      Submission[]
+  reports          Report[]
+}
+
+model Stage {
+  id          String        @id @default(uuid())
+  title       String
+  description String?
+  order       Int           @unique
+  status      ContentStatus @default(DRAFT)
+  materials   Material[]
+  tasks       Task[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Material {
+  id              String             @id @default(uuid())
+  stageId         String
+  title           String
+  contentText     String?
+  contentImageUrl String?
+  order           Int
+  isRequired      Boolean            @default(true)
+  status          ContentStatus      @default(DRAFT)
+  stage           Stage              @relation(fields: [stageId], references: [id])
+  audioAssets     MaterialAudio[]
+  progress        MaterialProgress[]
+  tasks           Task[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([stageId, order])
+  @@index([stageId, status])
+}
+
+model MaterialAudio {
+  materialId String
+  audioId    String
+  material   Material   @relation(fields: [materialId], references: [id])
+  audio      AudioAsset @relation(fields: [audioId], references: [id])
+
+  @@id([materialId, audioId])
+}
+
+model AudioAsset {
+  id                String          @id @default(uuid())
+  type              AudioType
+  status            AudioStatus     @default(ACTIVE)
+  originalName      String
+  objectKey         String          @unique
+  mimeType          String
+  sizeBytes         Int
+  durationSeconds   Float?
+  version           Int             @default(1)
+  archivedFromId    String?
+  archivedFrom      AudioAsset?     @relation("AudioVersions", fields: [archivedFromId], references: [id])
+  versions          AudioAsset[]    @relation("AudioVersions")
+  materialLinks     MaterialAudio[]
+  referenceTasks    Task[]          @relation("TaskReferenceAudio")
+  questionAudio     Question[]      @relation("QuestionAudio")
+  recording         Submission?     @relation("SubmissionRecordingAudio")
+  referenceSnapshot Submission[]    @relation("SubmissionReferenceAudio")
+  createdAt         DateTime        @default(now())
+
+  @@index([type, status])
+}
+
+model Task {
+  id               String         @id @default(uuid())
+  stageId          String
+  materialId       String?
+  title            String
+  type             TaskType
+  status           ContentStatus  @default(DRAFT)
+  order            Int
+  referenceAudioId String?
+  stage            Stage          @relation(fields: [stageId], references: [id])
+  material         Material?      @relation(fields: [materialId], references: [id])
+  referenceAudio   AudioAsset?    @relation("TaskReferenceAudio", fields: [referenceAudioId], references: [id])
+  questions        Question[]
+  progress         TaskProgress[]
+  quizAttempts     QuizAttempt[]
+  submissions      Submission[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([stageId, order])
+  @@index([status, type])
+}
+
+model Question {
+  id      String         @id @default(uuid())
+  taskId  String
+  prompt  String
+  audioId String?
+  order   Int
+  task    Task           @relation(fields: [taskId], references: [id])
+  audio   AudioAsset?    @relation("QuestionAudio", fields: [audioId], references: [id])
+  options AnswerOption[]
+  answers QuizAnswer[]
+
+  @@unique([taskId, order])
+}
+
+model AnswerOption {
+  id         String       @id @default(uuid())
+  questionId String
+  text       String
+  isCorrect  Boolean      @default(false)
+  question   Question     @relation(fields: [questionId], references: [id])
+  answers    QuizAnswer[]
+}
+
+model QuizAttempt {
+  id          String       @id @default(uuid())
+  userId      String
+  taskId      String
+  score       Float
+  completedAt DateTime     @default(now())
+  user        User         @relation(fields: [userId], references: [id])
+  task        Task         @relation(fields: [taskId], references: [id])
+  answers     QuizAnswer[]
+
+  @@index([userId, taskId, completedAt])
+}
+
+model QuizAnswer {
+  id         String       @id @default(uuid())
+  attemptId  String
+  questionId String
+  optionId   String
+  attempt    QuizAttempt  @relation(fields: [attemptId], references: [id])
+  question   Question     @relation(fields: [questionId], references: [id])
+  option     AnswerOption @relation(fields: [optionId], references: [id])
+
+  @@unique([attemptId, questionId])
+}
+
+model Submission {
+  id               String           @id @default(uuid())
+  userId           String
+  taskId           String
+  recordingAudioId String           @unique
+  referenceAudioId String?
+  status           EvaluationStatus @default(SUBMITTED)
+  errorMessage     String?
+  submittedAt      DateTime         @default(now())
+  processedAt      DateTime?
+  user             User             @relation(fields: [userId], references: [id])
+  task             Task             @relation(fields: [taskId], references: [id])
+  recordingAudio   AudioAsset       @relation("SubmissionRecordingAudio", fields: [recordingAudioId], references: [id])
+  referenceAudio   AudioAsset?      @relation("SubmissionReferenceAudio", fields: [referenceAudioId], references: [id])
+  evaluation       Evaluation?
+
+  @@index([userId, taskId, status])
+}
+
+model Evaluation {
+  id           String     @id @default(uuid())
+  submissionId String     @unique
+  score        Float?
+  feedback     String?
+  modelVersion String?
+  errorMessage String?
+  evaluatedAt  DateTime?
+  submission   Submission @relation(fields: [submissionId], references: [id])
+}
+
+model MaterialProgress {
+  id          String    @id @default(uuid())
+  userId      String
+  materialId  String
+  completedAt DateTime?
+  user        User      @relation(fields: [userId], references: [id])
+  material    Material  @relation(fields: [materialId], references: [id])
+
+  @@unique([userId, materialId])
+}
+
+model TaskProgress {
+  id          String    @id @default(uuid())
+  userId      String
+  taskId      String
+  completedAt DateTime?
+  user        User      @relation(fields: [userId], references: [id])
+  task        Task      @relation(fields: [taskId], references: [id])
+
+  @@unique([userId, taskId])
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  userId      String
+  objectKey   String?
+  generatedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, generatedAt])
+}
