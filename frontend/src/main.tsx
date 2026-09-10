@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { AppRouter } from './app/router';
+import './styles/index.css';
 
-function App(): JSX.Element { return <main>Yusro</main>; }
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode><AppRouter /></React.StrictMode>);
