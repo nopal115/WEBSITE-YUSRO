@@ -21,7 +21,7 @@ def _load_model():
 		raise ModelNotReadyError(f'Whisper model is unavailable: {error}') from error
 
 
-def encode_audio(samples: np.ndarray) -> tuple[np.ndarray, str | None]:
+def encode_audio(samples: np.ndarray) -> np.ndarray:
 	model = _load_model()
 	import whisper
 	import torch
@@ -30,4 +30,13 @@ def encode_audio(samples: np.ndarray) -> tuple[np.ndarray, str | None]:
 	mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
 	with torch.no_grad():
 		embedding = model.encoder(mel.unsqueeze(0)).mean(dim=1).squeeze(0).cpu().numpy()
-	return embedding.astype(np.float32), None
+	return embedding.astype(np.float32)
+
+
+def transcribe_audio(samples: np.ndarray) -> str:
+	model = _load_model()
+	try:
+		result = model.transcribe(samples.astype(np.float32, copy=False), fp16=False)
+	except Exception as error:
+		raise ModelNotReadyError(f'Whisper transcription failed: {error}') from error
+	return str(result.get('text', '')).strip()

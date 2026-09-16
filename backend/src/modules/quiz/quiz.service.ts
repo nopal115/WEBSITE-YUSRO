@@ -11,7 +11,7 @@ export class QuizService {
 	async listTasks(userId: string) {
 		await this.assertActiveUser(userId);
 		return this.prisma.task.findMany({
-			where: { type: TaskType.LISTEN_SELECT, status: ContentStatus.ACTIVE },
+			where: { type: TaskType.QUIZ, status: ContentStatus.ACTIVE },
 			orderBy: [{ stage: { order: 'asc' } }, { order: 'asc' }],
 			select: {
 				id: true,
@@ -36,7 +36,7 @@ export class QuizService {
 	async submitAttempt(userId: string, taskId: string, input: SubmitQuizDto) {
 		await this.assertActiveUser(userId);
 		const task = await this.prisma.task.findFirst({
-			where: { id: taskId, type: TaskType.LISTEN_SELECT, status: ContentStatus.ACTIVE },
+			where: { id: taskId, type: TaskType.QUIZ, status: ContentStatus.ACTIVE },
 			include: { questions: { include: { options: true } } },
 		});
 		if (!task) throw new NotFoundException('Dengar-Pilih task not found');
@@ -71,11 +71,16 @@ export class QuizService {
 					answers: { create: input.answers },
 				},
 			});
-			await transaction.taskProgress.upsert({
-				where: { userId_taskId: { userId, taskId } },
-				update: { completedAt: new Date() },
-				create: { userId, taskId, completedAt: new Date() },
-			});
+			const now = new Date();
+			const progress = await transaction.taskProgress.findUnique({ where: { userId_taskId: { userId, taskId } }, select: { bestScore: true } });
+			if (progress) {
+				await transaction.taskProgress.update({
+					where: { userId_taskId: { userId, taskId } },
+					data: { completedAt: now, lastAttemptAt: now, attemptCount: { increment: 1 }, bestScore: Math.max(Number(progress.bestScore ?? 0), score) },
+				});
+			} else {
+				await transaction.taskProgress.create({ data: { userId, taskId, completedAt: now, firstAttemptAt: now, lastAttemptAt: now, attemptCount: 1, bestScore: score } });
+			}
 			return createdAttempt;
 		});
 

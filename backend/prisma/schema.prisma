@@ -9,7 +9,7 @@ datasource db {
 
 enum UserRole {
   SANTRI
-  ADMIN_PENGAJAR
+  ADMIN
 }
 
 enum AccountStatus {
@@ -27,7 +27,7 @@ enum AudioType {
   LEARNING
   REFERENCE
   RECORDING
-  ML_DATASET
+  DATASET
 }
 
 enum AudioStatus {
@@ -36,8 +36,8 @@ enum AudioStatus {
 }
 
 enum TaskType {
-  LISTEN_SELECT
-  LISTEN_REPEAT
+  QUIZ
+  IMITATION
 }
 
 enum EvaluationStatus {
@@ -45,6 +45,20 @@ enum EvaluationStatus {
   PROCESSING
   EVALUATED
   FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+enum FeedbackCategory {
+  SANGAT_BAIK
+  BAIK
+  CUKUP
+  PERLU_LATIHAN
 }
 
 model User {
@@ -62,6 +76,10 @@ model User {
   quizAttempts     QuizAttempt[]
   submissions      Submission[]
   reports          Report[]
+  refreshTokens    RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  attempts         Attempt[]
+	requestedEvaluationJobs EvaluationJob[] @relation("EvaluationJobRequestedBy")
 }
 
 model Stage {
@@ -114,6 +132,8 @@ model AudioAsset {
   mimeType          String
   sizeBytes         Int
   durationSeconds   Float?
+  durationMs        Int?
+  checksumSha256    String?
   version           Int             @default(1)
   archivedFromId    String?
   archivedFrom      AudioAsset?     @relation("AudioVersions", fields: [archivedFromId], references: [id])
@@ -123,9 +143,12 @@ model AudioAsset {
   questionAudio     Question[]      @relation("QuestionAudio")
   recording         Submission?     @relation("SubmissionRecordingAudio")
   referenceSnapshot Submission[]    @relation("SubmissionReferenceAudio")
+  attemptRecordings Attempt[]       @relation("AttemptRecording")
+  attemptReferences Attempt[]       @relation("AttemptReference")
   createdAt         DateTime        @default(now())
 
   @@index([type, status])
+  @@index([checksumSha256])
 }
 
 model Task {
@@ -144,6 +167,7 @@ model Task {
   progress         TaskProgress[]
   quizAttempts     QuizAttempt[]
   submissions      Submission[]
+  attempts         Attempt[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -241,14 +265,20 @@ model MaterialProgress {
 }
 
 model TaskProgress {
-  id          String    @id @default(uuid())
-  userId      String
-  taskId      String
-  completedAt DateTime?
-  user        User      @relation(fields: [userId], references: [id])
-  task        Task      @relation(fields: [taskId], references: [id])
+  id             String    @id @default(uuid())
+  userId         String
+  taskId         String
+  completedAt    DateTime?
+  firstAttemptAt DateTime?
+  lastAttemptAt  DateTime?
+  attemptCount   Int       @default(0)
+  bestScore      Decimal?  @db.Decimal(5, 2)
+  user           User      @relation(fields: [userId], references: [id])
+  task           Task      @relation(fields: [taskId], references: [id])
 
   @@unique([userId, taskId])
+  @@index([userId, completedAt])
+  @@index([taskId, bestScore])
 }
 
 model Report {
@@ -259,4 +289,114 @@ model Report {
   user        User     @relation(fields: [userId], references: [id])
 
   @@index([userId, generatedAt])
+}
+
+// SDD v1.0 canonical attempt history. The legacy Submission/QuizAttempt
+// models above remain temporarily while services are migrated in the next step.
+model Attempt {
+  id                  String             @id @default(uuid())
+  userId              String
+  taskId              String
+  taskType            TaskType
+  attemptNo           Int
+  recordingAudioId    String?
+  referenceAudioId    String?
+  evaluationStatus    EvaluationStatus?
+  score               Decimal?           @db.Decimal(5, 2)
+  feedbackCategory    FeedbackCategory?
+  correctCount        Int?
+  questionCount       Int?
+  processingStartedAt DateTime?
+  evaluatedAt         DateTime?
+  failedAt            DateTime?
+  errorCode           String?
+  modelVersion        String?
+  processingMs        Int?
+  submittedAt         DateTime           @default(now())
+  createdAt           DateTime           @default(now())
+  user                User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  task                Task               @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  recordingAudio      AudioAsset?        @relation("AttemptRecording", fields: [recordingAudioId], references: [id], onDelete: Restrict)
+  referenceAudio      AudioAsset?        @relation("AttemptReference", fields: [referenceAudioId], references: [id], onDelete: Restrict)
+  jobs                EvaluationJob[]
+
+  @@unique([userId, taskId, attemptNo])
+  @@index([userId, taskId, evaluationStatus])
+  @@index([userId, submittedAt])
+  @@index([taskId, evaluationStatus, submittedAt])
+  @@index([taskType, evaluationStatus, submittedAt])
+  @@map("attempts")
+}
+
+model EvaluationJob {
+  id            String    @id @default(uuid())
+  attemptId     String
+  status        JobStatus @default(QUEUED)
+  runAfter      DateTime  @default(now())
+  runCount      Int       @default(0)
+	maxRuns       Int       @default(3)
+  startedAt     DateTime?
+	lockedAt      DateTime?
+	lockedBy      String?
+  finishedAt    DateTime?
+  lastErrorCode String?
+	lastErrorDetail String?
+	isRetry       Boolean   @default(false)
+	requestedById String?
+  createdAt     DateTime  @default(now())
+  attempt       Attempt   @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+	requestedBy   User?     @relation("EvaluationJobRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([status, runAfter, createdAt])
+  @@map("evaluation_jobs")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, familyId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@map("password_reset_tokens")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  @@map("audit_logs")
+}
+
+// Object uploaded successfully but left without a committed AudioAsset after
+// a failed submit transaction. A scheduled cleanup can safely retry deletion.
+model StorageOrphan {
+  id              String   @id @default(uuid())
+  objectKey       String   @unique
+  cleanupReason   String
+  lastErrorDetail String?
+  createdAt       DateTime @default(now())
+  cleanedAt       DateTime?
+
+  @@index([cleanedAt, createdAt])
+  @@map("storage_orphans")
 }

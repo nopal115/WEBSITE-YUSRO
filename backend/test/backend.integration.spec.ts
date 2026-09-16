@@ -48,7 +48,10 @@ describe('Backend business integration', () => {
     });
     userId = user.id;
     const stage = await prisma.stage.create({
-      data: { title: `Integration Stage ${suffix}`, order: -2000000000 + Math.floor(Math.random() * 1000), status: ContentStatus.ACTIVE },
+      // The first active stage must be unlocked regardless of previously
+      // seeded content. The old random range could place this fixture after
+      // an incomplete stage and make the test order-dependent.
+      data: { title: `Integration Stage ${suffix}`, order: -2147483648, status: ContentStatus.ACTIVE },
     });
     stageId = stage.id;
     const materials = await prisma.$transaction([
@@ -74,7 +77,7 @@ describe('Backend business integration', () => {
         stageId,
         materialId: materialOneId,
         title: 'Repeat Task',
-        type: TaskType.LISTEN_REPEAT,
+        type: TaskType.IMITATION,
         status: ContentStatus.ACTIVE,
         order: 1,
         referenceAudioId,
@@ -86,7 +89,7 @@ describe('Backend business integration', () => {
         stageId,
         materialId: materialOneId,
         title: 'Select Task',
-        type: TaskType.LISTEN_SELECT,
+        type: TaskType.QUIZ,
         status: ContentStatus.ACTIVE,
         order: 2,
         questions: {
@@ -103,6 +106,9 @@ describe('Backend business integration', () => {
   });
 
   afterAll(async () => {
+		await prisma.evaluationJob.deleteMany({ where: { attempt: { userId } } });
+		await prisma.attempt.deleteMany({ where: { userId } });
+		await prisma.audioAsset.deleteMany({ where: { objectKey: { startsWith: `recordings/${userId}/` } } });
     await prisma.evaluation.deleteMany({ where: { submission: { userId } } });
     await prisma.submission.deleteMany({ where: { userId } });
     await prisma.quizAnswer.deleteMany({ where: { attempt: { userId } } });
@@ -132,7 +138,7 @@ describe('Backend business integration', () => {
 
   it('allows only the declared role through RolesGuard', () => {
     class AdminController {}
-    Roles(UserRole.ADMIN_PENGAJAR)(AdminController);
+    Roles(UserRole.ADMIN)(AdminController);
     const reflector = new Reflector();
     const guard = new RolesGuard(reflector);
     const context = { getHandler: () => () => undefined, getClass: () => AdminController, switchToHttp: () => ({ getRequest: () => ({ user: { role: UserRole.SANTRI } }) }) } as unknown as ExecutionContext;
@@ -157,19 +163,24 @@ describe('Backend business integration', () => {
     expect(await prisma.taskProgress.findUnique({ where: { userId_taskId: { userId, taskId: selectTaskId } } })).not.toBeNull();
   });
 
-  it('stores an audio submission and completes it asynchronously', async () => {
-    const fakeStorage = { putObject: jest.fn().mockResolvedValue(undefined), getObject: jest.fn() };
-    const fakeAudio = { getMetadata: jest.fn().mockResolvedValue({ format: { duration: 2 } }) };
-    const fakeMl = { evaluateAudio: jest.fn().mockResolvedValue({ score: 85, label: 'good', model_ready: true }) };
-    const imitation = new ImitationService(prisma, fakeStorage as never, fakeAudio as never, fakeMl as never);
-    const result = await imitation.submitRecording(userId, repeatTaskId, { buffer: Buffer.from('audio'), size: 5, mimetype: 'audio/webm', originalname: 'recording.webm' } as Express.Multer.File);
+	it('stores an audio submission and queues it for the evaluation worker', async () => {
+		const fakeStorage = { putObject: jest.fn().mockResolvedValue(undefined), getObject: jest.fn(), deleteObject: jest.fn() };
+		const fakeAudio = {
+			getMetadata: jest.fn().mockResolvedValue({
+				format: { duration: 2, format_name: 'wav' },
+				streams: [{ codec_type: 'audio', codec_name: 'pcm_s16le', sample_rate: 16000, channels: 1, bits_per_sample: 16 }],
+			}),
+			getVolumeStats: jest.fn().mockResolvedValue({ meanDbfs: -20, maxDbfs: -10 }),
+		};
+		const imitation = new ImitationService(prisma, fakeStorage as never, fakeAudio as never);
+		const wavHeader = Buffer.from('RIFF\x24\x00\x00\x00WAVEfmt ');
+		const result = await imitation.submitRecording(userId, repeatTaskId, { buffer: wavHeader, size: wavHeader.length, mimetype: 'audio/wav', originalname: 'recording.wav' } as Express.Multer.File);
     submissionId = result.submissionId;
     expect(result.status).toBe(EvaluationStatus.SUBMITTED);
-    await new Promise(resolve => setTimeout(resolve, 100));
     const status = await imitation.getSubmission(userId, submissionId);
-    expect(status.status).toBe(EvaluationStatus.EVALUATED);
-    expect(status.score).toBe(85);
-    expect(status.feedback).toBe('Baik');
+		expect(status.status).toBe(EvaluationStatus.SUBMITTED);
+		expect(status.score).toBeNull();
+		expect(await prisma.evaluationJob.findFirst({ where: { attemptId: submissionId, status: 'QUEUED' } })).not.toBeNull();
   });
 
   it('calculates progress and statistics from completed activities and valid scores', async () => {
@@ -177,7 +188,7 @@ describe('Backend business integration', () => {
     const statistics = await new StatisticsService(prisma).getStudentStatistics(userId);
     expect(progress.tasks.completed).toBeGreaterThanOrEqual(1);
     expect(progress.materials.completed).toBeGreaterThanOrEqual(1);
-    expect(statistics.bestScore).toBe(85);
-    expect(statistics.averageScore).toBe(85);
+		expect(statistics.bestScore).toBeNull();
+		expect(statistics.averageScore).toBeNull();
   });
 });

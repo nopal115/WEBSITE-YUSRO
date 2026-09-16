@@ -9,8 +9,16 @@ import { ImitationService } from './imitation.service';
 export class ImitationController {
 	constructor(private readonly imitationService: ImitationService) {}
 
+	@Get('tasks/:taskId')
+	getTask(
+		@Req() request: Request & { user: { id: string } },
+		@Param('taskId', ParseUUIDPipe) taskId: string,
+	) {
+		return this.imitationService.getTask(request.user.id, taskId);
+	}
+
 	@Post('tasks/:taskId/submissions')
-	@UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 5 * 1024 * 1024 } }))
+	@UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 10 * 1024 * 1024 } }))
 	submitRecording(
 		@Req() request: Request & { user: { id: string } },
 		@Param('taskId', ParseUUIDPipe) taskId: string,
@@ -27,11 +35,11 @@ export class ImitationController {
 		return this.imitationService.getSubmission(request.user.id, submissionId);
 	}
 
-	@Post('submissions/:submissionId/retry')
-	retryEvaluation(
+	@Get('tasks/:taskId/submissions')
+	listSubmissions(
 		@Req() request: Request & { user: { id: string } },
-		@Param('submissionId', ParseUUIDPipe) submissionId: string,
+		@Param('taskId', ParseUUIDPipe) taskId: string,
 	) {
-		return this.imitationService.retryEvaluation(request.user.id, submissionId);
+		return this.imitationService.listSubmissions(request.user.id, taskId);
 	}
 }

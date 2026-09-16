@@ -2,25 +2,26 @@ import {
 	BadRequestException,
 	ConflictException,
 	ForbiddenException,
+	HttpException,
+	HttpStatus,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
 import { AccountStatus, AudioStatus, AudioType, ContentStatus, EvaluationStatus, TaskType } from '@prisma/client';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { tmpdir } from 'os';
 import type { FfprobeData } from 'fluent-ffmpeg';
 import { AudioProcessingService } from '../../shared/audio/audio-processing.service';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { StorageService } from '../../shared/storage/storage.service';
-import { MlClientService } from '../ml-client/ml-client.service';
 
-const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
-const MIN_DURATION_SECONDS = 1;
-const MAX_DURATION_SECONDS = 30;
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+const MIN_DURATION_SECONDS = 2;
+const MAX_DURATION_SECONDS = 60;
 const COOLDOWN_MS = 10_000;
-const ALLOWED_AUDIO_TYPES = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/mpeg']);
+const SILENCE_MAX_DBFS = -40;
 
 @Injectable()
 export class ImitationService {
@@ -28,175 +29,212 @@ export class ImitationService {
 		private readonly prisma: PrismaService,
 		private readonly storage: StorageService,
 		private readonly audioProcessing: AudioProcessingService,
-		private readonly mlClient: MlClientService,
 	) {}
 
 	async submitRecording(userId: string, taskId: string, file: Express.Multer.File) {
-		const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { status: true } });
-		if (!user) throw new NotFoundException('User not found');
-		if (user.status !== AccountStatus.ACTIVE) throw new ForbiddenException('Account is inactive');
 		if (!file) throw new BadRequestException('Audio file is required');
-		if (file.size > MAX_AUDIO_BYTES) throw new BadRequestException('Audio file must not exceed 5 MB');
-		if (!ALLOWED_AUDIO_TYPES.has(file.mimetype)) {
-			throw new BadRequestException('Unsupported audio format');
+		if (file.size > MAX_AUDIO_BYTES) throw new BadRequestException('Audio file must not exceed 10 MB');
+		if (!this.hasWavMagicBytes(file.buffer)) {
+			throw new BadRequestException('Audio must be a WAV file');
 		}
 
-		const task = await this.prisma.task.findFirst({
-			where: { id: taskId, type: TaskType.LISTEN_REPEAT, status: ContentStatus.ACTIVE },
-			select: { id: true, referenceAudioId: true },
-		});
-		if (!task) throw new NotFoundException('Dengar-Tirukan task not found');
-		if (!task.referenceAudioId) throw new BadRequestException('Task has no reference audio');
-
-		const activeSubmission = await this.prisma.submission.findFirst({
-			where: { userId, taskId, status: { in: [EvaluationStatus.SUBMITTED, EvaluationStatus.PROCESSING] } },
-			select: { id: true },
-		});
-		if (activeSubmission) throw new ConflictException('An evaluation is already active for this task');
-
-		const latestSubmission = await this.prisma.submission.findFirst({
-			where: { userId, taskId },
-			orderBy: { submittedAt: 'desc' },
-			select: { submittedAt: true },
-		});
-		if (latestSubmission && Date.now() - latestSubmission.submittedAt.getTime() < COOLDOWN_MS) {
-			throw new ConflictException('Please wait 10 seconds before submitting another recording');
-		}
-
-		const metadata = await this.getAudioMetadata(file);
+		const { metadata, maxDbfs } = await this.inspectRecording(file);
 		const duration = metadata.format.duration;
 		if (typeof duration !== 'number' || duration < MIN_DURATION_SECONDS || duration > MAX_DURATION_SECONDS) {
-			throw new BadRequestException('Audio duration must be between 1 and 30 seconds');
+			throw new BadRequestException('Audio duration must be between 2 and 60 seconds');
 		}
+		if (maxDbfs <= SILENCE_MAX_DBFS) throw new BadRequestException('Audio recording is silent');
 
-		const objectKey = `recordings/${userId}/${taskId}/${randomUUID()}-${file.originalname}`;
-		await this.storage.putObject(objectKey, file.buffer, file.mimetype);
+		const safeFilename = basename(file.originalname || 'recording.wav');
+		const objectKey = `recordings/${userId}/${taskId}/${randomUUID()}-${safeFilename}`;
+		const checksumSha256 = createHash('sha256').update(file.buffer).digest('hex');
+		let uploaded = false;
 
 		try {
-			const submission = await this.prisma.$transaction(async (transaction) => {
+			const attempt = await this.prisma.$transaction(async (transaction) => {
+				await transaction.$queryRaw`SELECT 1 AS locked FROM (SELECT pg_advisory_xact_lock(hashtext(${userId}), hashtext(${taskId}))) AS advisory_lock`;
+				const user = await transaction.user.findUnique({ where: { id: userId }, select: { status: true } });
+				if (!user) throw new NotFoundException('User not found');
+				if (user.status !== AccountStatus.ACTIVE) throw new ForbiddenException('Account is inactive');
+				const task = await transaction.task.findFirst({
+					where: { id: taskId, type: TaskType.IMITATION, status: ContentStatus.ACTIVE },
+					select: { id: true, referenceAudioId: true },
+				});
+				if (!task) throw new NotFoundException('Dengar-Tirukan task not found');
+				if (!task.referenceAudioId) throw new BadRequestException('Task has no reference audio');
+				const activeSubmission = await transaction.attempt.findFirst({
+					where: { userId, taskId, evaluationStatus: { in: [EvaluationStatus.SUBMITTED, EvaluationStatus.PROCESSING] } },
+					select: { id: true },
+				});
+				if (activeSubmission) throw new ConflictException('An evaluation is already active for this task');
+				const latestSubmission = await transaction.attempt.findFirst({
+					where: { userId, taskId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true },
+				});
+				if (latestSubmission && Date.now() - latestSubmission.createdAt.getTime() < COOLDOWN_MS) {
+					throw new HttpException('Please wait 10 seconds before submitting another recording', HttpStatus.TOO_MANY_REQUESTS);
+				}
+				const previous = await transaction.attempt.aggregate({
+					where: { userId, taskId },
+					_max: { attemptNo: true },
+				});
+				await this.storage.putObject(objectKey, file.buffer, 'audio/wav');
+				uploaded = true;
 				const recording = await transaction.audioAsset.create({
 					data: {
 						type: AudioType.RECORDING,
 						status: AudioStatus.ACTIVE,
 						originalName: file.originalname,
 						objectKey,
-						mimeType: file.mimetype,
+						mimeType: 'audio/wav',
 						sizeBytes: file.size,
 						durationSeconds: duration,
+						durationMs: Math.round(duration * 1000),
+						checksumSha256,
 					},
 				});
-				const created = await transaction.submission.create({
+				const created = await transaction.attempt.create({
 					data: {
 						userId,
 						taskId,
+						taskType: TaskType.IMITATION,
+						attemptNo: (previous._max.attemptNo ?? 0) + 1,
 						recordingAudioId: recording.id,
 						referenceAudioId: task.referenceAudioId,
-						status: EvaluationStatus.SUBMITTED,
+						evaluationStatus: EvaluationStatus.SUBMITTED,
+						submittedAt: new Date(),
 					},
 				});
+				await transaction.evaluationJob.create({ data: { attemptId: created.id } });
 				await transaction.taskProgress.upsert({
 					where: { userId_taskId: { userId, taskId } },
-					update: { completedAt: new Date() },
-					create: { userId, taskId, completedAt: new Date() },
+					update: { completedAt: new Date(), lastAttemptAt: new Date(), attemptCount: { increment: 1 } },
+					create: { userId, taskId, completedAt: new Date(), firstAttemptAt: new Date(), lastAttemptAt: new Date(), attemptCount: 1 },
 				});
 				return created;
 			});
 
-			setImmediate(() => void this.processEvaluation(submission.id, file.buffer, file.originalname, file.mimetype));
 			return {
-				submissionId: submission.id,
-				status: submission.status,
-				submittedAt: submission.submittedAt,
+				submissionId: attempt.id,
+				status: attempt.evaluationStatus,
+				submittedAt: attempt.createdAt,
 			};
 		} catch (error) {
-			throw new BadRequestException(`Could not save submission: ${error instanceof Error ? error.message : 'unknown error'}`);
+			if (uploaded) await this.cleanupOrphan(objectKey, error);
+			throw error;
 		}
 	}
 
-	async getSubmission(userId: string, submissionId: string) {
-		const submission = await this.prisma.submission.findFirst({
-			where: { id: submissionId, userId },
-			include: { evaluation: true },
+	async getTask(userId: string, taskId: string) {
+		await this.assertActiveUser(userId);
+		const task = await this.prisma.task.findFirst({
+			where: { id: taskId, type: TaskType.IMITATION, status: ContentStatus.ACTIVE },
+			select: {
+				id: true, title: true, order: true, stageId: true, materialId: true,
+				referenceAudio: { select: { id: true, originalName: true, durationSeconds: true, objectKey: true } },
+			},
 		});
-		if (!submission) throw new NotFoundException('Submission not found');
+		if (!task || !task.referenceAudio) throw new NotFoundException('Dengar-Tirukan task not found');
+		const { objectKey, ...referenceAudio } = task.referenceAudio;
 		return {
-			submissionId: submission.id,
-			status: submission.status,
-			score: submission.evaluation?.score ?? null,
-			feedback: submission.evaluation?.feedback ?? null,
-			errorMessage: submission.errorMessage ?? submission.evaluation?.errorMessage ?? null,
+			...task,
+			referenceAudio: { ...referenceAudio, url: await this.storage.getSignedGetUrl(objectKey) },
 		};
 	}
 
-	async retryEvaluation(userId: string, submissionId: string) {
-		const submission = await this.prisma.submission.findFirst({
-			where: { id: submissionId, userId, status: EvaluationStatus.FAILED },
-			include: { recordingAudio: true },
+	async listSubmissions(userId: string, taskId: string) {
+		await this.assertActiveUser(userId);
+		const task = await this.prisma.task.findFirst({
+			where: { id: taskId, type: TaskType.IMITATION }, select: { id: true },
 		});
-		if (!submission) throw new NotFoundException('Failed submission not found');
-		const audio = await this.storage.getObject(submission.recordingAudio.objectKey);
-		await this.prisma.submission.update({
-			where: { id: submissionId },
-			data: { status: EvaluationStatus.SUBMITTED, errorMessage: null, processedAt: null },
+		if (!task) throw new NotFoundException('Dengar-Tirukan task not found');
+		const attempts = await this.prisma.attempt.findMany({
+			where: { userId, taskId, taskType: TaskType.IMITATION }, orderBy: { submittedAt: 'desc' },
+			select: { id: true, attemptNo: true, evaluationStatus: true, score: true, feedbackCategory: true, errorCode: true, submittedAt: true, evaluatedAt: true, failedAt: true },
 		});
-		setImmediate(() => void this.processEvaluation(
-			submission.id,
-			Buffer.from(audio),
-			submission.recordingAudio.originalName,
-			submission.recordingAudio.mimeType,
-		));
-		return { submissionId, status: EvaluationStatus.SUBMITTED };
+		return attempts.map((attempt) => this.toSubmissionResponse(attempt));
 	}
 
-	private async processEvaluation(
-		submissionId: string,
-		audio: Buffer,
-		filename: string,
-		contentType: string,
-	): Promise<void> {
+	async getSubmission(userId: string, submissionId: string) {
+		const attempt = await this.prisma.attempt.findFirst({
+			where: { id: submissionId, userId, task: { type: TaskType.IMITATION } },
+			select: {
+				id: true,
+				evaluationStatus: true,
+				score: true,
+				feedbackCategory: true,
+				errorCode: true,
+				submittedAt: true,
+				evaluatedAt: true,
+				failedAt: true,
+			},
+		});
+		if (!attempt) throw new NotFoundException('Submission not found');
+		return this.toSubmissionResponse(attempt);
+	}
+
+	private toSubmissionResponse(attempt: { id: string; evaluationStatus: EvaluationStatus | null; score: unknown; feedbackCategory: unknown; errorCode: string | null; createdAt?: Date; submittedAt?: Date; evaluatedAt: Date | null; failedAt: Date | null; attemptNo?: number }) {
+		return {
+			submissionId: attempt.id,
+			...(attempt.attemptNo === undefined ? {} : { attemptNo: attempt.attemptNo }),
+			status: attempt.evaluationStatus,
+			score: attempt.score,
+			feedback: attempt.feedbackCategory,
+			errorCode: attempt.errorCode,
+			submittedAt: attempt.submittedAt ?? attempt.createdAt,
+			evaluatedAt: attempt.evaluatedAt,
+			failedAt: attempt.failedAt,
+		};
+	}
+
+	private hasWavMagicBytes(buffer: Buffer): boolean {
+		return buffer.length >= 12
+			&& buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+			&& buffer.subarray(8, 12).toString('ascii') === 'WAVE';
+	}
+
+	private async cleanupOrphan(objectKey: string, cause: unknown): Promise<void> {
 		try {
-			await this.prisma.submission.update({
-				where: { id: submissionId },
-				data: { status: EvaluationStatus.PROCESSING, errorMessage: null },
-			});
-			const result = await this.mlClient.evaluateAudio(audio, filename, contentType);
-			if (!Number.isFinite(result.score) || result.score < 0 || result.score > 100) {
-				throw new Error('ML service returned an invalid score');
+			await this.storage.deleteObject(objectKey);
+		} catch (cleanupError) {
+			try {
+				await this.prisma.storageOrphan.upsert({
+					where: { objectKey },
+					update: { lastErrorDetail: this.errorDetail(cleanupError) },
+					create: { objectKey, cleanupReason: 'IMITATION_SUBMIT_TRANSACTION_FAILED', lastErrorDetail: this.errorDetail(cause) },
+				});
+			} catch {
+				// Storage lifecycle policy remains the final safety net if the DB is unavailable too.
 			}
-			await this.prisma.$transaction([
-				this.prisma.submission.update({
-					where: { id: submissionId },
-					data: { status: EvaluationStatus.EVALUATED, processedAt: new Date(), errorMessage: null },
-				}),
-				this.prisma.evaluation.upsert({
-					where: { submissionId },
-					update: { score: result.score, feedback: this.feedbackFor(result.score), modelVersion: result.model_ready ? 'whisper-tiny-mlp' : 'baseline', evaluatedAt: new Date(), errorMessage: null },
-					create: { submissionId, score: result.score, feedback: this.feedbackFor(result.score), modelVersion: result.model_ready ? 'whisper-tiny-mlp' : 'baseline', evaluatedAt: new Date() },
-				}),
-			]);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Unknown evaluation error';
-			await this.prisma.$transaction([
-				this.prisma.submission.update({ where: { id: submissionId }, data: { status: EvaluationStatus.FAILED, processedAt: new Date(), errorMessage: message } }),
-				this.prisma.evaluation.upsert({ where: { submissionId }, update: { score: null, feedback: null, errorMessage: message }, create: { submissionId, errorMessage: message } }),
-			]);
 		}
 	}
 
-	private feedbackFor(score: number): string {
-		if (score >= 90) return 'Sangat Baik';
-		if (score >= 80) return 'Baik';
-		if (score >= 70) return 'Cukup';
-		return 'Perlu Latihan';
+	private errorDetail(error: unknown): string {
+		return (error instanceof Error ? error.message : 'Unknown error').slice(0, 1_000);
 	}
 
-	private async getAudioMetadata(file: Express.Multer.File): Promise<FfprobeData> {
+	private async assertActiveUser(userId: string): Promise<void> {
+		const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { status: true } });
+		if (!user) throw new NotFoundException('User not found');
+		if (user.status !== AccountStatus.ACTIVE) throw new ForbiddenException('Account is inactive');
+	}
+
+	private async inspectRecording(file: Express.Multer.File): Promise<{ metadata: FfprobeData; maxDbfs: number }> {
 		const temporaryDirectory = await fs.mkdtemp(join(tmpdir(), 'yusro-audio-'));
-		const temporaryPath = join(temporaryDirectory, file.originalname || 'recording');
+		const temporaryPath = join(temporaryDirectory, 'recording.wav');
 		await fs.writeFile(temporaryPath, file.buffer);
 		try {
-			return await this.audioProcessing.getMetadata(temporaryPath);
-		} catch {
+			const [metadata, volume] = await Promise.all([
+				this.audioProcessing.getMetadata(temporaryPath),
+				this.audioProcessing.getVolumeStats(temporaryPath),
+			]);
+			const audio = metadata.streams.find((stream) => stream.codec_type === 'audio');
+			if (!metadata.format.format_name?.split(',').includes('wav') || audio?.codec_name !== 'pcm_s16le' || audio.sample_rate !== 16000 || audio.channels !== 1 || audio.bits_per_sample !== 16) {
+				throw new BadRequestException('Audio must be WAV PCM 16-bit, 16 kHz, mono');
+			}
+			return { metadata, maxDbfs: volume.maxDbfs };
+		} catch (error) {
+			if (error instanceof BadRequestException) throw error;
+			// Avoid exposing parser details from ffprobe/ffmpeg to API clients.
 			throw new BadRequestException('Audio file cannot be read');
 		} finally {
 			await fs.rm(temporaryDirectory, { recursive: true, force: true });
