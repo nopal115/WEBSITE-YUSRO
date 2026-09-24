@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { DengarPilihPage } from '../features/quiz/DengarPilihPage';
+import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
@@ -30,7 +31,24 @@ export const router = createBrowserRouter([
         children: [
           {
             path: '/dashboard',
-            element: <PlaceholderPage>Dashboard</PlaceholderPage>,
+            element: <DashboardPage />,
+          },
+          {
+            path: '/pembelajaran',
+            element: <PlaceholderPage>Pembelajaran</PlaceholderPage>,
+          },
+          {
+            path: '/progress',
+            element: <PlaceholderPage>Progress</PlaceholderPage>,
+          },
+          {
+            // ASUMSI: "Riwayat" = modul report (SDD 3.15), perlu dikonfirmasi
+            path: '/riwayat',
+            element: <PlaceholderPage>Riwayat</PlaceholderPage>,
+          },
+          {
+            path: '/profil',
+            element: <PlaceholderPage>Profil</PlaceholderPage>,
           },
           {
             path: '/quiz/demo',

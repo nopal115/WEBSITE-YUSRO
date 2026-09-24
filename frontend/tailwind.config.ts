@@ -44,23 +44,23 @@ export default {
 				},
 			},
 			borderRadius: { card: '14px' },
-			fontFamily: { sans: ['Inter', 'sans-serif'] },
+			fontFamily: { sans: ['Inter', 'sans-serif'], arabic: ['Amiri Quran', 'serif'] },
 			fontSize: {
 				label: ['13px', { lineHeight: '18px', letterSpacing: '0.52px', fontWeight: '700' }],
 				'body-s': ['13px', { lineHeight: '20px', fontWeight: '400' }],
 				caption: ['12px', { lineHeight: '16px', fontWeight: '400' }],
-				display: ['var(--font-display, 32px)', { lineHeight: '1.2' }], // TODO(verifikasi Figma Dev Mode)
+				display: ['34px', { lineHeight: '44px', letterSpacing: '-0.544px', fontWeight: '700' }],
 				h1: ['var(--font-h1, 32px)', { lineHeight: '1.2' }], // TODO(verifikasi Figma Dev Mode)
-				h2: ['var(--font-h2, 28px)', { lineHeight: '1.25' }], // TODO(verifikasi Figma Dev Mode)
-				h3: ['var(--font-h3, 24px)', { lineHeight: '1.3' }], // TODO(verifikasi Figma Dev Mode)
-				body: ['var(--font-body, 16px)', { lineHeight: '1.5' }], // TODO(verifikasi Figma Dev Mode)
-				'body-l': ['var(--font-body-l, 18px)', { lineHeight: '1.5' }], // TODO(verifikasi Figma Dev Mode)
-				button: ['var(--font-button, 16px)', { lineHeight: '1.25' }], // TODO(verifikasi Figma Dev Mode)
-				score: ['var(--font-score, 24px)', { lineHeight: '1.2' }], // TODO(verifikasi Figma Dev Mode)
+				h2: ['22px', { lineHeight: '30px', letterSpacing: '-0.176px', fontWeight: '700' }],
+				h3: ['18px', { lineHeight: '26px', letterSpacing: '-0.072px', fontWeight: '600' }],
+				body: ['15px', { lineHeight: '24px', fontWeight: '400' }],
+				'body-l': ['17px', { lineHeight: '28px', fontWeight: '400' }],
+				button: ['16px', { lineHeight: '20px', letterSpacing: '0.8px', fontWeight: '700' }],
+				score: ['56px', { lineHeight: '64px', letterSpacing: '-1.12px', fontWeight: '700' }],
 				'arabic-xl': ['var(--font-arabic-xl, 40px)', { lineHeight: '1.4' }], // TODO(verifikasi Figma Dev Mode)
 				'arabic-l': ['var(--font-arabic-l, 32px)', { lineHeight: '1.4' }], // TODO(verifikasi Figma Dev Mode)
-				'arabic-m': ['var(--font-arabic-m, 24px)', { lineHeight: '1.4' }], // TODO(verifikasi Figma Dev Mode)
-				'arabic-s': ['var(--font-arabic-s, 18px)', { lineHeight: '1.4' }], // TODO(verifikasi Figma Dev Mode)
+				'arabic-m': ['32px', { lineHeight: '64px', fontWeight: '400' }],
+				'arabic-s': ['24px', { lineHeight: '50px', fontWeight: '400' }],
 			},
 		},
 	},
