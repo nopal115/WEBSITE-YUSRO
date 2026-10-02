@@ -21,6 +21,24 @@ def _load_model():
 		raise ModelNotReadyError(f'Whisper model is unavailable: {error}') from error
 
 
+def load_whisper_model() -> None:
+	"""Warm Whisper at startup so readiness never depends on the first request."""
+	_load_model()
+
+
+def configure_deterministic_inference() -> None:
+	try:
+		import torch
+	except ImportError as error:
+		raise ModelNotReadyError('torch is not installed') from error
+	torch.manual_seed(0)
+	if torch.cuda.is_available():
+		torch.cuda.manual_seed_all(0)
+		torch.backends.cudnn.benchmark = False
+		torch.backends.cudnn.deterministic = True
+	torch.use_deterministic_algorithms(True)
+
+
 def encode_audio(samples: np.ndarray) -> np.ndarray:
 	model = _load_model()
 	import whisper
@@ -36,7 +54,7 @@ def encode_audio(samples: np.ndarray) -> np.ndarray:
 def transcribe_audio(samples: np.ndarray) -> str:
 	model = _load_model()
 	try:
-		result = model.transcribe(samples.astype(np.float32, copy=False), fp16=False)
+		result = model.transcribe(samples.astype(np.float32, copy=False), fp16=False, language='ar', task='transcribe')
 	except Exception as error:
 		raise ModelNotReadyError(f'Whisper transcription failed: {error}') from error
 	return str(result.get('text', '')).strip()

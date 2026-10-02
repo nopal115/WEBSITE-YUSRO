@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AccountStatus, ContentStatus, EvaluationStatus, UserRole } from '@prisma/client';
+import { AccountStatus, ContentStatus, EvaluationStatus, TaskType, UserRole } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 
 @Injectable()
@@ -53,21 +53,28 @@ export class StatisticsService {
 	}
 
 	private getValidHistory(userId: string) {
-		return this.prisma.evaluation.findMany({
-			where: { submission: { userId, status: EvaluationStatus.EVALUATED }, score: { not: null } },
+		return this.prisma.attempt.findMany({
+			where: {
+				userId,
+				taskType: TaskType.IMITATION,
+				evaluationStatus: EvaluationStatus.EVALUATED,
+				score: { not: null },
+			},
 			select: {
+				id: true,
+				taskId: true,
 				score: true,
-				feedback: true,
+				feedbackCategory: true,
 				evaluatedAt: true,
-				submission: { select: { id: true, taskId: true, submittedAt: true } },
+				submittedAt: true,
 			},
 			orderBy: { evaluatedAt: 'asc' },
 		}).then(items => items.map(item => ({
-			submissionId: item.submission.id,
-			taskId: item.submission.taskId,
-			score: item.score as number,
-			feedback: item.feedback,
-			submittedAt: item.submission.submittedAt,
+			submissionId: item.id,
+			taskId: item.taskId,
+			score: Number(item.score),
+			feedback: item.feedbackCategory,
+			submittedAt: item.submittedAt,
 			evaluatedAt: item.evaluatedAt,
 		})));
 	}

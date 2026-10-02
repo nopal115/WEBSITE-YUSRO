@@ -1,7 +1,10 @@
 import { Controller, Get, Param, ParseUUIDPipe, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { RolesGuard } from '../../shared/guards/roles.guard';
 import { ImitationService } from './imitation.service';
 
 @Controller('imitation')
@@ -18,6 +21,8 @@ export class ImitationController {
 	}
 
 	@Post('tasks/:taskId/submissions')
+	@UseGuards(RolesGuard)
+	@Roles(UserRole.SANTRI)
 	@UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 10 * 1024 * 1024 } }))
 	submitRecording(
 		@Req() request: Request & { user: { id: string } },

@@ -9,6 +9,16 @@ COMPARISON_FEATURE_NAMES = (
 )
 
 
+def vectorize_comparison_features(features: dict[str, float]) -> np.ndarray:
+	"""The single ordered feature contract used by training and inference."""
+	if tuple(features) != COMPARISON_FEATURE_NAMES:
+		raise ValueError('Comparison feature contract is invalid')
+	vector = np.asarray([features[name] for name in COMPARISON_FEATURE_NAMES], dtype=np.float32)
+	if not np.isfinite(vector).all():
+		raise ValueError('Comparison features contain invalid values')
+	return vector
+
+
 def extract_acoustic_features(samples: np.ndarray, sample_rate: int) -> dict[str, float]:
 	duration = float(len(samples) / sample_rate)
 	rms = float(np.sqrt(np.mean(np.square(samples))))

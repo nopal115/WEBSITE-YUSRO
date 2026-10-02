@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AccountStatus, ContentStatus, TaskType } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
+import { feedbackCategoryFor } from '../evaluation/domain/evaluation.rules';
 import { calculateQuizScore } from './domain/quiz.rules';
 import { SubmitQuizDto } from './dto/submit-quiz.dto';
 
@@ -63,15 +64,26 @@ export class QuizService {
 
 		const score = calculateQuizScore(correctAnswers, task.questions.length);
 		const attempt = await this.prisma.$transaction(async (transaction) => {
-			const createdAttempt = await transaction.quizAttempt.create({
+			const previous = await transaction.attempt.aggregate({
+				where: { userId, taskId },
+				_max: { attemptNo: true },
+			});
+			const now = new Date();
+			const createdAttempt = await transaction.attempt.create({
 				data: {
 					userId,
 					taskId,
+					taskType: TaskType.QUIZ,
+					attemptNo: (previous._max.attemptNo ?? 0) + 1,
 					score,
+					feedbackCategory: feedbackCategoryFor(score),
+					correctCount: correctAnswers,
+					questionCount: task.questions.length,
+					evaluatedAt: now,
+					submittedAt: now,
 					answers: { create: input.answers },
 				},
 			});
-			const now = new Date();
 			const progress = await transaction.taskProgress.findUnique({ where: { userId_taskId: { userId, taskId } }, select: { bestScore: true } });
 			if (progress) {
 				await transaction.taskProgress.update({
@@ -89,7 +101,7 @@ export class QuizService {
 			score,
 			correctAnswers,
 			totalQuestions: task.questions.length,
-			completedAt: attempt.completedAt,
+			completedAt: attempt.evaluatedAt,
 		};
 	}
 

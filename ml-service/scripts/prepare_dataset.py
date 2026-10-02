@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 from pathlib import Path
@@ -40,6 +41,10 @@ def load_records(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f'{path}:{line_number}: score must be between 0 and 100')
         if not record['group_id'] or not record['recording_path'] or not record['reference_path']:
             raise ValueError(f'{path}:{line_number}: group and audio paths cannot be empty')
+        for field in ('recording_path', 'reference_path'):
+            candidate = Path(record[field])
+            if candidate.is_absolute() or '..' in candidate.parts:
+                raise ValueError(f'{path}:{line_number}: {field} must stay inside the approved dataset directory')
         seen_ids.add(record['id'])
         records.append(record)
     if not records:
@@ -71,12 +76,27 @@ def split_records(records: list[dict[str, Any]], seed: int) -> dict[str, list[di
     return result
 
 
-def write_splits(splits: dict[str, list[dict[str, Any]]], output: Path) -> None:
+def write_splits(splits: dict[str, list[dict[str, Any]]], output: Path, *, dataset_version: str, seed: int) -> None:
     output.mkdir(parents=True, exist_ok=True)
     for name, records in splits.items():
         destination = output / f'{name}.jsonl'
         content = ''.join(json.dumps(record, sort_keys=True) + '\n' for record in records)
         destination.write_text(content, encoding='utf-8')
+    combined = ''.join(
+        json.dumps(record, sort_keys=True) + '\n'
+        for name in SPLIT_NAMES
+        for record in splits[name]
+    )
+    metadata = {
+        'dataset_version': dataset_version,
+        'split_seed': seed,
+        'split_strategy': 'group_id:70/15/15',
+        'record_count': sum(len(records) for records in splits.values()),
+        'group_count': len({record['group_id'] for records in splits.values() for record in records}),
+        'manifest_sha256': hashlib.sha256(combined.encode('utf-8')).hexdigest(),
+        'splits': {name: len(records) for name, records in splits.items()},
+    }
+    (output / 'split-metadata.json').write_text(json.dumps(metadata, indent=2, sort_keys=True) + '\n', encoding='utf-8')
 
 
 def main() -> None:
@@ -84,9 +104,10 @@ def main() -> None:
     parser.add_argument('--input', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--dataset-version', required=True)
     args = parser.parse_args()
     splits = split_records(load_records(args.input), args.seed)
-    write_splits(splits, args.output)
+    write_splits(splits, args.output, dataset_version=args.dataset_version, seed=args.seed)
     print({name: len(records) for name, records in splits.items()})
 
 

@@ -7,6 +7,7 @@ import {
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { AccountStatus, AudioStatus, AudioType, ContentStatus, EvaluationStatus, TaskType } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
@@ -66,12 +67,20 @@ export class ImitationService {
 					where: { userId, taskId, evaluationStatus: { in: [EvaluationStatus.SUBMITTED, EvaluationStatus.PROCESSING] } },
 					select: { id: true },
 				});
-				if (activeSubmission) throw new ConflictException('An evaluation is already active for this task');
+				if (activeSubmission) {
+					throw new ConflictException({
+						message: 'An evaluation is already active for this task',
+						error_code: 'IMITATION_ACTIVE_EXISTS',
+					});
+				}
 				const latestSubmission = await transaction.attempt.findFirst({
 					where: { userId, taskId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true },
 				});
 				if (latestSubmission && Date.now() - latestSubmission.createdAt.getTime() < COOLDOWN_MS) {
-					throw new HttpException('Please wait 10 seconds before submitting another recording', HttpStatus.TOO_MANY_REQUESTS);
+					throw new HttpException({
+						message: 'Please wait 10 seconds before submitting another recording',
+						error_code: 'IMITATION_COOLDOWN',
+					}, HttpStatus.TOO_MANY_REQUESTS);
 				}
 				const previous = await transaction.attempt.aggregate({
 					where: { userId, taskId },
@@ -170,6 +179,33 @@ export class ImitationService {
 		});
 		if (!attempt) throw new NotFoundException('Submission not found');
 		return this.toSubmissionResponse(attempt);
+	}
+
+	// A failed immediate delete is recorded during submit. Retrying here keeps
+	// storage cleanup independent from the request lifecycle and safely marks
+	// each row only after object deletion succeeds.
+	@Interval(5 * 60_000)
+	async cleanupRecordedOrphans(): Promise<void> {
+		const orphans = await this.prisma.storageOrphan.findMany({
+			where: { cleanedAt: null },
+			orderBy: { createdAt: 'asc' },
+			take: 100,
+			select: { id: true, objectKey: true },
+		});
+		for (const orphan of orphans) {
+			try {
+				await this.storage.deleteObject(orphan.objectKey);
+				await this.prisma.storageOrphan.updateMany({
+					where: { id: orphan.id, cleanedAt: null },
+					data: { cleanedAt: new Date(), lastErrorDetail: null },
+				});
+			} catch (error) {
+				await this.prisma.storageOrphan.updateMany({
+					where: { id: orphan.id, cleanedAt: null },
+					data: { lastErrorDetail: this.errorDetail(error) },
+				});
+			}
+		}
 	}
 
 	private toSubmissionResponse(attempt: { id: string; evaluationStatus: EvaluationStatus | null; score: unknown; feedbackCategory: unknown; errorCode: string | null; createdAt?: Date; submittedAt?: Date; evaluatedAt: Date | null; failedAt: Date | null; attemptNo?: number }) {

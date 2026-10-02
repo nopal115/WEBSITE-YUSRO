@@ -134,6 +134,7 @@ model AudioAsset {
   durationSeconds   Float?
   durationMs        Int?
   checksumSha256    String?
+  allowLegacyResample Boolean         @default(false)
   version           Int             @default(1)
   archivedFromId    String?
   archivedFrom      AudioAsset?     @relation("AudioVersions", fields: [archivedFromId], references: [id])
@@ -185,6 +186,7 @@ model Question {
   audio   AudioAsset?    @relation("QuestionAudio", fields: [audioId], references: [id])
   options AnswerOption[]
   answers QuizAnswer[]
+  attemptAnswers AttemptAnswer[]
 
   @@unique([taskId, order])
 }
@@ -196,6 +198,7 @@ model AnswerOption {
   isCorrect  Boolean      @default(false)
   question   Question     @relation(fields: [questionId], references: [id])
   answers    QuizAnswer[]
+  attemptAnswers AttemptAnswer[]
 }
 
 model QuizAttempt {
@@ -319,6 +322,7 @@ model Attempt {
   recordingAudio      AudioAsset?        @relation("AttemptRecording", fields: [recordingAudioId], references: [id], onDelete: Restrict)
   referenceAudio      AudioAsset?        @relation("AttemptReference", fields: [referenceAudioId], references: [id], onDelete: Restrict)
   jobs                EvaluationJob[]
+  answers             AttemptAnswer[]
 
   @@unique([userId, taskId, attemptNo])
   @@index([userId, taskId, evaluationStatus])
@@ -326,6 +330,23 @@ model Attempt {
   @@index([taskId, evaluationStatus, submittedAt])
   @@index([taskType, evaluationStatus, submittedAt])
   @@map("attempts")
+}
+
+// Canonical answer history for Quiz attempts. QuizAnswer remains attached to
+// the legacy QuizAttempt model only while old data is retained for rollback.
+model AttemptAnswer {
+  id         String       @id @default(uuid())
+  attemptId  String
+  questionId String
+  optionId   String
+  attempt    Attempt      @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  question   Question     @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  option     AnswerOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+
+  @@unique([attemptId, questionId])
+  @@index([questionId])
+  @@index([optionId])
+  @@map("attempt_answers")
 }
 
 model EvaluationJob {

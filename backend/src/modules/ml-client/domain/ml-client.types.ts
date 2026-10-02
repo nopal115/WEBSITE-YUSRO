@@ -14,6 +14,8 @@ export interface MlEvaluationRequest {
 	submissionId: string;
 	reference: MlAudioInput;
 	recording: MlAudioInput;
+	allowLegacyReferenceResample: boolean;
+	requestId?: string;
 }
 
 export interface MlEvaluationResponse {

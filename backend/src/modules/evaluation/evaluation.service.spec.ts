@@ -7,7 +7,8 @@ describe('EvaluationService worker rules', () => {
 		const tx = {
 			$queryRaw: jest.fn(),
 			attempt: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-			evaluationJob: { create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+			evaluationJob: { create: jest.fn(), update: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
+			taskProgress: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
 			auditLog: { create: jest.fn() },
 		};
 		const prisma = {
@@ -23,26 +24,26 @@ describe('EvaluationService worker rules', () => {
 	it('requeues only retryable errors and restores SUBMITTED before retrying', async () => {
 		const { service, tx } = createService();
 		tx.attempt.findFirst.mockResolvedValue({ id: 'attempt-1' });
-		tx.attempt.update.mockResolvedValue({});
+		tx.attempt.updateMany.mockResolvedValue({ count: 1 });
 		tx.evaluationJob.updateMany.mockResolvedValue({ count: 1 });
 
 		await (service as never as { handleFailure: (job: string, attempt: string, run: number, retry: boolean, error: MlClientError) => Promise<void> })
 			.handleFailure('job-1', 'attempt-1', 1, true, new MlClientError('ML_UNAVAILABLE', true, 'offline'));
 
-		expect(tx.attempt.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ evaluationStatus: EvaluationStatus.SUBMITTED, processingStartedAt: null }) }));
+		expect(tx.attempt.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ evaluationStatus: EvaluationStatus.SUBMITTED, processingStartedAt: null }) }));
 		expect(tx.evaluationJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: JobStatus.QUEUED, lastErrorCode: 'ML_UNAVAILABLE' }) }));
 	});
 
 	it('fails permanently without changing score to zero', async () => {
 		const { service, tx } = createService();
 		tx.attempt.findFirst.mockResolvedValue({ id: 'attempt-1' });
-		tx.attempt.update.mockResolvedValue({});
+		tx.attempt.updateMany.mockResolvedValue({ count: 1 });
 		tx.evaluationJob.updateMany.mockResolvedValue({ count: 1 });
 
 		await (service as never as { handleFailure: (job: string, attempt: string, run: number, retry: boolean, error: MlClientError) => Promise<void> })
 			.handleFailure('job-1', 'attempt-1', 1, false, new MlClientError('ML_INVALID_RESPONSE', false, 'bad response'));
 
-		expect(tx.attempt.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ evaluationStatus: EvaluationStatus.FAILED, score: null, errorCode: 'ML_INVALID_RESPONSE' }) }));
+		expect(tx.attempt.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ evaluationStatus: EvaluationStatus.FAILED, score: null, errorCode: 'ML_INVALID_RESPONSE' }) }));
 		expect(tx.evaluationJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: JobStatus.FAILED }) }));
 	});
 
@@ -73,16 +74,17 @@ describe('EvaluationService worker rules', () => {
 	it('does not evaluate a job when its attempt is no longer SUBMITTED', async () => {
 		const { service, tx, mlClient } = createService();
 		tx.$queryRaw.mockResolvedValue([{ id: 'job-1' }]);
-		tx.evaluationJob.update.mockResolvedValue({
+		tx.evaluationJob.updateMany.mockResolvedValue({ count: 1 });
+		tx.evaluationJob.findUniqueOrThrow.mockResolvedValue({
 			id: 'job-1', attemptId: 'attempt-1', runCount: 1, maxRuns: 3,
-			attempt: { recordingAudio: { objectKey: 'recording.wav' }, referenceAudio: { objectKey: 'reference.wav' } },
+			attempt: { recordingAudio: { objectKey: 'recording.wav' }, referenceAudio: { objectKey: 'reference.wav', allowLegacyResample: false } },
 		});
 		tx.attempt.updateMany.mockResolvedValue({ count: 0 });
 
 		await service.processNextJob();
 
 		expect(mlClient.evaluate).not.toHaveBeenCalled();
-		expect(tx.evaluationJob.update).toHaveBeenLastCalledWith(expect.objectContaining({
+		expect(tx.evaluationJob.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({
 			data: expect.objectContaining({ status: JobStatus.FAILED, lastErrorCode: 'EVAL_JOB_STALE' }),
 		}));
 	});
@@ -90,14 +92,16 @@ describe('EvaluationService worker rules', () => {
 	it('sends both audio snapshots to ML and completes a claimed job', async () => {
 		const { service, tx, storage, mlClient } = createService();
 		tx.$queryRaw.mockResolvedValue([{ id: 'job-1' }]);
-		tx.evaluationJob.update.mockResolvedValue({
+		tx.evaluationJob.updateMany.mockResolvedValue({ count: 1 });
+		tx.evaluationJob.findUniqueOrThrow.mockResolvedValue({
 			id: 'job-1', attemptId: 'attempt-1', runCount: 1, maxRuns: 3,
 			attempt: {
 				recordingAudio: { objectKey: 'recording.wav', originalName: 'recording.wav', mimeType: 'audio/wav' },
-				referenceAudio: { objectKey: 'reference.wav', originalName: 'reference.wav', mimeType: 'audio/wav' },
+				referenceAudio: { objectKey: 'reference.wav', originalName: 'reference.wav', mimeType: 'audio/wav', allowLegacyResample: false },
 			},
 		});
 		tx.attempt.updateMany.mockResolvedValue({ count: 1 });
+		tx.taskProgress.findUnique.mockResolvedValue({ bestScore: 80 });
 		storage.getObject.mockResolvedValueOnce(Buffer.from('recording')).mockResolvedValueOnce(Buffer.from('reference'));
 		mlClient.evaluate.mockResolvedValue({ submission_id: 'attempt-1', score: 85, model_version: 'model-1', whisper_version: 'tiny', processing_ms: 42, details: {} });
 
@@ -107,17 +111,65 @@ describe('EvaluationService worker rules', () => {
 			submissionId: 'attempt-1',
 			recording: expect.objectContaining({ bytes: Buffer.from('recording') }),
 			reference: expect.objectContaining({ bytes: Buffer.from('reference') }),
+			allowLegacyReferenceResample: false,
 		}));
 		expect(tx.attempt.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
 			evaluationStatus: EvaluationStatus.EVALUATED, score: 85, feedbackCategory: 'BAIK', modelVersion: 'model-1', processingMs: 42,
 		}) }));
 		expect(tx.evaluationJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: JobStatus.DONE }) }));
+		expect(tx.taskProgress.update).toHaveBeenCalledWith(expect.objectContaining({ data: { bestScore: 85 } }));
+	});
+
+	it('does not persist an out-of-range ML score', async () => {
+		const { service, tx, storage, mlClient } = createService();
+		tx.$queryRaw.mockResolvedValue([{ id: 'job-1' }]);
+		tx.evaluationJob.updateMany.mockResolvedValue({ count: 1 });
+		tx.evaluationJob.findUniqueOrThrow.mockResolvedValue({
+			id: 'job-1', attemptId: 'attempt-1', runCount: 1, maxRuns: 3,
+			attempt: {
+				recordingAudio: { objectKey: 'recording.wav', originalName: 'recording.wav', mimeType: 'audio/wav' },
+				referenceAudio: { objectKey: 'reference.wav', originalName: 'reference.wav', mimeType: 'audio/wav', allowLegacyResample: false },
+			},
+		});
+		tx.attempt.updateMany.mockResolvedValue({ count: 1 });
+		tx.attempt.findFirst.mockResolvedValue({ id: 'attempt-1' });
+		storage.getObject.mockResolvedValue(Buffer.from('audio'));
+		mlClient.evaluate.mockResolvedValue({ submission_id: 'attempt-1', score: 150, model_version: 'model-1', whisper_version: 'tiny', processing_ms: 42, details: {} });
+
+		await service.processNextJob();
+
+		expect(tx.attempt.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+			evaluationStatus: EvaluationStatus.FAILED, score: null, errorCode: 'ML_INVALID_RESPONSE',
+		}) }));
+	});
+
+	it('requeues after temporary object storage failure so it can run when storage recovers', async () => {
+		const { service, tx, storage, mlClient } = createService();
+		tx.$queryRaw.mockResolvedValue([{ id: 'job-1' }]);
+		tx.evaluationJob.updateMany.mockResolvedValue({ count: 1 });
+		tx.evaluationJob.findUniqueOrThrow.mockResolvedValue({
+			id: 'job-1', attemptId: 'attempt-1', runCount: 1, maxRuns: 3,
+			attempt: {
+				recordingAudio: { objectKey: 'recording.wav', originalName: 'recording.wav', mimeType: 'audio/wav' },
+				referenceAudio: { objectKey: 'reference.wav', originalName: 'reference.wav', mimeType: 'audio/wav', allowLegacyResample: false },
+			},
+		});
+		tx.attempt.updateMany.mockResolvedValue({ count: 1 });
+		tx.attempt.findFirst.mockResolvedValue({ id: 'attempt-1' });
+		storage.getObject.mockRejectedValue(new Error('storage offline'));
+
+		await service.processNextJob();
+
+		expect(mlClient.evaluate).not.toHaveBeenCalled();
+		expect(tx.evaluationJob.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+			status: JobStatus.QUEUED, lastErrorCode: 'STORAGE_UNAVAILABLE',
+		}) }));
 	});
 
 	it('creates an auditable retry only for a failed attempt', async () => {
 		const { service, tx } = createService();
 		tx.attempt.findUnique.mockResolvedValue({ id: 'attempt-1', evaluationStatus: EvaluationStatus.FAILED });
-		tx.attempt.update.mockResolvedValue({});
+		tx.attempt.updateMany.mockResolvedValue({ count: 1 });
 		tx.evaluationJob.create.mockResolvedValue({ id: 'job-2' });
 
 		await expect(service.retryByAdmin('admin-1', 'attempt-1')).resolves.toEqual({
@@ -133,5 +185,16 @@ describe('EvaluationService worker rules', () => {
 
 		await expect(service.retryByAdmin('admin-1', 'attempt-1')).rejects.toThrow('EVAL_RETRY_NOT_ALLOWED');
 		expect(tx.evaluationJob.create).not.toHaveBeenCalled();
+	});
+
+	it('includes failed jobs in the admin queue while retaining all status counts', async () => {
+		const { service, prisma } = createService();
+		prisma.evaluationJob.findMany.mockResolvedValue([]);
+		prisma.evaluationJob.groupBy.mockResolvedValue([{ status: JobStatus.FAILED, _count: { _all: 2 } }]);
+
+		await expect(service.getQueue()).resolves.toEqual({ jobs: [], counts: { FAILED: 2 } });
+		expect(prisma.evaluationJob.findMany).toHaveBeenCalledWith(expect.objectContaining({
+			where: { status: { in: [JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.FAILED] } },
+		}));
 	});
 });

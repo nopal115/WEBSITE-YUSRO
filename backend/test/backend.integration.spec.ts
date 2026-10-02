@@ -47,11 +47,12 @@ describe('Backend business integration', () => {
       },
     });
     userId = user.id;
+    const earliestStage = await prisma.stage.aggregate({ _min: { order: true } });
+    const fixtureStageOrder = (earliestStage._min.order ?? 0) - 1;
     const stage = await prisma.stage.create({
-      // The first active stage must be unlocked regardless of previously
-      // seeded content. The old random range could place this fixture after
-      // an incomplete stage and make the test order-dependent.
-      data: { title: `Integration Stage ${suffix}`, order: -2147483648, status: ContentStatus.ACTIVE },
+      // Keep this fixture before every existing stage without assuming a
+      // particular seed value or colliding with a prior interrupted run.
+      data: { title: `Integration Stage ${suffix}`, order: fixtureStageOrder, status: ContentStatus.ACTIVE },
     });
     stageId = stage.id;
     const materials = await prisma.$transaction([
@@ -107,6 +108,7 @@ describe('Backend business integration', () => {
 
   afterAll(async () => {
 		await prisma.evaluationJob.deleteMany({ where: { attempt: { userId } } });
+		await prisma.attemptAnswer.deleteMany({ where: { attempt: { userId } } });
 		await prisma.attempt.deleteMany({ where: { userId } });
 		await prisma.audioAsset.deleteMany({ where: { objectKey: { startsWith: `recordings/${userId}/` } } });
     await prisma.evaluation.deleteMany({ where: { submission: { userId } } });
@@ -155,11 +157,13 @@ describe('Backend business integration', () => {
     expect(stages.find(stage => stage.id === stageId)?.materials[1].isUnlocked).toBe(true);
   });
 
-  it('submits a quiz attempt and records task progress', async () => {
+	it('submits a quiz attempt and records task progress', async () => {
     const quiz = new QuizService(prisma);
     const task = await prisma.task.findUniqueOrThrow({ where: { id: selectTaskId }, include: { questions: { include: { options: true } } } });
     const result = await quiz.submitAttempt(userId, selectTaskId, { answers: [{ questionId: task.questions[0].id, optionId: task.questions[0].options.find(option => option.isCorrect)!.id }] });
     expect(result.score).toBe(100);
+    expect(await prisma.attempt.findFirst({ where: { id: result.attemptId, taskType: TaskType.QUIZ, userId }, include: { answers: true } })).toMatchObject({ correctCount: 1, questionCount: 1, answers: [{ questionId: task.questions[0].id }] });
+    expect(await prisma.quizAttempt.count({ where: { userId, taskId: selectTaskId } })).toBe(0);
     expect(await prisma.taskProgress.findUnique({ where: { userId_taskId: { userId, taskId: selectTaskId } } })).not.toBeNull();
   });
 
@@ -183,12 +187,17 @@ describe('Backend business integration', () => {
 		expect(await prisma.evaluationJob.findFirst({ where: { attemptId: submissionId, status: 'QUEUED' } })).not.toBeNull();
   });
 
-  it('calculates progress and statistics from completed activities and valid scores', async () => {
-    const progress = await new ProgressService(prisma).getProgress(userId);
-    const statistics = await new StatisticsService(prisma).getStudentStatistics(userId);
+	it('calculates progress and statistics from canonical evaluated attempts', async () => {
+		await prisma.attempt.update({
+			where: { id: submissionId },
+			data: { evaluationStatus: EvaluationStatus.EVALUATED, score: 93, feedbackCategory: 'SANGAT_BAIK', evaluatedAt: new Date() },
+		});
+		const progress = await new ProgressService(prisma).getProgress(userId);
+		const statistics = await new StatisticsService(prisma).getStudentStatistics(userId);
     expect(progress.tasks.completed).toBeGreaterThanOrEqual(1);
     expect(progress.materials.completed).toBeGreaterThanOrEqual(1);
-		expect(statistics.bestScore).toBeNull();
-		expect(statistics.averageScore).toBeNull();
-  });
+		expect(statistics.bestScore).toBe(93);
+		expect(statistics.averageScore).toBe(93);
+		expect(statistics.validEvaluationCount).toBe(1);
+	});
 });

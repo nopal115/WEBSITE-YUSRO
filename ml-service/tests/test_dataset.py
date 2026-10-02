@@ -1,8 +1,10 @@
 import json
 
+import numpy as np
 import pytest
 
-from scripts.prepare_dataset import load_records, split_records
+from scripts.prepare_dataset import load_records, split_records, write_splits
+from scripts.train_mlp import load_export, metrics
 
 
 def records_for_groups() -> list[dict]:
@@ -38,3 +40,30 @@ def test_manifest_rejects_invalid_score(tmp_path) -> None:
     manifest.write_text(json.dumps(record) + '\n', encoding='utf-8')
     with pytest.raises(ValueError, match='score must be between 0 and 100'):
         load_records(manifest)
+
+
+def test_split_metadata_records_reproducibility_inputs(tmp_path) -> None:
+    write_splits(split_records(records_for_groups(), seed=42), tmp_path, dataset_version='approved-2026-09-22', seed=42)
+    metadata = json.loads((tmp_path / 'split-metadata.json').read_text(encoding='utf-8'))
+    assert metadata['dataset_version'] == 'approved-2026-09-22'
+    assert metadata['split_seed'] == 42
+    assert len(metadata['manifest_sha256']) == 64
+
+
+def test_training_export_rejects_group_leakage(tmp_path) -> None:
+    path = tmp_path / 'features.npz'
+    np.savez(
+        path,
+        X=np.ones((3, 8), dtype=np.float32), y=np.array([60, 70, 80], dtype=np.float32),
+        split=np.array(['train', 'validation', 'test']), group_id=np.array(['speaker-1', 'speaker-1', 'speaker-2']),
+        feature_names=np.array(['embedding_cosine_similarity', 'text_similarity', 'duration_ratio', 'rms_similarity', 'zero_crossing_similarity', 'spectral_centroid_similarity', 'mel_mean_similarity', 'mel_std_similarity']),
+    )
+    with pytest.raises(ValueError, match='multiple splits'):
+        load_export(path)
+
+
+def test_metrics_include_teacher_correlation_mae_and_category_accuracy() -> None:
+    result = metrics(np.array([55.0, 70.0, 90.0]), np.array([50.0, 74.0, 95.0]))
+    assert result['mae'] == pytest.approx(4.6666667)
+    assert result['pearson_correlation'] > 0.9
+    assert result['category_accuracy'] == 1.0

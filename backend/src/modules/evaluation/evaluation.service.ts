@@ -1,9 +1,11 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { EvaluationStatus, JobStatus } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import { MlClientError, MlClientService } from '../ml-client/ml-client.service';
+import { feedbackCategoryFor } from './domain/evaluation.rules';
 
 const RETRY_DELAYS_MS = [10_000, 30_000, 60_000] as const;
 const JOB_LOCK_STALE_AFTER_MS = 15 * 60_000;
@@ -11,6 +13,8 @@ const ATTEMPT_TIMEOUT_MS = 10 * 60_000;
 
 @Injectable()
 export class EvaluationService {
+	private readonly logger = new Logger(EvaluationService.name);
+
 	constructor(private readonly mlClient: MlClientService, private readonly prisma: PrismaService, private readonly storage: StorageService) {}
 
 	async getReadiness(): Promise<{ status: 'ready'; evaluator: 'ml-service' }> {
@@ -23,7 +27,11 @@ export class EvaluationService {
 			const attempt = await tx.attempt.findUnique({ where: { id: attemptId }, select: { id: true, evaluationStatus: true } });
 			if (!attempt) throw new NotFoundException('Submission not found');
 			if (attempt.evaluationStatus !== EvaluationStatus.FAILED) throw new ConflictException('EVAL_RETRY_NOT_ALLOWED');
-			await tx.attempt.update({ where: { id: attemptId }, data: { evaluationStatus: EvaluationStatus.SUBMITTED, errorCode: null, failedAt: null } });
+			const reset = await tx.attempt.updateMany({
+				where: { id: attemptId, evaluationStatus: EvaluationStatus.FAILED },
+				data: { evaluationStatus: EvaluationStatus.SUBMITTED, errorCode: null, failedAt: null },
+			});
+			if (reset.count === 0) throw new ConflictException('EVAL_RETRY_NOT_ALLOWED');
 			const job = await tx.evaluationJob.create({ data: { attemptId, isRetry: true, requestedById: adminId } });
 			await tx.auditLog.create({ data: { actorId: adminId, action: 'EVALUATION_RETRY_REQUESTED', entityType: 'Attempt', entityId: attemptId } });
 			return { submissionId: attemptId, jobId: job.id, status: EvaluationStatus.SUBMITTED };
@@ -33,7 +41,7 @@ export class EvaluationService {
 	async getQueue() {
 		const [jobs, grouped] = await Promise.all([
 			this.prisma.evaluationJob.findMany({
-			where: { status: { in: [JobStatus.QUEUED, JobStatus.RUNNING] } },
+			where: { status: { in: [JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.FAILED] } },
 			orderBy: [{ runAfter: 'asc' }, { createdAt: 'asc' }],
 			include: { attempt: { select: { id: true, userId: true, taskId: true, evaluationStatus: true, createdAt: true } } },
 			}),
@@ -52,15 +60,24 @@ export class EvaluationService {
 			if (!rows[0]) return null;
 			const now = new Date();
 			const workerId = process.env.EVAL_WORKER_ID ?? `worker-${process.pid}`;
-			const claimed = await tx.evaluationJob.update({ where: { id: rows[0].id }, data: { status: JobStatus.RUNNING, startedAt: now, lockedAt: now, lockedBy: workerId, runCount: { increment: 1 } }, include: { attempt: { include: { recordingAudio: true, referenceAudio: true } } } });
+			const claim = await tx.evaluationJob.updateMany({
+				where: { id: rows[0].id, status: JobStatus.QUEUED, runAfter: { lte: now } },
+				data: { status: JobStatus.RUNNING, startedAt: now, lockedAt: now, lockedBy: workerId, runCount: { increment: 1 } },
+			});
+			if (claim.count === 0) return null;
+			const claimed = await tx.evaluationJob.findUniqueOrThrow({
+				where: { id: rows[0].id }, include: { attempt: { include: { recordingAudio: true, referenceAudio: true } } },
+			});
 			const transition = await tx.attempt.updateMany({ where: { id: claimed.attemptId, evaluationStatus: EvaluationStatus.SUBMITTED }, data: { evaluationStatus: EvaluationStatus.PROCESSING, processingStartedAt: new Date() } });
 			if (transition.count === 0) {
-				await tx.evaluationJob.update({ where: { id: claimed.id }, data: { status: JobStatus.FAILED, finishedAt: new Date(), lockedAt: null, lockedBy: null, lastErrorCode: 'EVAL_JOB_STALE', lastErrorDetail: 'Attempt is no longer awaiting evaluation' } });
+				await tx.evaluationJob.updateMany({ where: { id: claimed.id, status: JobStatus.RUNNING }, data: { status: JobStatus.FAILED, finishedAt: new Date(), lockedAt: null, lockedBy: null, lastErrorCode: 'EVAL_JOB_STALE', lastErrorDetail: 'Attempt is no longer awaiting evaluation' } });
 				return null;
 			}
 			return claimed;
 		});
 		if (!job) return;
+		const requestId = randomUUID();
+		this.logger.log(`Evaluation job=${job.id} attempt=${job.attemptId} worker=${job.lockedBy ?? 'unknown'} run=${job.runCount} request=${requestId} claimed`);
 		if (!job.attempt.recordingAudio || !job.attempt.referenceAudio) {
 			await this.failJob(job.id, job.attemptId, 'EVAL_AUDIO_SNAPSHOT_MISSING', 'Recording or reference audio snapshot is missing');
 			return;
@@ -72,6 +89,8 @@ export class EvaluationService {
 			]);
 			const result = await this.mlClient.evaluate({
 				submissionId: job.attemptId,
+				requestId,
+				allowLegacyReferenceResample: job.attempt.referenceAudio.allowLegacyResample,
 				reference: {
 					bytes: reference,
 					filename: job.attempt.referenceAudio.originalName,
@@ -84,10 +103,12 @@ export class EvaluationService {
 				},
 			});
 			this.assertValidMlResult(result);
-			await this.completeJob(job.id, job.attemptId, result);
+			await this.completeJob(job.id, job.attemptId, job.attempt.userId, job.attempt.taskId, result);
+			this.logger.log(`Evaluation job=${job.id} attempt=${job.attemptId} request=${requestId} completed model=${result.model_version} processingMs=${result.processing_ms}`);
 		} catch (error) {
 			const mlError = this.classifyError(error);
 			const retry = mlError.retryable && job.runCount < job.maxRuns;
+			this.logger.warn(`Evaluation job=${job.id} attempt=${job.attemptId} request=${requestId} code=${mlError.code} retry=${retry}`);
 			await this.handleFailure(job.id, job.attemptId, job.runCount, retry, mlError);
 		}
 	}
@@ -132,14 +153,25 @@ export class EvaluationService {
 		]);
 	}
 
-	private async completeJob(jobId: string, attemptId: string, result: { score: number; model_version: string; processing_ms: number }): Promise<void> {
+	private async completeJob(jobId: string, attemptId: string, userId: string, taskId: string, result: { score: number; model_version: string; processing_ms: number }): Promise<void> {
 		await this.prisma.$transaction(async (tx) => {
+			const evaluatedAt = new Date();
 			const completed = await tx.attempt.updateMany({
 				where: { id: attemptId, evaluationStatus: EvaluationStatus.PROCESSING },
-				data: { evaluationStatus: EvaluationStatus.EVALUATED, score: result.score, feedbackCategory: this.feedbackFor(result.score), modelVersion: result.model_version, evaluatedAt: new Date(), processingMs: result.processing_ms },
+				data: { evaluationStatus: EvaluationStatus.EVALUATED, score: result.score, feedbackCategory: feedbackCategoryFor(result.score), modelVersion: result.model_version, evaluatedAt, processingMs: result.processing_ms },
 			});
 			if (completed.count === 0) return;
-			await tx.evaluationJob.updateMany({ where: { id: jobId, status: JobStatus.RUNNING }, data: { status: JobStatus.DONE, finishedAt: new Date(), lockedAt: null, lockedBy: null } });
+			const progress = await tx.taskProgress.findUnique({ where: { userId_taskId: { userId, taskId } }, select: { bestScore: true } });
+			if (progress) {
+				await tx.taskProgress.update({
+					where: { userId_taskId: { userId, taskId } },
+					data: { bestScore: Math.max(Number(progress.bestScore ?? 0), result.score) },
+				});
+			} else {
+				await tx.taskProgress.create({ data: { userId, taskId, completedAt: evaluatedAt, firstAttemptAt: evaluatedAt, lastAttemptAt: evaluatedAt, attemptCount: 1, bestScore: result.score } });
+			}
+			const finished = await tx.evaluationJob.updateMany({ where: { id: jobId, status: JobStatus.RUNNING }, data: { status: JobStatus.DONE, finishedAt: evaluatedAt, lockedAt: null, lockedBy: null } });
+			if (finished.count === 0) throw new ConflictException('EVAL_JOB_STATE_CONFLICT');
 		});
 	}
 
@@ -148,12 +180,16 @@ export class EvaluationService {
 			const active = await tx.attempt.findFirst({ where: { id: attemptId, evaluationStatus: EvaluationStatus.PROCESSING }, select: { id: true } });
 			if (!active) return;
 			if (retry) {
-				await tx.attempt.update({ where: { id: attemptId }, data: { evaluationStatus: EvaluationStatus.SUBMITTED, processingStartedAt: null } });
-				await tx.evaluationJob.updateMany({ where: { id: jobId, status: JobStatus.RUNNING }, data: { status: JobStatus.QUEUED, runAfter: new Date(Date.now() + (RETRY_DELAYS_MS[Math.min(runCount - 1, RETRY_DELAYS_MS.length - 1)] ?? RETRY_DELAYS_MS[0])), lastErrorCode: error.code, lastErrorDetail: this.errorDetail(error), lockedAt: null, lockedBy: null } });
+				const reset = await tx.attempt.updateMany({ where: { id: attemptId, evaluationStatus: EvaluationStatus.PROCESSING }, data: { evaluationStatus: EvaluationStatus.SUBMITTED, processingStartedAt: null } });
+				if (reset.count === 0) return;
+				const requeued = await tx.evaluationJob.updateMany({ where: { id: jobId, status: JobStatus.RUNNING }, data: { status: JobStatus.QUEUED, runAfter: new Date(Date.now() + (RETRY_DELAYS_MS[Math.min(runCount - 1, RETRY_DELAYS_MS.length - 1)] ?? RETRY_DELAYS_MS[0])), lastErrorCode: error.code, lastErrorDetail: this.errorDetail(error), lockedAt: null, lockedBy: null } });
+				if (requeued.count === 0) throw new ConflictException('EVAL_JOB_STATE_CONFLICT');
 				return;
 			}
-			await tx.attempt.update({ where: { id: attemptId }, data: { evaluationStatus: EvaluationStatus.FAILED, score: null, failedAt: new Date(), errorCode: error.code } });
-			await tx.evaluationJob.updateMany({ where: { id: jobId, status: JobStatus.RUNNING }, data: { status: JobStatus.FAILED, finishedAt: new Date(), lastErrorCode: error.code, lastErrorDetail: this.errorDetail(error), lockedAt: null, lockedBy: null } });
+			const failed = await tx.attempt.updateMany({ where: { id: attemptId, evaluationStatus: EvaluationStatus.PROCESSING }, data: { evaluationStatus: EvaluationStatus.FAILED, score: null, failedAt: new Date(), errorCode: error.code } });
+			if (failed.count === 0) return;
+			const failedJob = await tx.evaluationJob.updateMany({ where: { id: jobId, status: JobStatus.RUNNING }, data: { status: JobStatus.FAILED, finishedAt: new Date(), lastErrorCode: error.code, lastErrorDetail: this.errorDetail(error), lockedAt: null, lockedBy: null } });
+			if (failedJob.count === 0) throw new ConflictException('EVAL_JOB_STATE_CONFLICT');
 		});
 	}
 
@@ -179,10 +215,4 @@ export class EvaluationService {
 		return error.message.slice(0, 1_000);
 	}
 
-	private feedbackFor(score: number) {
-		if (score >= 90) return 'SANGAT_BAIK' as const;
-		if (score >= 80) return 'BAIK' as const;
-		if (score >= 70) return 'CUKUP' as const;
-		return 'PERLU_LATIHAN' as const;
-	}
 }

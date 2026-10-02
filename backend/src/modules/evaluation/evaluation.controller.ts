@@ -1,10 +1,12 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { Request } from 'express';
 import { Roles } from '../../shared/decorators/roles.decorator';
+import { RolesGuard } from '../../shared/guards/roles.guard';
 import { EvaluationService } from './evaluation.service';
 
 @Controller()
+@UseGuards(RolesGuard)
 export class EvaluationController {
 	constructor(private readonly evaluationService: EvaluationService) {}
 

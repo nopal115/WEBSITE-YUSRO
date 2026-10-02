@@ -29,3 +29,5 @@ class ModelInfoResponse(BaseModel):
 	whisper_version: str
 	features: list[str]
 	model_loaded: bool
+	trained_at: str | None = None
+	metrics: dict[str, float] | None = None
