@@ -29,13 +29,15 @@ const dummyDashboardData = {
 
 export function DashboardPage(): JSX.Element {
   return (
-    <div className="mx-auto grid max-w-[1168px] grid-cols-[minmax(0,660px)_320px] gap-10 px-12 py-12">
-      <div className="space-y-8">
-        <header>
-          <h1 className="text-display">Assalamu&apos;alaikum, {dummyDashboardData.name}</h1>
-          <p className="mt-2 text-body-l text-text-secondary">{dummyDashboardData.idSantri} · {dummyDashboardData.activeStage}</p>
-        </header>
-
+    // SDD 7.5: isi utama maksimal 1040 px dan rail 300 px di desktop; di mobile satu kolom
+    // dan rail menjadi kartu di bawah isi. Sapaan melintang dua kolom sehingga rail sejajar
+    // dengan kartu pertama tanpa offset.
+    <div className="mx-auto grid max-w-[1380px] gap-6 lg:grid-cols-[minmax(0,1040px)_300px] lg:gap-x-10 lg:gap-y-8">
+      <header className="lg:col-span-2">
+        <h1 className="text-display">Assalamu&apos;alaikum, {dummyDashboardData.name}</h1>
+        <p className="mt-2 text-body-l text-text-secondary">{dummyDashboardData.idSantri} · {dummyDashboardData.activeStage}</p>
+      </header>
+      <div className="min-w-0 space-y-6 lg:space-y-8">
         <section className="rounded-lg bg-brand-primary p-8 text-text-on-brand shadow-[0_6px_0_theme(colors.brand.primary-hover)]">
           <p className="text-label text-brand-accent">LANJUTKAN</p>
           <div className="mt-6 flex items-center gap-5">
@@ -79,8 +81,7 @@ export function DashboardPage(): JSX.Element {
         </Card>
       </div>
 
-      {/* pt-[76px]: Pengecualian skala jarak SDD 7.2.2: offset kompensasi tinggi elemen fixed/perataan, bukan jarak antarelemen. */}
-      <div className="space-y-6 pt-[76px]">
+      <div className="space-y-6">
         <Card>
           <p className="text-label text-text-muted">PROGRESS</p>
           <p className="mt-2 text-score text-brand-primary">{dummyDashboardData.progress.value}%</p>
