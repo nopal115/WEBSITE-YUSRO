@@ -13,15 +13,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 // Varian dari Figma. Bayangan padat "0 4px 0 <token hover varian>" juga pola Figma,
 // karena SDD tidak mengatur bayangan tombol.
-// [REKOMENDASI] Hover (SDD 7.6) memakai token -hover varian; outline, ghost, dan off
-// belum punya warna hover (menunggu keputusan).
+// [REKOMENDASI] Hover (SDD 7.6; warnanya tidak diatur SDD maupun Figma): varian berwarna
+// memakai token -hover; outline -> neutral/surface-alt, ghost -> neutral/border, off tanpa hover.
 const variantClasses: Record<ButtonVariant, string> = {
   primary: 'bg-brand-primary text-text-on-brand shadow-[0_4px_0_theme(colors.brand.primary-hover)] enabled:hover:bg-brand-primary-hover',
   accent: 'bg-brand-accent text-text-primary shadow-[0_4px_0_theme(colors.brand.accent-hover)] enabled:hover:bg-brand-accent-hover',
   benar: 'bg-feedback-benar text-text-on-brand shadow-[0_4px_0_theme(colors.feedback.benar-hover)] enabled:hover:bg-feedback-benar-hover',
   salah: 'bg-feedback-salah text-text-on-brand shadow-[0_4px_0_theme(colors.feedback.salah-hover)] enabled:hover:bg-feedback-salah-hover',
-  outline: 'border-2 border-neutral-border-strong bg-neutral-surface text-text-primary shadow-[0_4px_0_theme(colors.neutral.border-strong)]',
-  ghost: 'bg-neutral-surface-alt text-text-secondary shadow-[0_4px_0_theme(colors.neutral.border)]',
+  outline: 'border-2 border-neutral-border-strong bg-neutral-surface text-text-primary shadow-[0_4px_0_theme(colors.neutral.border-strong)] enabled:hover:bg-neutral-surface-alt',
+  ghost: 'bg-neutral-surface-alt text-text-secondary shadow-[0_4px_0_theme(colors.neutral.border)] enabled:hover:bg-neutral-border',
   off: 'bg-neutral-surface-alt text-text-muted',
 };
 
