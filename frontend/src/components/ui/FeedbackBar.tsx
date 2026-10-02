@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Button, type ButtonVariant } from './Button';
 
 export type FeedbackState = 'benar' | 'salah' | 'diproses';
@@ -5,7 +6,8 @@ export type FeedbackState = 'benar' | 'salah' | 'diproses';
 interface FeedbackBarProps {
   state: FeedbackState;
   title: string;
-  detail: string;
+  /** ReactNode agar teks Arab di dalamnya bisa diberi lang="ar" dir="rtl" (SDD 7.4.1). */
+  detail: ReactNode;
   actionLabel: string;
   onAction?: () => void;
 }

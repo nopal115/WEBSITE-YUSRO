@@ -43,7 +43,7 @@ export function DengarPilihPage(): JSX.Element {
 
       <main className="mx-auto flex max-w-[760px] flex-col px-5 pb-12 pt-32">
         <p className="text-label uppercase text-brand-primary">Dengar-Pilih · Tahapan 2 Materi 3</p>
-        <h1 className="mt-3 text-h2 font-bold text-text-primary">Huruf apakah yang dibaca?</h1>
+        <h1 className="mt-3 text-h2 text-text-primary">Huruf apakah yang dibaca?</h1>
 
         <section className="mt-8 rounded-card border border-neutral-border bg-neutral-surface p-5 shadow-sm" aria-label="Pemutar audio contoh">
           <div className="flex items-center gap-4">
@@ -75,7 +75,7 @@ export function DengarPilihPage(): JSX.Element {
         {!isAnswered && <Button className="mx-auto mt-5 min-w-40" variant="accent" disabled={!selectedOption} onClick={checkAnswer}>PERIKSA</Button>}
       </main>
 
-      {isAnswered && <FeedbackBar state="benar" title="Tepat sekali!" detail="Zha — ظَ" actionLabel="LANJUT" />}
+      {isAnswered && <FeedbackBar state="benar" title="Tepat sekali!" detail={<>Zha — <span lang="ar" dir="rtl">ظَ</span></>} actionLabel="LANJUT" />}
     </div>
   );
 }

@@ -51,22 +51,28 @@ export default {
 				},
 			},
 			borderRadius: { card: '14px' },
-			fontFamily: { sans: ['Inter', 'sans-serif'], arabic: ['Amiri Quran', 'serif'] },
+			fontFamily: {
+				sans: ['Inter', 'sans-serif'],
+				// [TBD] LPMQ Isep Misbah adalah huruf utama menurut SDD 7.4.1, menunggu berkas font + izin.
+				arabic: ['"Amiri Quran"', '"Scheherazade New"', 'Amiri', '"Noto Sans Arabic"', 'serif'],
+			},
+			// SDD 7.4 / 7.4.1. Caption, Button, Score, Arabic S: nilai Figma (SDD tidak mengatur).
+			// Letter-spacing selain Label: rasio Figma dalam em (SDD tidak mengatur).
 			fontSize: {
-				label: ['13px', { lineHeight: '18px', letterSpacing: '0.52px', fontWeight: '700' }],
-				'body-s': ['13px', { lineHeight: '20px', fontWeight: '400' }],
-				caption: ['12px', { lineHeight: '16px', fontWeight: '400' }],
-				display: ['34px', { lineHeight: '44px', letterSpacing: '-0.544px', fontWeight: '700' }],
-				h1: ['28px', { lineHeight: '36px', letterSpacing: '-0.336px', fontWeight: '700' }],
-				h2: ['22px', { lineHeight: '30px', letterSpacing: '-0.176px', fontWeight: '700' }],
-				h3: ['18px', { lineHeight: '26px', letterSpacing: '-0.072px', fontWeight: '600' }],
-				body: ['15px', { lineHeight: '24px', fontWeight: '400' }],
-				'body-l': ['17px', { lineHeight: '28px', fontWeight: '400' }],
-				button: ['16px', { lineHeight: '20px', letterSpacing: '0.8px', fontWeight: '700' }],
-				score: ['56px', { lineHeight: '64px', letterSpacing: '-1.12px', fontWeight: '700' }],
-				'arabic-xl': ['var(--font-arabic-xl, 40px)', { lineHeight: '1.4' }], // TODO(verifikasi Figma Dev Mode)
-				'arabic-l': ['var(--font-arabic-l, 32px)', { lineHeight: '1.4' }], // TODO(verifikasi Figma Dev Mode)
-				'arabic-m': ['32px', { lineHeight: '64px', fontWeight: '400' }],
+				display: ['40px', { lineHeight: '48px', letterSpacing: '-0.016em', fontWeight: '700' }],
+				h1: ['32px', { lineHeight: '40px', letterSpacing: '-0.012em', fontWeight: '700' }],
+				h2: ['24px', { lineHeight: '32px', letterSpacing: '-0.008em', fontWeight: '600' }],
+				h3: ['18px', { lineHeight: '26px', letterSpacing: '-0.004em', fontWeight: '600' }],
+				'body-l': ['17px', { lineHeight: '28px', letterSpacing: '0', fontWeight: '400' }],
+				body: ['15px', { lineHeight: '24px', letterSpacing: '0', fontWeight: '400' }],
+				'body-s': ['13px', { lineHeight: '20px', letterSpacing: '0', fontWeight: '400' }],
+				label: ['11px', { lineHeight: '16px', letterSpacing: '0.12em', fontWeight: '500' }],
+				caption: ['12px', { lineHeight: '16px', letterSpacing: '0', fontWeight: '400' }],
+				button: ['16px', { lineHeight: '20px', letterSpacing: '0.05em', fontWeight: '700' }],
+				score: ['56px', { lineHeight: '64px', letterSpacing: '-0.02em', fontWeight: '700' }],
+				'arabic-xl': ['76px', { lineHeight: '132px', fontWeight: '400' }],
+				'arabic-l': ['52px', { lineHeight: '98px', fontWeight: '400' }],
+				'arabic-m': ['34px', { lineHeight: '70px', fontWeight: '400' }],
 				'arabic-s': ['24px', { lineHeight: '50px', fontWeight: '400' }],
 			},
 		},

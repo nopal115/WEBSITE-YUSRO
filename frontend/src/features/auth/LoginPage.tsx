@@ -15,6 +15,8 @@ function BrandLogo(): JSX.Element {
     <div
       className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-card bg-brand-accent font-arabic text-arabic-s text-brand-primary"
       aria-hidden="true"
+      lang="ar"
+      dir="rtl"
     >
       ي
     </div>
