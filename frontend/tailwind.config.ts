@@ -32,7 +32,7 @@ export default {
 				semantic: {
 					info: '#1B87BD',
 					'info-soft': '#E1F1F8',
-					warning: '#B5820A',
+					warning: '#906708',
 					'warning-soft': '#FBF1D9',
 				},
 				neutral: {
