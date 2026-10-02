@@ -50,6 +50,10 @@ export function userMessageForStatus(status: number): string {
       return 'Data yang dicari tidak ditemukan.';
     case 409:
       return 'Data bertentangan dengan data yang sudah ada.';
+    case 413:
+      return 'Ukuran berkas melebihi batas.';
+    case 415:
+      return 'Format audio tidak didukung.';
     case 422:
       return 'Data tidak dapat diproses. Periksa kembali isian Anda.';
     case 429:
@@ -62,7 +66,11 @@ export function userMessageForStatus(status: number): string {
 }
 
 export function createApiError(status: number, body: unknown): ApiError {
-  return new ApiError({ status, ...parseErrorBody(body) });
+  const { userMessage, ...parsed } = parseErrorBody(body);
+  // Cadangan: 415 diperlakukan sama dengan 422 AUDIO_FORMAT_UNSUPPORTED (SDD 3.6.8, 5.10).
+  const code = parsed.code ?? (status === 415 ? 'AUDIO_FORMAT_UNSUPPORTED' : undefined);
+  // Pesan format SDD 5.5 sudah siap tampil; selain itu dipetakan dari status.
+  return new ApiError({ status, ...parsed, code, message: userMessage });
 }
 
 export function createNetworkError(cause?: unknown): ApiError {

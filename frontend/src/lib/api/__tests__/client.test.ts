@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tokenStore } from '../../auth/tokenStore';
 import { ApiError } from '../ApiError';
-import { apiRequest, setUnauthorizedHandler } from '../client';
+import { apiRequest, apiRequestBlob, apiRequestWithMeta, setUnauthorizedHandler } from '../client';
 
 const BASE_URL = 'http://localhost:3000/api/v1';
 
@@ -145,5 +145,38 @@ describe('apiRequest', () => {
 
     await expect(apiRequest('auth/me')).rejects.toThrow('VITE_API_BASE_URL belum diisi');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+it('mengirim FormData tanpa Content-Type manual dan meneruskan header tambahan', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(202, { success: true, data: { submissionId: 's1' } }));
+    const form = new FormData();
+    form.append('audio_file', new Blob(['x'], { type: 'audio/webm' }));
+
+    await apiRequest('imitation/tasks/t1/submissions', { method: 'POST', body: form, headers: { 'Idempotency-Key': 'k1' } });
+
+    const init = fetchMock.mock.lastCall?.[1];
+    expect(init?.body).toBe(form);
+    expect(lastRequestHeaders()['Content-Type']).toBeUndefined();
+    expect(lastRequestHeaders()['Idempotency-Key']).toBe('k1');
+  });
+
+  it('apiRequestWithMeta mengembalikan data dan meta', async () => {
+    const meta = { page: 2, limit: 10, total: 11, totalPages: 2 };
+    fetchMock.mockResolvedValue(jsonResponse(200, { success: true, data: [{ id: 'a' }], meta }));
+
+    await expect(apiRequestWithMeta('progress/history?page=2')).resolves.toEqual({ data: [{ id: 'a' }], meta });
+  });
+
+  it('apiRequestBlob mengembalikan berkas dan nama dari Content-Disposition', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(new Blob(['%PDF'], { type: 'application/pdf' }), {
+        status: 200,
+        headers: { 'Content-Disposition': 'attachment; filename="Laporan-YSR-000001-2026-10-02.pdf"' },
+      }),
+    );
+
+    const result = await apiRequestBlob('report/pdf');
+
+    expect(result.filename).toBe('Laporan-YSR-000001-2026-10-02.pdf');
+    expect(await result.blob.text()).toBe('%PDF');
   });
 });

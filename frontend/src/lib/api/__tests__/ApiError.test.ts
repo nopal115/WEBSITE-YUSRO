@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError, createApiError, createNetworkError, userMessageForStatus } from '../ApiError';
-import { parseSuccess } from '../responseFormat';
+import { parseSuccess, parseSuccessWithMeta } from '../responseFormat';
 
 describe('createApiError', () => {
   it('membaca format error NestJS dengan message string', () => {
@@ -24,19 +24,26 @@ describe('createApiError', () => {
     expect(error.details).toEqual(['email must be an email', 'password should not be empty']);
   });
 
-  it('membaca format error SDD 5.5 (success/errorCode)', () => {
+  it('membaca format error SDD 5.5 dan memakai message server sebagai pesan pengguna', () => {
+    const errors = [{ field: 'audio_file', message: 'Format tidak didukung.' }];
     const error = createApiError(409, {
       success: false,
+      message: 'Masih ada rekaman yang sedang dievaluasi untuk tugas ini.',
       errorCode: 'IMITATION_ACTIVE_EXISTS',
-      message: 'Evaluation already active',
-      details: { taskId: 'abc' },
+      errors,
     });
 
     expect(error.status).toBe(409);
     expect(error.code).toBe('IMITATION_ACTIVE_EXISTS');
-    expect(error.serverMessage).toBe('Evaluation already active');
-    expect(error.details).toEqual({ taskId: 'abc' });
-    expect(error.message).toBe(userMessageForStatus(409));
+    expect(error.message).toBe('Masih ada rekaman yang sedang dievaluasi untuk tugas ini.');
+    expect(error.details).toEqual(errors);
+  });
+
+  it('memperlakukan 415 tanpa errorCode sebagai AUDIO_FORMAT_UNSUPPORTED', () => {
+    const error = createApiError(415, undefined);
+
+    expect(error.code).toBe('AUDIO_FORMAT_UNSUPPORTED');
+    expect(error.message).toBe(userMessageForStatus(415));
   });
 
   it('tetap menghasilkan ApiError bila body bukan JSON atau kosong', () => {
@@ -70,5 +77,11 @@ describe('parseSuccess', () => {
 
   it('membuka amplop SDD 5.5 { success, data }', () => {
     expect(parseSuccess({ success: true, data: { id: '1' } })).toEqual({ id: '1' });
+  });
+
+  it('mengembalikan meta pagination SDD 5.5', () => {
+    const meta = { page: 1, limit: 20, total: 137, totalPages: 7 };
+    expect(parseSuccessWithMeta({ success: true, data: [], meta })).toEqual({ data: [], meta });
+    expect(parseSuccessWithMeta({ success: true, data: [], meta: null }).meta).toBeNull();
   });
 });

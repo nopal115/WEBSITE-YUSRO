@@ -25,9 +25,13 @@ export const authApi = {
 export function getLoginErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     // Pesan kredensial dibuat seragam agar tidak membocorkan email mana yang terdaftar.
-    // 400 ikut dipetakan karena LoginDto backend menolak password < 8 karakter dengan 400.
-    if (error.status === 401 || error.status === 400) return 'Email atau password salah.';
-    if (error.status === 403) return 'Akun dinonaktifkan, hubungi pengajar.';
+    // Status 400/401/403 tetap dipetakan untuk backend yang belum mengirim errorCode.
+    if (error.code === 'AUTH_INVALID_CREDENTIALS' || (!error.code && (error.status === 401 || error.status === 400))) {
+      return 'Email atau password salah.';
+    }
+    if (error.code === 'AUTH_ACCOUNT_INACTIVE' || (!error.code && error.status === 403)) {
+      return 'Akun Anda dinonaktifkan. Hubungi pengajar.';
+    }
     return error.message;
   }
   return 'Terjadi kesalahan. Coba lagi.';
