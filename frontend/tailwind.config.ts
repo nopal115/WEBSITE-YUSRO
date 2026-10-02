@@ -26,7 +26,7 @@ export default {
 				},
 				// SDD 7.3: status evaluasi. Belum ada varian soft di SDD.
 				state: {
-					processing: '#B5820A',
+					processing: '#906708',
 					failed: '#8A5A2B',
 				},
 				semantic: {
@@ -46,7 +46,7 @@ export default {
 				text: {
 					primary: '#16211D',
 					secondary: '#4A5A54',
-					muted: '#6E7A73',
+					muted: '#6A766F',
 					'on-brand': '#FFFFFF',
 				},
 			},
