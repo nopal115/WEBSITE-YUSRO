@@ -29,6 +29,7 @@ export function DengarPilihPage(): JSX.Element {
     }
   };
 
+  // pb-32: Pengecualian skala jarak SDD 7.2.2: offset kompensasi tinggi elemen fixed/perataan, bukan jarak antarelemen.
   return (
     <div className="min-h-screen bg-neutral-bg pb-32 font-sans text-text-primary">
       <header className="fixed inset-x-0 top-0 z-10 border-b border-neutral-border bg-neutral-surface px-5 py-4">
@@ -41,6 +42,7 @@ export function DengarPilihPage(): JSX.Element {
         </div>
       </header>
 
+      {/* pt-32: Pengecualian skala jarak SDD 7.2.2: offset kompensasi tinggi elemen fixed/perataan, bukan jarak antarelemen. */}
       <main className="mx-auto flex max-w-[760px] flex-col px-5 pb-12 pt-32">
         <p className="text-label uppercase text-brand-primary">Dengar-Pilih · Tahapan 2 Materi 3</p>
         <h1 className="mt-3 text-h2 text-text-primary">Huruf apakah yang dibaca?</h1>

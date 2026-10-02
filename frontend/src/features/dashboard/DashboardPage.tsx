@@ -79,6 +79,7 @@ export function DashboardPage(): JSX.Element {
         </Card>
       </div>
 
+      {/* pt-[76px]: Pengecualian skala jarak SDD 7.2.2: offset kompensasi tinggi elemen fixed/perataan, bukan jarak antarelemen. */}
       <div className="space-y-6 pt-[76px]">
         <Card>
           <p className="text-label text-text-muted">PROGRESS</p>
