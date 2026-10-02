@@ -62,7 +62,6 @@ function filenameFromDisposition(header: string | null): string | null {
 /** Mengirim request dan mengembalikan Response yang sukses; galat diubah menjadi ApiError. */
 async function send(path: string, options: RequestOptions): Promise<Response> {
   const { method = 'GET', body, auth = true, signal } = options;
-  const url = `${getBaseUrl()}/${path.replace(/^\/+/, '')}`;
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
 
   const headers: Record<string, string> = { Accept: 'application/json', ...options.headers };
@@ -70,15 +69,22 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
   const token = auth ? tokenStore.get() : null;
   if (token) headers.Authorization = `Bearer ${token}`;
 
+  // FormData: browser mengisi Content-Type multipart beserta boundary-nya sendiri.
+  const requestBody = body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body);
+
+  // Mode mock (pengembangan saja). VITE_USE_MOCK diganti menjadi literal saat build
+  // (vite.config.ts), sehingga cabang mock dan import() modulnya terbuang bila flag mati.
+  // Perbandingan harus ditulis langsung di kondisi agar Rollup bisa membuangnya.
+  const url = import.meta.env.VITE_USE_MOCK === 'true' ? '' : `${getBaseUrl()}/${path.replace(/^\/+/, '')}`;
+
   let response: Response;
   try {
-    response = await fetch(url, {
-      method,
-      headers,
-      // FormData: browser mengisi Content-Type multipart beserta boundary-nya sendiri.
-      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
-      signal,
-    });
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const { mockFetch } = await import('./mock');
+      response = await mockFetch(method, path, { headers, body: requestBody });
+    } else {
+      response = await fetch(url, { method, headers, body: requestBody, signal });
+    }
   } catch (error) {
     // Pembatalan (mis. oleh TanStack Query) diteruskan apa adanya.
     if (isAbortError(error)) throw error;
