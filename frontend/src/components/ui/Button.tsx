@@ -20,7 +20,7 @@ const variantClasses: Record<ButtonVariant, string> = {
 export function Button({ children, variant = 'primary', className = '', ...props }: ButtonProps): JSX.Element {
   return (
     <button
-      className={`min-h-[56px] rounded-card px-6 py-3 text-button font-bold transition active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 ${variantClasses[variant]} ${variant === 'ghost' ? '' : 'shadow-md'} ${className}`}
+      className={`min-h-[56px] rounded-md px-6 py-3 text-button font-bold transition active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 ${variantClasses[variant]} ${variant === 'ghost' ? '' : 'shadow-md'} ${className}`}
       {...props}
     >
       {children}

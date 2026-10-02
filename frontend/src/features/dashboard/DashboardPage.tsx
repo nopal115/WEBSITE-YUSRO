@@ -36,10 +36,10 @@ export function DashboardPage(): JSX.Element {
           <p className="mt-2 text-body-l text-text-secondary">{dummyDashboardData.idSantri} · {dummyDashboardData.activeStage}</p>
         </header>
 
-        <section className="rounded-[28px] bg-brand-primary p-8 text-white shadow-[0_6px_0_#0b3b47]">
+        <section className="rounded-lg bg-brand-primary p-8 text-white shadow-[0_6px_0_theme(colors.brand.primary-hover)]">
           <p className="text-label text-brand-accent">LANJUTKAN</p>
           <div className="mt-6 flex items-center gap-5">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[20px] bg-white text-arabic-m text-brand-primary" lang="ar" dir="rtl">{dummyDashboardData.continue.arabic}</div>
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg bg-white text-arabic-m text-brand-primary" lang="ar" dir="rtl">{dummyDashboardData.continue.arabic}</div>
             <div>
               <h2 className="text-h2">{dummyDashboardData.continue.title}</h2>
               <p className="mt-1 text-body text-white/75">{dummyDashboardData.continue.description}</p>
@@ -52,7 +52,7 @@ export function DashboardPage(): JSX.Element {
           <p className="text-label text-text-muted">BELUM SELESAI</p>
           <div className="mt-5 space-y-3">
             {dummyDashboardData.unfinished.map((item) => (
-              <div key={item.title} className="flex items-center justify-between gap-4 rounded-[14px] bg-neutral-surface-alt p-5">
+              <div key={item.title} className="flex items-center justify-between gap-4 rounded-md bg-neutral-surface-alt p-5">
                 <div>
                   <h3 className="text-h3">{item.title}</h3>
                   <p className="mt-1 text-body-s text-text-secondary">{item.subtitle}</p>

@@ -13,7 +13,7 @@ import { loginSchema, type LoginFormValues } from './loginSchema';
 function BrandLogo(): JSX.Element {
   return (
     <div
-      className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-card bg-brand-accent font-arabic text-arabic-s text-brand-primary"
+      className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-md bg-brand-accent font-arabic text-arabic-s text-brand-primary"
       aria-hidden="true"
       lang="ar"
       dir="rtl"
@@ -89,7 +89,7 @@ export function LoginPage(): JSX.Element {
 
             {/* [REKOMENDASI] Tidak ada di Figma: kotak error dari server (SDD 7.7.2). */}
             {serverError && (
-              <div className="rounded-card bg-feedback-salah-soft px-5 py-3 text-body-s text-feedback-salah" role="alert">
+              <div className="rounded-md bg-feedback-salah-soft px-5 py-3 text-body-s text-feedback-salah" role="alert">
                 {serverError}
               </div>
             )}

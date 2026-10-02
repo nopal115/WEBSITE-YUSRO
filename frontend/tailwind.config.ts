@@ -50,7 +50,12 @@ export default {
 					'on-brand': '#FFFFFF',
 				},
 			},
-			borderRadius: { card: '14px' },
+			// SDD 7.2.3. rounded-full bawaan Tailwind dipakai untuk avatar/indikator bulat.
+			borderRadius: { sm: '8px', md: '14px', lg: '20px' },
+			boxShadow: {
+				card: '0 1px 3px rgba(0,0,0,.08)',
+				raised: '0 4px 12px rgba(0,0,0,.10)',
+			},
 			fontFamily: {
 				sans: ['Inter', 'sans-serif'],
 				// [TBD] LPMQ Isep Misbah adalah huruf utama menurut SDD 7.4.1, menunggu berkas font + izin.

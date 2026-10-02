@@ -20,7 +20,7 @@ export function LetterCard({ letter, label, selected, state = 'default', onClick
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`flex min-h-[150px] flex-col items-center justify-center rounded-card border-2 p-5 shadow-sm transition ${stateClasses[state]} ${selected && state === 'default' ? 'border-brand-primary bg-brand-primary-soft' : ''}`}
+      className={`flex min-h-[150px] flex-col items-center justify-center rounded-md border-2 p-5 shadow-card transition ${stateClasses[state]} ${selected && state === 'default' ? 'border-brand-primary bg-brand-primary-soft' : ''}`}
     >
       {/* SDD 7.4.1: Arab M untuk pilihan jawaban. */}
       <span className="text-arabic-m font-bold text-text-primary" lang="ar" dir="rtl">{letter}</span>

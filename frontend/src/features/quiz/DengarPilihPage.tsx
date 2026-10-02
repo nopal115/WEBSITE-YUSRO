@@ -45,7 +45,7 @@ export function DengarPilihPage(): JSX.Element {
         <p className="text-label uppercase text-brand-primary">Dengar-Pilih · Tahapan 2 Materi 3</p>
         <h1 className="mt-3 text-h2 text-text-primary">Huruf apakah yang dibaca?</h1>
 
-        <section className="mt-8 rounded-card border border-neutral-border bg-neutral-surface p-5 shadow-sm" aria-label="Pemutar audio contoh">
+        <section className="mt-8 rounded-md border border-neutral-border bg-neutral-surface p-5 shadow-card" aria-label="Pemutar audio contoh">
           <div className="flex items-center gap-4">
             <button type="button" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-primary text-text-on-brand shadow-md active:translate-y-0.5 active:shadow-none" aria-label="Putar audio">
               <Play size={23} fill="currentColor" />
