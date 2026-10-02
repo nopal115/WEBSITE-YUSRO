@@ -45,7 +45,7 @@ export function DashboardPage(): JSX.Element {
               <p className="mt-1 text-body text-white/75">{dummyDashboardData.continue.description}</p>
             </div>
           </div>
-          <Button className="mt-8 w-full shadow-[0_4px_0_#d99b02]" variant="accent">MULAI LATIHAN</Button>
+          <Button className="mt-8 w-full" variant="accent">MULAI LATIHAN</Button>
         </section>
 
         <Card>

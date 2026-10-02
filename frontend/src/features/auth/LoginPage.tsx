@@ -94,14 +94,8 @@ export function LoginPage(): JSX.Element {
               </div>
             )}
 
-            <Button
-              type="submit"
-              // `!` diperlukan: tanpa itu shadow-md bawaan Button menang urutan CSS.
-              className="w-full !shadow-[0_4px_0_theme(colors.brand.primary-hover)] active:!shadow-none"
-              disabled={login.isPending}
-              aria-busy={login.isPending}
-            >
-              {login.isPending ? 'MEMPROSES…' : 'MASUK'}
+            <Button type="submit" className="w-full" isLoading={login.isPending} loadingText="MEMPROSES…">
+              MASUK
             </Button>
 
             <div className="flex items-center justify-center gap-2 pt-2">

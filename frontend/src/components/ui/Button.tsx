@@ -5,25 +5,52 @@ export type ButtonVariant = 'primary' | 'accent' | 'benar' | 'salah' | 'outline'
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
   variant?: ButtonVariant;
+  /** [REKOMENDASI] State memuat (SDD 7.6): tombol disabled dan aria-busy="true". */
+  isLoading?: boolean;
+  /** Teks pengganti selama memuat; tanpa ini teks tombol tidak berubah. */
+  loadingText?: ReactNode;
 }
 
+// Varian dari Figma. Bayangan padat "0 4px 0 <token hover varian>" juga pola Figma,
+// karena SDD tidak mengatur bayangan tombol.
+// [REKOMENDASI] Hover (SDD 7.6) memakai token -hover varian; outline, ghost, dan off
+// belum punya warna hover (menunggu keputusan).
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-primary text-text-on-brand hover:bg-brand-primary-hover',
-  accent: 'bg-brand-accent text-text-primary hover:bg-brand-accent-hover',
-  benar: 'bg-feedback-benar text-text-on-brand hover:bg-feedback-benar-hover',
-  salah: 'bg-feedback-salah text-text-on-brand hover:bg-feedback-salah-hover',
-  outline: 'border-2 border-brand-primary text-brand-primary hover:bg-brand-primary-soft',
-  ghost: 'bg-transparent text-brand-primary hover:bg-brand-primary-soft',
-  off: 'bg-neutral-locked text-text-secondary',
+  primary: 'bg-brand-primary text-text-on-brand shadow-[0_4px_0_theme(colors.brand.primary-hover)] enabled:hover:bg-brand-primary-hover',
+  accent: 'bg-brand-accent text-text-primary shadow-[0_4px_0_theme(colors.brand.accent-hover)] enabled:hover:bg-brand-accent-hover',
+  benar: 'bg-feedback-benar text-text-on-brand shadow-[0_4px_0_theme(colors.feedback.benar-hover)] enabled:hover:bg-feedback-benar-hover',
+  salah: 'bg-feedback-salah text-text-on-brand shadow-[0_4px_0_theme(colors.feedback.salah-hover)] enabled:hover:bg-feedback-salah-hover',
+  outline: 'border-2 border-neutral-border-strong bg-neutral-surface text-text-primary shadow-[0_4px_0_theme(colors.neutral.border-strong)]',
+  ghost: 'bg-neutral-surface-alt text-text-secondary shadow-[0_4px_0_theme(colors.neutral.border)]',
+  off: 'bg-neutral-surface-alt text-text-muted',
 };
 
-export function Button({ children, variant = 'primary', className = '', ...props }: ButtonProps): JSX.Element {
+// [REKOMENDASI] State SDD 7.6 (tidak ada di Figma):
+// ditekan = turun 4px tanpa bayangan; fokus = outline 2px brand/primary offset 2px
+// (outline, bukan ring, agar tidak bertumpuk dengan bayangan); disabled = tampilan off.
+const stateClasses = [
+  'enabled:active:translate-y-1 enabled:active:shadow-none',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary',
+  'disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-surface-alt disabled:text-text-muted disabled:shadow-none',
+].join(' ');
+
+export function Button({
+  children,
+  variant = 'primary',
+  isLoading = false,
+  loadingText,
+  disabled,
+  className = '',
+  ...props
+}: ButtonProps): JSX.Element {
   return (
     <button
-      className={`min-h-[56px] rounded-md px-6 py-3 text-button font-bold transition active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 ${variantClasses[variant]} ${variant === 'ghost' ? '' : 'shadow-md'} ${className}`}
       {...props}
+      disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
+      className={`inline-flex h-14 items-center justify-center rounded-md px-8 text-button transition ${variantClasses[variant]} ${stateClasses} ${className}`}
     >
-      {children}
+      {isLoading && loadingText ? loadingText : children}
     </button>
   );
 }
