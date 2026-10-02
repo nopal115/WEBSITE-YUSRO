@@ -58,6 +58,11 @@ export const router = createBrowserRouter([
             element: <PlaceholderPage>Pembelajaran</PlaceholderPage>,
           },
           {
+            // [TBD] NFR-USE-02 mewajibkan menu Tugas; isi halaman belum didefinisikan SRS/SDD/Figma, menunggu konfirmasi pembimbing.
+            path: '/tugas',
+            element: <PlaceholderPage>Tugas</PlaceholderPage>,
+          },
+          {
             path: '/progress',
             element: <PlaceholderPage>Progress</PlaceholderPage>,
           },
@@ -70,11 +75,12 @@ export const router = createBrowserRouter([
             path: '/profil',
             element: <PlaceholderPage>Profil</PlaceholderPage>,
           },
-          {
-            path: '/quiz/demo',
-            element: <DengarPilihPage />,
-          },
         ],
+      },
+      {
+        // Layar latihan tampil penuh, tanpa sidebar dan bilah bawah (Figma 07–17).
+        path: '/quiz/demo',
+        element: <DengarPilihPage />,
       },
     ],
   },

@@ -1,5 +1,6 @@
 import { Play, X } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { FeedbackBar } from '../../components/ui/FeedbackBar';
 import { LetterCard } from '../../components/ui/LetterCard';
@@ -22,6 +23,15 @@ const waveform = [18, 30, 12, 24, 38, 22, 14, 32, 44, 25, 16, 36, 28, 20, 40, 26
 export function DengarPilihPage(): JSX.Element {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
+  const navigate = useNavigate();
+
+  // [REKOMENDASI] Tombol X: kembali ke halaman sebelumnya, atau ke /pembelajaran bila tidak ada riwayat.
+  // TODO: tampilkan dialog konfirmasi (jawaban belum dikirim akan hilang) saat quiz tersambung API.
+  const exitQuiz = (): void => {
+    const historyIndex = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (historyIndex > 0) navigate(-1);
+    else navigate('/pembelajaran');
+  };
 
   const checkAnswer = (): void => {
     if (selectedOption === 'Zha') {
@@ -34,7 +44,7 @@ export function DengarPilihPage(): JSX.Element {
     <div className="min-h-screen bg-neutral-bg pb-32 font-sans text-text-primary">
       <header className="fixed inset-x-0 top-0 z-10 border-b border-neutral-border bg-neutral-surface px-5 py-4">
         <div className="mx-auto flex max-w-[960px] items-center gap-5">
-          <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-neutral-surface-alt" aria-label="Keluar dari quiz">
+          <button type="button" onClick={exitQuiz} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-neutral-surface-alt" aria-label="Keluar dari quiz">
             <X size={22} strokeWidth={2.5} />
           </button>
           <ProgressBar value={3} max={10} className="flex-1" />
