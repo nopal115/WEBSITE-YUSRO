@@ -4,10 +4,12 @@ export default {
 	content: ['./index.html', './src/**/*.{ts,tsx}'],
 	theme: {
 		extend: {
+			// Nilai SDD 7.2.1 / 7.3; token yang tidak diatur SDD memakai nilai Figma.
+			// Komponen tidak boleh memakai hex langsung (SDD 7.2.1).
 			colors: {
 				brand: {
 					primary: '#0F4C5C',
-					'primary-hover': '#0B3B47',
+					'primary-hover': '#0C3D4A',
 					'primary-soft': '#E3EDF0',
 					'primary-line': '#C6DCE1',
 					accent: '#FFB703',
@@ -15,12 +17,17 @@ export default {
 					'accent-soft': '#FFF3D6',
 				},
 				feedback: {
-					benar: '#3D8C00',
+					benar: '#2F7A2B',
 					'benar-hover': '#2E6A00',
-					'benar-soft': '#D7FFB8',
+					'benar-soft': '#E7F4E4',
 					salah: '#C42B2B',
 					'salah-hover': '#9B2020',
-					'salah-soft': '#FFDFE0',
+					'salah-soft': '#FCEBEB',
+				},
+				// SDD 7.3: status evaluasi. Belum ada varian soft di SDD.
+				state: {
+					processing: '#B5820A',
+					failed: '#8A5A2B',
 				},
 				semantic: {
 					info: '#1B87BD',
@@ -31,15 +38,15 @@ export default {
 				neutral: {
 					bg: '#FFFFFF',
 					surface: '#FFFFFF',
-					'surface-alt': '#F7F9FA',
-					border: '#E5E7EB',
+					'surface-alt': '#FBF9F4',
+					border: '#E6E0D4',
 					'border-strong': '#D5DBE0',
 					locked: '#E5E7EB',
 				},
 				text: {
-					primary: '#1E293B',
-					secondary: '#64748B',
-					muted: '#AFB8C1',
+					primary: '#16211D',
+					secondary: '#4A5A54',
+					muted: '#6E7A73',
 					'on-brand': '#FFFFFF',
 				},
 			},
