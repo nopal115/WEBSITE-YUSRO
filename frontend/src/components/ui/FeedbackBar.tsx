@@ -12,10 +12,11 @@ interface FeedbackBarProps {
   onAction?: () => void;
 }
 
-const stateStyles: Record<FeedbackState, { bar: string; icon: string; button: ButtonVariant }> = {
-  benar: { bar: 'bg-feedback-benar-soft', icon: 'bg-feedback-benar text-text-on-brand', button: 'benar' },
-  salah: { bar: 'bg-feedback-salah-soft', icon: 'bg-feedback-salah text-text-on-brand', button: 'salah' },
-  diproses: { bar: 'bg-semantic-info-soft', icon: '', button: 'ghost' },
+const stateStyles: Record<FeedbackState, { bar: string; title: string; icon: string; button: ButtonVariant }> = {
+  benar: { bar: 'bg-feedback-benar-soft', title: 'text-text-primary', icon: 'bg-feedback-benar text-text-on-brand', button: 'benar' },
+  salah: { bar: 'bg-feedback-salah-soft', title: 'text-text-primary', icon: 'bg-feedback-salah text-text-on-brand', button: 'salah' },
+  // SDD 7.3; latar memakai token yang ada karena SDD belum punya varian soft untuk state.
+  diproses: { bar: 'bg-semantic-warning-soft', title: 'text-state-processing', icon: '', button: 'ghost' },
 };
 
 export function FeedbackBar({ state, title, detail, actionLabel, onAction }: FeedbackBarProps): JSX.Element {
@@ -27,7 +28,7 @@ export function FeedbackBar({ state, title, detail, actionLabel, onAction }: Fee
         <div className="flex items-center gap-3">
           {state !== 'diproses' && <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-bold ${styles.icon}`}>{state === 'benar' ? '✓' : '✕'}</span>}
           <div>
-            <p className="text-body font-bold text-text-primary">{title}</p>
+            <p className={`text-body font-bold ${styles.title}`}>{title}</p>
             <p className="text-body-s text-text-secondary">{detail}</p>
           </div>
         </div>

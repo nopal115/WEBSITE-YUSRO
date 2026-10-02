@@ -22,7 +22,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
       {/* Seluruh kotak adalah <label>, jadi klik di mana pun di dalamnya memfokuskan input. */}
       <label
         htmlFor={inputId}
-        className={`flex cursor-text flex-col gap-1 rounded-sm border-2 bg-neutral-surface px-5 py-[14px] transition-colors ${borderClass}`}
+        className={`flex cursor-text flex-col gap-1 rounded-sm border-2 bg-neutral-surface px-5 py-3 transition-colors ${borderClass}`}
       >
         <span id={labelId} className="text-body-s text-text-muted">
           {label}
