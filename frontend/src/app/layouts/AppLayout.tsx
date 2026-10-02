@@ -1,8 +1,9 @@
-import { PanelLeftClose, PanelLeftOpen, User } from 'lucide-react';
-import { useState } from 'react';
+import { Menu, PanelLeftClose, PanelLeftOpen, User } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../lib/hooks/useAuth';
 import { BOTTOM_NAV_ITEMS, isPathActive, NAV_ITEMS, pageTitle } from './navigation';
+import { NavDrawer } from './NavDrawer';
 
 const COLLAPSED_KEY = 'yusro.sidebarCollapsed';
 
@@ -29,6 +30,9 @@ export function AppLayout(): JSX.Element {
   const { user } = useAuth();
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
   const toggleCollapsed = (): void => {
     setCollapsed((value) => {
@@ -89,6 +93,18 @@ export function AppLayout(): JSX.Element {
         {/* Header menyisakan ruang poni/status bar (viewport-fit=cover). */}
         <header className="sticky top-0 z-20 border-b border-neutral-border bg-neutral-surface pt-[env(safe-area-inset-top)]">
           <div className="flex h-16 items-center gap-2 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:px-8 lg:px-12">
+            <button
+              ref={menuButtonRef}
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Buka menu"
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen}
+              aria-controls="nav-drawer"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-neutral-surface-alt md:hidden"
+            >
+              <Menu size={24} aria-hidden="true" />
+            </button>
             <p className="min-w-0 flex-1 truncate text-h2">{pageTitle(pathname)}</p>
             <Link to="/profil" className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2 text-body text-text-secondary hover:bg-neutral-surface-alt">
               <User size={24} aria-hidden="true" />
@@ -102,6 +118,8 @@ export function AppLayout(): JSX.Element {
           <Outlet />
         </main>
       </div>
+
+      <NavDrawer open={drawerOpen} onClose={closeDrawer} returnFocusRef={menuButtonRef} />
 
       {/* [REKOMENDASI] Bilah bawah memperhitungkan env(safe-area-inset-bottom). */}
       <nav
