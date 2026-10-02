@@ -1,8 +1,12 @@
-import type { MockIdentity, MockRoute } from '../router';
+import type { MockRoute } from '../router';
+import { authRoutes } from './auth';
+import { imitationRoutes } from './imitation';
+import { learningRoutes } from './learning';
+import { profileRoutes } from './profile';
+import { progressRoutes } from './progress';
+import { quizRoutes } from './quiz';
 
-// Daftar route tiruan; diisi per fitur.
-export const routes: MockRoute[] = [];
+export { resolveIdentity } from './auth';
 
-export function resolveIdentity(): MockIdentity | null {
-  return null;
-}
+// Endpoint sisi Santri SDD 5.6–5.13. Endpoint admin tidak ditiru (dijawab 404).
+export const routes: MockRoute[] = [...authRoutes, ...profileRoutes, ...learningRoutes, ...quizRoutes, ...imitationRoutes, ...progressRoutes];
