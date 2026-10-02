@@ -1,12 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-
-const navigationItems = [
-  { label: 'Beranda', to: '/dashboard' },
-  { label: 'Pembelajaran', to: '/pembelajaran' },
-  { label: 'Progress', to: '/progress' },
-  { label: 'Riwayat', to: '/riwayat' },
-  { label: 'Profil', to: '/profil' },
-];
+import { NAV_ITEMS } from './navigation';
 
 export function AppLayout(): JSX.Element {
   return (
@@ -17,7 +10,7 @@ export function AppLayout(): JSX.Element {
           <span className="text-h2 text-brand-primary">Yusro</span>
         </div>
         <nav className="flex flex-col gap-2">
-          {navigationItems.map((item) => (
+          {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -26,7 +19,7 @@ export function AppLayout(): JSX.Element {
             >
               {({ isActive }) => (
                 <>
-                  <span className={`h-7 w-7 rounded-[6px] ${isActive ? 'bg-brand-primary' : 'bg-text-muted'}`} aria-hidden="true" />
+                  <item.icon size={24} aria-hidden="true" />
                   <span className={isActive ? 'text-h3' : 'text-body'}>{item.label}</span>
                 </>
               )}
