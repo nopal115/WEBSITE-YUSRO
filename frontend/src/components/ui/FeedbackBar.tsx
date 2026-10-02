@@ -26,10 +26,12 @@ export function FeedbackBar({ state, title, detail, actionLabel, onAction }: Fee
     <section className={`fixed inset-x-0 bottom-0 z-20 border-t border-neutral-border px-5 py-4 ${styles.bar}`} aria-live="polite">
       <div className="mx-auto flex max-w-[760px] items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          {state !== 'diproses' && <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-bold ${styles.icon}`}>{state === 'benar' ? '✓' : '✕'}</span>}
+          {/* Figma: lingkaran ikon 60px, glyph memakai style H1 bold. */}
+          {state !== 'diproses' && <span className={`flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full text-h1 font-bold ${styles.icon}`}>{state === 'benar' ? '✓' : '✕'}</span>}
           <div>
             <p className={`text-body font-bold ${styles.title}`}>{title}</p>
-            <p className="text-body-s text-text-secondary">{detail}</p>
+            {/* Figma: baris detail memakai Body L. */}
+            <p className="text-body-l text-text-secondary">{detail}</p>
           </div>
         </div>
         <Button variant={styles.button} onClick={onAction}>{actionLabel}</Button>
