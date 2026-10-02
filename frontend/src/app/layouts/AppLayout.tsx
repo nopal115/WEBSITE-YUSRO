@@ -1,4 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { Button } from '../../components/ui/Button';
+import { useAuth } from '../../lib/hooks/useAuth';
 
 const navigationItems = [
   { label: 'Beranda', to: '/dashboard' },
@@ -9,6 +11,8 @@ const navigationItems = [
 ];
 
 export function AppLayout(): JSX.Element {
+  const { logout } = useAuth();
+
   return (
     <div className="flex min-h-screen bg-neutral-bg text-text-primary">
       <aside className="flex w-[248px] shrink-0 flex-col border-r border-neutral-border bg-white px-6 py-8" aria-label="Navigasi utama">
@@ -34,6 +38,8 @@ export function AppLayout(): JSX.Element {
           ))}
         </nav>
         <div className="flex-1" />
+        {/* [REKOMENDASI] Tidak ada di Figma; perlu agar santri bisa logout. Posisi final menunggu desain. */}
+        <Button variant="ghost" className="w-full" onClick={logout}>KELUAR</Button>
       </aside>
       <main className="min-w-0 flex-1">
         <Outlet />

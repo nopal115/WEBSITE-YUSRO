@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { DengarPilihPage } from '../features/quiz/DengarPilihPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
+import { AdminPlaceholderPage } from './AdminPlaceholderPage';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
@@ -8,6 +9,7 @@ import { PlaceholderPage } from './PlaceholderPage';
 
 export const router = createBrowserRouter([
   {
+    // Admin yang membuka "/" akan diarahkan ProtectedRoute ke /admin.
     path: '/',
     element: <Navigate to="/dashboard" replace />,
   },
@@ -18,10 +20,30 @@ export const router = createBrowserRouter([
         path: '/login',
         element: <PlaceholderPage>Login</PlaceholderPage>,
       },
+      {
+        // TODO: registrasi santri (SRS UC 6.4, Figma layar 02), di luar tugas ini.
+        path: '/registrasi',
+        element: <PlaceholderPage>Registrasi</PlaceholderPage>,
+      },
+      {
+        // TODO: backend belum punya endpoint reset password.
+        path: '/lupa-password',
+        element: <PlaceholderPage>Lupa password</PlaceholderPage>,
+      },
     ],
   },
   {
-    element: <ProtectedRoute />,
+    element: <ProtectedRoute allowedRoles={['ADMIN']} />,
+    children: [
+      {
+        // TODO(admin): [TBD] placeholder sampai halaman Admin/Pengajar dirancang.
+        path: '/admin',
+        element: <AdminPlaceholderPage />,
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute allowedRoles={['SANTRI']} />,
     children: [
       {
         element: <AppLayout />,
