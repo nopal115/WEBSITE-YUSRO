@@ -28,7 +28,7 @@ export function LetterCard({ letter, label, selected, state = 'default', onClick
       className={`flex min-h-[150px] flex-col items-center justify-center rounded-md border-2 p-5 shadow-card transition ${toneClasses}`}
     >
       {/* SDD 7.4.1: Arab M untuk pilihan jawaban. */}
-      <span className="text-arabic-m font-bold text-text-primary" lang="ar" dir="rtl">{letter}</span>
+      <span className="font-arabic text-arabic-m text-text-primary" lang="ar" dir="rtl">{letter}</span>
       <span className="mt-2 text-body-s font-bold text-text-secondary">{label}</span>
     </button>
   );

@@ -13,7 +13,7 @@ export function AppLayout(): JSX.Element {
     <div className="flex min-h-screen bg-neutral-bg text-text-primary">
       <aside className="flex w-[248px] shrink-0 flex-col border-r border-neutral-border bg-white px-6 py-8" aria-label="Navigasi utama">
         <div className="mb-12 flex items-center gap-3 px-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-brand-primary text-arabic-s text-brand-accent" aria-hidden="true" lang="ar" dir="rtl">ي</div>
+          <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-brand-primary font-arabic text-arabic-s text-brand-accent" aria-hidden="true" lang="ar" dir="rtl">ي</div>
           <span className="text-h2 text-brand-primary">Yusro</span>
         </div>
         <nav className="flex flex-col gap-2">

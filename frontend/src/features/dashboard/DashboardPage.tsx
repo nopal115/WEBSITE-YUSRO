@@ -39,7 +39,7 @@ export function DashboardPage(): JSX.Element {
         <section className="rounded-lg bg-brand-primary p-8 text-white shadow-[0_6px_0_theme(colors.brand.primary-hover)]">
           <p className="text-label text-brand-accent">LANJUTKAN</p>
           <div className="mt-6 flex items-center gap-5">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg bg-white text-arabic-m text-brand-primary" lang="ar" dir="rtl">{dummyDashboardData.continue.arabic}</div>
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg bg-white font-arabic text-arabic-m text-brand-primary" lang="ar" dir="rtl">{dummyDashboardData.continue.arabic}</div>
             <div>
               <h2 className="text-h2">{dummyDashboardData.continue.title}</h2>
               <p className="mt-1 text-body text-white/75">{dummyDashboardData.continue.description}</p>

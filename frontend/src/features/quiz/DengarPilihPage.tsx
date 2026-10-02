@@ -77,7 +77,7 @@ export function DengarPilihPage(): JSX.Element {
         {!isAnswered && <Button className="mx-auto mt-5 min-w-40" variant="accent" disabled={!selectedOption} onClick={checkAnswer}>PERIKSA</Button>}
       </main>
 
-      {isAnswered && <FeedbackBar state="benar" title="Tepat sekali!" detail={<>Zha — <span lang="ar" dir="rtl">ظَ</span></>} actionLabel="LANJUT" />}
+      {isAnswered && <FeedbackBar state="benar" title="Tepat sekali!" detail={<>Zha — <span className="font-arabic" lang="ar" dir="rtl">ظَ</span></>} actionLabel="LANJUT" />}
     </div>
   );
 }
