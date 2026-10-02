@@ -4,10 +4,7 @@ import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
-
-const PlaceholderPage = ({ children }: { children: string }): JSX.Element => (
-  <div className="p-8">{children} (belum dibuat)</div>
-);
+import { PlaceholderPage } from './PlaceholderPage';
 
 export const router = createBrowserRouter([
   {
