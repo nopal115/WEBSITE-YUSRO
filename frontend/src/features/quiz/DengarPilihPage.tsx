@@ -39,10 +39,11 @@ export function DengarPilihPage(): JSX.Element {
     }
   };
 
-  // pb-32: Pengecualian skala jarak SDD 7.2.2: offset kompensasi tinggi elemen fixed/perataan, bukan jarak antarelemen.
+  // pb-40 (mobile, FeedbackBar ~145 px karena teks terbungkus) dan md:pb-32: Pengecualian skala jarak SDD 7.2.2:
+  // offset kompensasi tinggi elemen fixed/perataan, bukan jarak antarelemen.
   return (
-    <div className="min-h-screen bg-neutral-bg pb-32 font-sans text-text-primary">
-      <header className="fixed inset-x-0 top-0 z-10 border-b border-neutral-border bg-neutral-surface px-5 py-4">
+    <div className="min-h-screen bg-neutral-bg pb-40 font-sans md:pb-32 text-text-primary">
+      <header className="fixed inset-x-0 top-0 z-10 border-b border-neutral-border bg-neutral-surface pb-4 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))]">
         <div className="mx-auto flex max-w-[960px] items-center gap-5">
           <button type="button" onClick={exitQuiz} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-neutral-surface-alt" aria-label="Keluar dari quiz">
             <X size={22} strokeWidth={2.5} />
@@ -62,9 +63,10 @@ export function DengarPilihPage(): JSX.Element {
             <button type="button" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-primary text-text-on-brand shadow-md active:translate-y-0.5 active:shadow-none" aria-label="Putar audio">
               <Play size={23} fill="currentColor" />
             </button>
-            <div className="flex flex-1 items-center justify-between gap-4">
-              <div className="flex h-12 flex-1 items-center gap-1" aria-hidden="true">
-                {waveform.map((height, index) => <span key={`${height}-${index}`} className="w-1 rounded-full bg-brand-primary" style={{ height }} />)}
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-4">
+              {/* Batang yang tidak muat di layar sempit terpotong, tidak melebarkan halaman. */}
+              <div className="flex h-12 min-w-0 flex-1 items-center gap-1 overflow-hidden" aria-hidden="true">
+                {waveform.map((height, index) => <span key={`${height}-${index}`} className="w-1 shrink-0 rounded-full bg-brand-primary" style={{ height }} />)}
               </div>
               <span className="whitespace-nowrap text-caption text-text-secondary">0:03 / 0:07</span>
             </div>

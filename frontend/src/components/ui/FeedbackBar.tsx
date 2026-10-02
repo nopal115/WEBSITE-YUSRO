@@ -25,9 +25,10 @@ export function FeedbackBar({ state, title, detail, actionLabel, onAction }: Fee
   const styles = stateStyles[state];
 
   return (
-    <section className={`fixed inset-x-0 bottom-0 z-20 border-t border-neutral-border px-12 py-8 ${styles.bar}`} aria-live="polite">
+    <section className={`fixed inset-x-0 bottom-0 z-20 border-t border-neutral-border px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-6 md:px-12 md:pb-[calc(2rem+env(safe-area-inset-bottom))] md:pt-8 ${styles.bar}`} aria-live="polite">
       {/* Figma: ikon, teks, dan tombol dalam satu baris dengan gap 24px; teks mengisi sisa lebar. */}
-      <div className="mx-auto flex max-w-[760px] items-center gap-6">
+      {/* Di bawah 768 px padding 24/16 dan gap 16 (skala SDD 7.2.2) agar muat di layar 375 px. */}
+      <div className="mx-auto flex max-w-[760px] items-center gap-4 md:gap-6">
         {/* Figma: lingkaran ikon 60px putih, glyph H1 bold berwarna state. State diproses tidak punya ikon. */}
         {state !== 'diproses' && (
           <span className={`flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-neutral-surface text-h1 font-bold ${styles.text}`}>
