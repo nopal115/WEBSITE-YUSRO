@@ -50,7 +50,7 @@ export default {
 				'body-s': ['13px', { lineHeight: '20px', fontWeight: '400' }],
 				caption: ['12px', { lineHeight: '16px', fontWeight: '400' }],
 				display: ['34px', { lineHeight: '44px', letterSpacing: '-0.544px', fontWeight: '700' }],
-				h1: ['var(--font-h1, 32px)', { lineHeight: '1.2' }], // TODO(verifikasi Figma Dev Mode)
+				h1: ['28px', { lineHeight: '36px', letterSpacing: '-0.336px', fontWeight: '700' }],
 				h2: ['22px', { lineHeight: '30px', letterSpacing: '-0.176px', fontWeight: '700' }],
 				h3: ['18px', { lineHeight: '26px', letterSpacing: '-0.072px', fontWeight: '600' }],
 				body: ['15px', { lineHeight: '24px', fontWeight: '400' }],

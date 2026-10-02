@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { DengarPilihPage } from '../features/quiz/DengarPilihPage';
+import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AdminPlaceholderPage } from './AdminPlaceholderPage';
 import { AppLayout } from './layouts/AppLayout';
@@ -18,7 +19,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/login',
-        element: <PlaceholderPage>Login</PlaceholderPage>,
+        element: <LoginPage />,
       },
       {
         // TODO: registrasi santri (SRS UC 6.4, Figma layar 02), di luar tugas ini.
