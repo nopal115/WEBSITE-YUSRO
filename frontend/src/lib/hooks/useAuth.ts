@@ -20,7 +20,8 @@ export interface AuthState {
   /** Gagal memuat user karena alasan selain 401 (mis. jaringan atau server). */
   error: ApiError | null;
   retry: () => void;
-  logout: () => void;
+  /** Memanggil POST /auth/logout; token dan cache tetap dihapus walaupun request gagal. */
+  logout: () => Promise<void>;
 }
 
 export function useAuth(): AuthState {
@@ -35,10 +36,16 @@ export function useAuth(): AuthState {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Tanpa endpoint logout di backend, logout hanya di sisi klien.
-  const logout = useCallback(() => {
-    tokenStore.clear();
-    queryClient.clear();
+  // SDD 5.6 / FR-AUTH-03.
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // Sesi lokal tetap diakhiri walaupun server gagal dihubungi.
+    } finally {
+      tokenStore.clear();
+      queryClient.clear();
+    }
   }, [queryClient]);
 
   const { refetch } = meQuery;
@@ -65,10 +72,10 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: authApi.login,
-    onSuccess: ({ accessToken, user }) => {
-      // Buang cache milik sesi sebelumnya, lalu isi user agar tidak perlu menunggu user/me.
+    onSuccess: ({ accessToken }) => {
+      // Buang cache sesi sebelumnya. Data user lengkap (termasuk email) diambil dari /auth/me,
+      // karena ringkasan pada respons login tidak memuat email (SDD 5.6).
       queryClient.clear();
-      queryClient.setQueryData(AUTH_ME_QUERY_KEY, user);
       tokenStore.set(accessToken);
     },
   });
