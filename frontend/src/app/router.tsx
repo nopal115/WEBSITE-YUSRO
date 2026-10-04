@@ -6,6 +6,7 @@ import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { StageListPage } from '../features/learning/StageListPage';
 import { MaterialDetailPage } from '../features/learning/MaterialDetailPage';
+import { ProgressPage } from '../features/progress/ProgressPage';
 import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { AdminPlaceholderPage } from './AdminPlaceholderPage';
@@ -78,7 +79,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/progress',
-            element: <PlaceholderPage>Progress</PlaceholderPage>,
+            element: <ProgressPage />,
           },
           {
             // ASUMSI: "Riwayat" = modul report (SDD 3.15), perlu dikonfirmasi
