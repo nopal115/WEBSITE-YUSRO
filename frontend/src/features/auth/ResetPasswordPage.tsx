@@ -39,6 +39,8 @@ export function ResetPasswordPage(): JSX.Element {
 
   const onSubmit = handleSubmit((values) => mutation.mutate({ token, ...values }));
   const error = mutation.error;
+  // [ASUMSI] Kode galat token reset tidak berlaku/kedaluwarsa = AUTH_RESET_INVALID; SDD 5.6 tidak
+  // mencantumkan kode galat reset. Perlu disepakati dengan backend.
   const linkInvalid = !token || (error instanceof ApiError && error.code === 'AUTH_RESET_INVALID');
 
   if (linkInvalid) {
