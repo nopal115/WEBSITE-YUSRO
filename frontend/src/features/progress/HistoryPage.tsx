@@ -15,18 +15,11 @@ const TASK_TYPE_LABEL = { QUIZ: 'Dengar-Pilih', IMITATION: 'Dengar-Tirukan' } as
 const scoreText = (item: HistoryItem): string => (item.score === null ? '—' : formatScore(item.score));
 
 function TaskCell({ item }: { item: HistoryItem }): JSX.Element {
-  const link = historyLink(item);
-  const title = <span className="text-body font-semibold text-text-primary">{item.taskTitle}</span>;
   return (
     <div className="min-w-0">
-      {/* [TBD] Baris Dengar-Tirukan belum bertaut; detailnya dibangun bersama Dengar-Tirukan. */}
-      {link ? (
-        <Link to={link} className="text-brand-primary hover:underline">
-          {title}
-        </Link>
-      ) : (
-        title
-      )}
+      <Link to={historyLink(item)} className="text-brand-primary hover:underline">
+        <span className="text-body font-semibold text-text-primary">{item.taskTitle}</span>
+      </Link>
       <p className="text-body-s text-text-secondary">
         {TASK_TYPE_LABEL[item.taskType]} · {item.materialTitle}
       </p>
@@ -104,12 +97,11 @@ export function HistoryPage(): JSX.Element {
       {/* < 768 px: daftar kartu tanpa gulir mendatar (SDD 7.7.13). */}
       <ul className="flex flex-col gap-3 md:hidden">
         {items.map((item) => {
-          const link = historyLink(item);
           const content = (
             <div className="flex flex-col gap-3 rounded-md border border-neutral-border bg-neutral-surface p-4">
               <div className="flex items-start justify-between gap-3">
                 <TaskCell item={item} />
-                {link && <ChevronRight size={20} className="shrink-0 text-brand-primary" aria-hidden="true" />}
+                <ChevronRight size={20} className="shrink-0 text-brand-primary" aria-hidden="true" />
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-body-s text-text-secondary">
                 <span>Percobaan ke-{item.attemptNo}</span>

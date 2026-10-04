@@ -17,7 +17,11 @@ export function historyTone(item: Pick<HistoryItem, 'evaluationStatus'>): PillSt
   }
 }
 
-/** Baris Dengar-Pilih menaut ke detail percobaan; Dengar-Tirukan belum ([TBD]). */
-export function historyLink(item: Pick<HistoryItem, 'taskType' | 'attemptId'>): string | null {
-  return item.taskType === 'QUIZ' ? `/riwayat/${item.attemptId}` : null;
+/**
+ * Tautan detail percobaan. Dengar-Tirukan diberi ?jenis=tirukan agar halaman detail memanggil
+ * GET imitation/submissions/:id (attemptId = submissionId, contoh SDD 5.10/5.11); tetap benar saat dimuat ulang.
+ */
+export function historyLink(item: Pick<HistoryItem, 'taskType' | 'attemptId'>): string {
+  const path = `/riwayat/${encodeURIComponent(item.attemptId)}`;
+  return item.taskType === 'IMITATION' ? `${path}?jenis=tirukan` : path;
 }

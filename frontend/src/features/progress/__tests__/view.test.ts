@@ -21,7 +21,7 @@ describe('historyTone (SDD 7.7.13)', () => {
 
   it('hanya Dengar-Pilih yang menaut ke detail percobaan', () => {
     expect(historyLink({ taskType: 'QUIZ', attemptId: 'att-1' })).toBe('/riwayat/att-1');
-    expect(historyLink({ taskType: 'IMITATION', attemptId: 'sub-1' })).toBeNull();
+    expect(historyLink({ taskType: 'IMITATION', attemptId: 'sub-1' })).toBe('/riwayat/sub-1?jenis=tirukan');
   });
 });
 
