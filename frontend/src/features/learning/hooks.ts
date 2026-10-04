@@ -27,7 +27,9 @@ export function useCompleteMaterial() {
     mutationFn: learningApi.completeMaterial,
     onSuccess: () =>
       Promise.all([
-        queryClient.invalidateQueries({ queryKey: learningKeys.all }),
+        // refetchType all: daftar yang sedang tidak tampil ikut diperbarui, agar tidak sempat
+        // menampilkan status lama saat dibuka kembali.
+        queryClient.invalidateQueries({ queryKey: learningKeys.all, refetchType: 'all' }),
         queryClient.invalidateQueries({ queryKey: ['progress'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
       ]),
