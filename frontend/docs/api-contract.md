@@ -323,7 +323,7 @@ Id di route diteruskan apa adanya ke path API (`encodeURIComponent`). Backend-no
 
 | # | Temuan | Lokasi |
 | --- | --- | --- |
-| T1 | Penyimpanan token di `sessionStorage` dan tidak adanya pemanggilan `POST auth/refresh` menyimpang dari SDD 6.3/5.6. Sudah ditandai `TODO(SDD 6.3)`, tetapi belum tercatat di CLAUDE.md sebagai penyimpangan yang disetujui. | `src/lib/auth/tokenStore.ts` |
+| T1 | Penyimpanan token di `sessionStorage` dan tidak adanya pemanggilan `POST auth/refresh` menyimpang dari SDD 6.3/5.6. Sudah ditandai `TODO(SDD 6.3)`. **Keputusan: penyimpangan sementara yang disetujui sampai backend menyediakan refresh token** (tercatat di CLAUDE.md). | `src/lib/auth/tokenStore.ts` |
 | T2 | AS13 dan AS14 belum diberi label `[ASUMSI]` di kode, padahal CLAUDE.md mewajibkannya. | `src/features/progress/view.ts`, `src/features/auth/ResetPasswordPage.tsx` |
 | T3 | Rekaman diunggah dalam format asli tanpa keadaan CONVERTING. Ini menyimpang dari SDD 7.6.2 dan DD-03 ("konversi audio ke WAV di sisi klien", SDD 12.6), sesuai keputusan final berbasis SRS FR-IMITATE-06. Contoh galat SDD 5.5 ("Hanya berkas WAV yang diterima", field `recording`) juga masih mengacu WAV. Penyimpangan ini disetujui, tetapi di kode belum ada komentar yang menyebut DD-03. | `src/features/imitation/recorder.ts`, `ImitationTaskPage.tsx` |
 | T4 | Pesan "tidak mendukung perekaman" mengikuti SDD 7.9 ("Chrome, Edge, atau Firefox"). SRS revisi 2 menambahkan Safari sebagai target browser (NFR-COMP-01). Kalimat SDD belum mengikuti SRS. | `src/features/imitation/ImitationTaskPage.tsx` |

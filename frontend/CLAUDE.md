@@ -61,6 +61,9 @@
   sudah disetujui, berstatus [TBD].
 - Sapaan Dashboard "Assalamu'alaikum, [nama]" (menyimpang dari SDD 7.7.4).
 - Tombol logout belum ditambahkan; menunggu desain.
+- Token akses disimpan di sessionStorage, penyimpangan sementara dari SDD
+  6.3 (refresh token + cookie HttpOnly), sampai backend menyediakan refresh
+  token.
 
 ## Verifikasi standar
 tsc --noEmit, npm run lint, npx vitest run, dan npm run build harus lolos.
