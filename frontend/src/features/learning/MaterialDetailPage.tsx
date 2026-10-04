@@ -27,7 +27,7 @@ function Block({ block, onAudioExpired }: { block: MaterialBlock; onAudioExpired
         <p className="font-arabic text-arabic-l text-text-primary" lang="ar" dir="rtl">
           {block.arabicContent}
         </p>
-        {block.transliteration && <p className="text-body text-text-secondary">{block.transliteration}</p>}
+        {block.transliteration && <p className="mt-2 text-body text-text-secondary">{block.transliteration}</p>}
       </div>
     );
   }
