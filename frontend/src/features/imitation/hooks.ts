@@ -13,6 +13,9 @@ export function useImitationTask(taskId: string) {
   return useQuery({
     queryKey: imitationKeys.task(taskId),
     queryFn: ({ signal }) => imitationApi.getTask(taskId, signal),
+    // activeSubmission adalah keadaan langsung: tidak disimpan setelah halaman ditutup, sehingga membuka
+    // ulang selalu memakai data segar (refetch yang terputus saat keluar dapat mengembalikan data lama).
+    gcTime: 0,
   });
 }
 

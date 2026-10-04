@@ -126,7 +126,7 @@ function EvaluationPanel({ taskId, submission, onRetry, onContinue }: { taskId: 
           Evaluasi gagal diproses
         </h1>
         <p className="text-body text-text-primary">Rekaman Anda tersimpan dan percobaan ini tetap tercatat. Nilai belum tersedia.</p>
-        <Button variant="accent" className="self-start" onClick={onRetry}>
+        <Button variant="accent" className="w-full sm:w-auto sm:self-start" onClick={onRetry}>
           KIRIM ULANG REKAMAN
         </Button>
       </Card>
@@ -141,7 +141,7 @@ function EvaluationPanel({ taskId, submission, onRetry, onContinue }: { taskId: 
         {stopped ? (
           <>
             <p className="text-body text-text-secondary">Pemeriksaan otomatis dihentikan.</p>
-            <Button variant="primary" className="self-start" isLoading={checking} loadingText="MEMERIKSA…" onClick={() => void checkNow()}>
+            <Button variant="primary" className="w-full sm:w-auto sm:self-start" isLoading={checking} loadingText="MEMERIKSA…" onClick={() => void checkNow()}>
               PERIKSA STATUS SEKARANG
             </Button>
           </>
@@ -161,15 +161,16 @@ function EvaluationPanel({ taskId, submission, onRetry, onContinue }: { taskId: 
   return <div aria-live="polite">{content}</div>;
 }
 
-/** Waktu sekarang yang diperbarui berkala selama active (hitung mundur 429). */
-function useNow(active: boolean): number {
+/** Hitung mundur 429. Di-key dengan cooldownUntil agar waktu awalnya diambil saat galat muncul. */
+function Cooldown({ until, children }: { until: number | undefined; children: (remaining: number) => ReactNode }): JSX.Element {
   const [now, setNow] = useState(() => Date.now());
+  const active = until !== undefined && until > now;
   useEffect(() => {
     if (!active) return;
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, [active]);
-  return now;
+  return <>{children(until === undefined ? 0 : Math.max(0, Math.ceil((until - now) / 1000)))}</>;
 }
 
 function RecorderPanel({
@@ -190,10 +191,6 @@ function RecorderPanel({
   onSubmit: () => void;
 }): JSX.Element {
   const error = state.status === 'READY' ? state.error : undefined;
-  const cooldownUntil = error?.cooldownUntil;
-  const now = useNow(cooldownUntil !== undefined);
-  const remaining = cooldownUntil === undefined ? 0 : Math.ceil((cooldownUntil - now) / 1000);
-  const coolingDown = remaining > 0;
 
   if (state.status === 'UNSUPPORTED' || mimeType === null) return <Notice tone="info">{UNSUPPORTED_MESSAGE}</Notice>;
   if (state.status === 'PERMISSION_DENIED') return <Notice tone="error">{PERMISSION_MESSAGE}</Notice>;
@@ -212,15 +209,21 @@ function RecorderPanel({
           </div>
         )}
         {error && <Notice tone="error">{error.message}</Notice>}
-        {coolingDown && <p className="text-body-s text-text-secondary">Anda dapat mengirim lagi dalam {remaining} detik.</p>}
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button variant="outline" disabled={uploading} onClick={() => dispatch({ type: 'DISCARD' })}>
-            REKAM ULANG
-          </Button>
-          <Button variant="accent" disabled={error?.canResend === false || coolingDown} isLoading={uploading} loadingText="MENGIRIM…" onClick={onSubmit}>
-            {error && error.canResend !== false && error.cooldownUntil === undefined ? 'COBA KIRIM LAGI' : 'KIRIM REKAMAN'}
-          </Button>
-        </div>
+        <Cooldown key={error?.cooldownUntil ?? 'tanpa-jeda'} until={error?.cooldownUntil}>
+          {(remaining) => (
+            <>
+              {remaining > 0 && <p className="text-body-s text-text-secondary">Anda dapat mengirim lagi dalam {remaining} detik.</p>}
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button variant="outline" disabled={uploading} onClick={() => dispatch({ type: 'DISCARD' })}>
+                  REKAM ULANG
+                </Button>
+                <Button variant="accent" disabled={error?.canResend === false || remaining > 0} isLoading={uploading} loadingText="MENGIRIM…" onClick={onSubmit}>
+                  {error && error.canResend !== false && error.cooldownUntil === undefined ? 'COBA KIRIM LAGI' : 'KIRIM REKAMAN'}
+                </Button>
+              </div>
+            </>
+          )}
+        </Cooldown>
       </div>
     );
   }
