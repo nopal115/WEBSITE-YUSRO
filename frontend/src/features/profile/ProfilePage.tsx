@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { TextField } from '../../components/ui/TextField';
 import { ApiError } from '../../lib/api/ApiError';
 import { AUTH_ME_QUERY_KEY } from '../../lib/hooks/useAuth';
+import { formatDateStamp } from '../../lib/utils/format';
 import { changePasswordSchema, profileNameSchema, type ChangePasswordFormValues, type ProfileNameFormValues } from '../auth/authSchemas';
 import { ErrorState, ListSkeleton } from '../learning/QueryStates';
 import { reportApi } from '../report/api';
@@ -127,8 +128,8 @@ function ReportSection({ studentCode }: { studentCode: string }): JSX.Element {
   const mutation = useMutation({
     mutationFn: () => reportApi.downloadPdf(),
     onSuccess: ({ blob, filename }) => {
-      // Nama dari Content-Disposition; cadangan mengikuti pola SDD 5.13.
-      const name = filename ?? `Laporan-${studentCode}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      // Nama dari Content-Disposition; cadangan mengikuti pola SDD 5.13 dengan tanggal lokal perangkat.
+      const name = filename ?? `Laporan-${studentCode}-${formatDateStamp(new Date())}.pdf`;
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
