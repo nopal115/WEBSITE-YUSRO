@@ -1,7 +1,9 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { DengarPilihPage } from '../features/quiz/DengarPilihPage';
 import { LoginPage } from '../features/auth/LoginPage';
+import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
 import { RegisterPage } from '../features/auth/RegisterPage';
+import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AdminPlaceholderPage } from './AdminPlaceholderPage';
 import { AppLayout } from './layouts/AppLayout';
@@ -22,13 +24,12 @@ export const router = createBrowserRouter([
         element: <RegisterPage />,
       },
       {
-        // TODO: backend belum punya endpoint reset password.
         path: '/forgot-password',
-        element: <PlaceholderPage>Lupa password</PlaceholderPage>,
+        element: <ForgotPasswordPage />,
       },
       {
         path: '/reset-password',
-        element: <PlaceholderPage>Reset password</PlaceholderPage>,
+        element: <ResetPasswordPage />,
       },
     ],
   },

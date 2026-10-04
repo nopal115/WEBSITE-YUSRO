@@ -19,7 +19,7 @@ const statusClasses: Record<PillStatus, string> = {
 
 export function Pill({ status, children }: PillProps): JSX.Element {
   return (
-    <span className={`inline-flex rounded-sm px-3 py-1 text-caption font-bold ${statusClasses[status]}`}>
+    <span className={`inline-flex rounded-sm px-3 py-1 text-label ${statusClasses[status]}`}>
       {children}
     </span>
   );
