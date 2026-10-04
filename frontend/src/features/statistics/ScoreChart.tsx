@@ -33,27 +33,30 @@ export function ScoreChart({ points, summary }: { points: ChartPoint[]; summary:
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <table className="sr-only">
-        <caption>Daftar nilai per percobaan</caption>
-        <thead>
-          <tr>
-            <th scope="col">Percobaan</th>
-            <th scope="col">Tugas</th>
-            <th scope="col">Nilai</th>
-            <th scope="col">Waktu</th>
-          </tr>
-        </thead>
-        <tbody>
-          {points.map((point) => (
-            <tr key={point.attemptId}>
-              <td>{point.sequence}</td>
-              <td>{point.taskTitle}</td>
-              <td>{formatScore(point.score)}</td>
-              <td>{formatDateTime(point.submittedAt)}</td>
+      {/* sr-only pada pembungkus: elemen <table> tidak menyusut ke 1px dan bisa melebarkan halaman. */}
+      <div className="sr-only">
+        <table>
+          <caption>Daftar nilai per percobaan</caption>
+          <thead>
+            <tr>
+              <th scope="col">Percobaan</th>
+              <th scope="col">Tugas</th>
+              <th scope="col">Nilai</th>
+              <th scope="col">Waktu</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {points.map((point) => (
+              <tr key={point.attemptId}>
+                <td>{point.sequence}</td>
+                <td>{point.taskTitle}</td>
+                <td>{formatScore(point.score)}</td>
+                <td>{formatDateTime(point.submittedAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }
