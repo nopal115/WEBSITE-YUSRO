@@ -42,7 +42,7 @@ export function DengarPilihPage(): JSX.Element {
   // pb-40 (mobile, FeedbackBar ~145 px karena teks terbungkus) dan md:pb-32: Pengecualian skala jarak SDD 7.2.2:
   // offset kompensasi tinggi elemen fixed/perataan, bukan jarak antarelemen.
   return (
-    <div className="min-h-screen bg-neutral-bg pb-40 font-sans md:pb-32 text-text-primary">
+    <div className="min-h-screen bg-neutral-surface-alt pb-40 font-sans md:pb-32 text-text-primary">
       <header className="fixed inset-x-0 top-0 z-10 border-b border-neutral-border bg-neutral-surface pb-4 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pt-[calc(1rem+env(safe-area-inset-top))]">
         <div className="mx-auto flex max-w-[960px] items-center gap-5">
           <button type="button" onClick={exitQuiz} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-neutral-surface-alt" aria-label="Keluar dari quiz">

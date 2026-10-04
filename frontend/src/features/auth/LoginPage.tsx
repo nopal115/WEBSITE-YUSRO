@@ -38,7 +38,7 @@ export function LoginPage(): JSX.Element {
   const serverError = login.isError ? getLoginErrorMessage(login.error) : null;
 
   return (
-    <div className="flex min-h-screen bg-neutral-bg text-text-primary">
+    <div className="flex min-h-screen bg-neutral-surface-alt text-text-primary">
       <aside className="hidden w-[560px] shrink-0 flex-col justify-between bg-brand-primary p-16 text-text-on-brand lg:flex">
         <div className="flex items-center gap-4">
           <BrandLogo />
