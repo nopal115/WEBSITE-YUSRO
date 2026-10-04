@@ -1,20 +1,24 @@
 import { X } from 'lucide-react';
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { isNavItemActive, NAV_ITEMS } from './navigation';
+import type { NavItem } from './navigation';
 
 interface NavDrawerProps {
   open: boolean;
   onClose: () => void;
   /** Tombol pembuka; fokus dikembalikan ke sini saat laci ditutup. */
   returnFocusRef: RefObject<HTMLElement>;
+  items: NavItem[];
+  isActive: (pathname: string, item: NavItem) => boolean;
+  /** Isi bawah laci (mis. tombol logout admin). */
+  footer?: ReactNode;
 }
 
 /**
  * Laci navigasi mobile (SDD 7.5.1). <dialog> + showModal() memberi role dialog, modal,
  * penutupan dengan Esc, dan membuat bagian halaman lain inert sehingga fokus terkunci di laci.
  */
-export function NavDrawer({ open, onClose, returnFocusRef }: NavDrawerProps): JSX.Element {
+export function NavDrawer({ open, onClose, returnFocusRef, items, isActive, footer }: NavDrawerProps): JSX.Element {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const { pathname } = useLocation();
 
@@ -65,20 +69,21 @@ export function NavDrawer({ open, onClose, returnFocusRef }: NavDrawerProps): JS
           </button>
         </div>
         <nav className="flex flex-col gap-2" aria-label="Navigasi utama">
-          {NAV_ITEMS.map((item) => (
+          {items.map((item) => (
             <Link
               key={item.to}
               to={item.to}
-              aria-current={isNavItemActive(pathname, item) ? 'page' : undefined}
+              aria-current={isActive(pathname, item) ? 'page' : undefined}
               // Laci tertutup setelah memilih tujuan.
               onClick={() => dialogRef.current?.close()}
-              className={`flex min-h-14 items-center gap-4 rounded-md border px-4 ${isNavItemActive(pathname, item) ? 'border-brand-primary-line bg-brand-primary-soft text-brand-primary' : 'border-transparent text-text-secondary hover:bg-neutral-surface-alt'}`}
+              className={`flex min-h-14 items-center gap-4 rounded-md border px-4 ${isActive(pathname, item) ? 'border-brand-primary-line bg-brand-primary-soft text-brand-primary' : 'border-transparent text-text-secondary hover:bg-neutral-surface-alt'}`}
             >
               <item.icon size={24} className="shrink-0" aria-hidden="true" />
               <span className="text-body">{item.label}</span>
             </Link>
           ))}
         </nav>
+        {footer}
       </div>
     </dialog>
   );
