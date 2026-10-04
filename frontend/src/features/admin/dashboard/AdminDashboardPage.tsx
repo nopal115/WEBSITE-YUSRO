@@ -2,21 +2,12 @@ import { AlertTriangle, ArrowRight, CheckCircle2, ChevronRight, Hourglass } from
 import { Link } from 'react-router-dom';
 import { Card } from '../../../components/ui/Card';
 import { Pill } from '../../../components/ui/Pill';
+import { StatTile } from '../../../components/ui/StatTile';
 import { formatScore } from '../../dashboard/view';
 import { EmptyState, ErrorState, ListSkeleton } from '../../learning/QueryStates';
 import { useAdminAttention, useAdminDashboard } from './hooks';
 import type { AdminDashboard, AttentionItem, EvaluationHealth } from './types';
 import { attentionDetails, reasonLabel, serviceStatusView, type ServiceTone } from './view';
-
-function StatTile({ label, value, note }: { label: string; value: string; note?: string }): JSX.Element {
-  return (
-    <div className="rounded-md border border-neutral-border bg-neutral-surface p-4">
-      <p className="text-label text-text-muted">{label}</p>
-      <p className="mt-2 text-h1 text-brand-primary">{value}</p>
-      {note && <p className="mt-1 text-body-s text-text-secondary">{note}</p>}
-    </div>
-  );
-}
 
 function SummaryCards({ data }: { data: AdminDashboard }): JSX.Element {
   return (
