@@ -1,4 +1,6 @@
 // SDD 5.12. Percobaan SUBMITTED, PROCESSING, dan FAILED tidak pernah ikut dihitung (BR-SCORE-04).
+// [ASUMSI] Percobaan Dengar-Pilih ikut dihitung sebagai hasil valid pada statistik dan grafik (keputusan
+// proyek). SDD 3.14.2 tidak tegas soal ini; perlu diperjelas di SDD dan disepakati dengan backend.
 export interface Statistics {
   materialsCompleted: number;
   tasksCompleted: number;

@@ -137,8 +137,10 @@ export interface ValidResult {
 }
 
 /**
- * Hasil valid untuk statistik (SDD 3.14.2): percobaan Dengar-Pilih dan submission EVALUATED.
- * [ASUMSI] Percobaan Dengar-Pilih selalu dihitung sebagai hasil valid.
+ * Hasil valid untuk statistik dan grafik (SDD 3.14.2): percobaan Dengar-Pilih dan submission EVALUATED.
+ * [ASUMSI] Percobaan Dengar-Pilih selalu dihitung sebagai hasil valid (keputusan proyek). SDD 3.14.2
+ * tidak tegas: rumusnya mensyaratkan evaluation_status = EVALUATED, padahal percobaan Dengar-Pilih
+ * ber-evaluationStatus null (SDD 5.11). Perlu diperjelas di SDD dan disepakati dengan backend.
  */
 export function validResults(userId: string, now = Date.now()): ValidResult[] {
   const quiz = quizAttemptsOf(userId).map((a) => ({ attemptId: a.id, taskId: a.taskId, score: a.score, submittedAt: a.submittedAt }));
