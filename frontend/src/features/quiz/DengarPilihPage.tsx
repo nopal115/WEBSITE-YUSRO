@@ -25,12 +25,12 @@ export function DengarPilihPage(): JSX.Element {
   const [isAnswered, setIsAnswered] = useState(false);
   const navigate = useNavigate();
 
-  // [REKOMENDASI] Tombol X: kembali ke halaman sebelumnya, atau ke /pembelajaran bila tidak ada riwayat.
+  // [REKOMENDASI] Tombol X: kembali ke halaman sebelumnya, atau ke /belajar bila tidak ada riwayat.
   // TODO: tampilkan dialog konfirmasi (jawaban belum dikirim akan hilang) saat quiz tersambung API.
   const exitQuiz = (): void => {
     const historyIndex = (window.history.state as { idx?: number } | null)?.idx ?? 0;
     if (historyIndex > 0) navigate(-1);
-    else navigate('/pembelajaran');
+    else navigate('/belajar');
   };
 
   const checkAnswer = (): void => {

@@ -8,7 +8,7 @@ describe('resolvePostLoginPath', () => {
   });
 
   it('ke beranda role bila tidak ada tujuan', () => {
-    expect(resolvePostLoginPath(undefined, 'SANTRI')).toBe('/dashboard');
+    expect(resolvePostLoginPath(undefined, 'SANTRI')).toBe('/');
     expect(resolvePostLoginPath(undefined, 'ADMIN')).toBe('/admin');
   });
 
@@ -19,11 +19,11 @@ describe('resolvePostLoginPath', () => {
   });
 
   it('menolak tujuan yang tidak sesuai role', () => {
-    expect(resolvePostLoginPath('/admin', 'SANTRI')).toBe('/dashboard');
-    expect(resolvePostLoginPath('/dashboard', 'ADMIN')).toBe('/admin');
+    expect(resolvePostLoginPath('/admin', 'SANTRI')).toBe('/');
+    expect(resolvePostLoginPath('/belajar', 'ADMIN')).toBe('/admin');
   });
 
   it('tidak kembali ke halaman auth', () => {
-    expect(resolvePostLoginPath('/login', 'SANTRI')).toBe('/dashboard');
+    expect(resolvePostLoginPath('/login', 'SANTRI')).toBe('/');
   });
 });

@@ -1,10 +1,10 @@
 import type { UserRole } from './types';
 
-const AUTH_PATHS = ['/login', '/registrasi', '/lupa-password'];
+const AUTH_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
 
 export function homePathForRole(role: UserRole): string {
   // TODO(admin): ganti setelah halaman Admin/Pengajar dibuat.
-  return role === 'ADMIN' ? '/admin' : '/dashboard';
+  return role === 'ADMIN' ? '/admin' : '/';
 }
 
 function isAdminPath(pathname: string): boolean {

@@ -60,6 +60,7 @@ export function AppLayout(): JSX.Element {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === '/'}
               aria-label={collapsed ? item.label : undefined}
               title={collapsed ? item.label : undefined}
               className={({ isActive }) =>

@@ -68,6 +68,7 @@ export function NavDrawer({ open, onClose, returnFocusRef }: NavDrawerProps): JS
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === '/'}
               // Laci tertutup setelah memilih tujuan.
               onClick={() => dialogRef.current?.close()}
               className={({ isActive }) =>

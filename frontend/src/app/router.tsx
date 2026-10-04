@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { DengarPilihPage } from '../features/quiz/DengarPilihPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
@@ -10,11 +10,6 @@ import { PlaceholderPage } from './PlaceholderPage';
 
 export const router = createBrowserRouter([
   {
-    // Admin yang membuka "/" akan diarahkan ProtectedRoute ke /admin.
-    path: '/',
-    element: <Navigate to="/dashboard" replace />,
-  },
-  {
     element: <AuthLayout />,
     children: [
       {
@@ -23,13 +18,17 @@ export const router = createBrowserRouter([
       },
       {
         // TODO: registrasi santri (SRS UC 6.4, Figma layar 02), di luar tugas ini.
-        path: '/registrasi',
+        path: '/register',
         element: <PlaceholderPage>Registrasi</PlaceholderPage>,
       },
       {
         // TODO: backend belum punya endpoint reset password.
-        path: '/lupa-password',
+        path: '/forgot-password',
         element: <PlaceholderPage>Lupa password</PlaceholderPage>,
+      },
+      {
+        path: '/reset-password',
+        element: <PlaceholderPage>Reset password</PlaceholderPage>,
       },
     ],
   },
@@ -50,14 +49,16 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           {
-            path: '/dashboard',
+            // Sitemap SDD 12.5. Admin yang membuka "/" diarahkan ProtectedRoute ke /admin.
+            path: '/',
             element: <DashboardPage />,
           },
           {
-            path: '/pembelajaran',
+            path: '/belajar',
             element: <PlaceholderPage>Pembelajaran</PlaceholderPage>,
           },
           {
+            // Tidak ada di sitemap SDD 12.5; [TBD] menunggu konfirmasi pembimbing.
             // [TBD] NFR-USE-02 mewajibkan menu Tugas; isi halaman belum didefinisikan SRS/SDD/Figma, menunggu konfirmasi pembimbing.
             path: '/tugas',
             element: <PlaceholderPage>Tugas</PlaceholderPage>,
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
       },
       {
         // Layar latihan tampil penuh, tanpa sidebar dan bilah bawah (Figma 07–17).
+        // TODO: Diganti /tugas/:taskId/pilih (SDD 12.5) saat Dengar-Pilih dibangun.
         path: '/quiz/demo',
         element: <DengarPilihPage />,
       },

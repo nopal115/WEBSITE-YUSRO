@@ -82,7 +82,7 @@ export function LoginPage(): JSX.Element {
             />
 
             <div className="flex justify-end">
-              <Link to="/lupa-password" className="text-body text-brand-primary hover:underline">
+              <Link to="/forgot-password" className="text-body text-brand-primary hover:underline">
                 Lupa password?
               </Link>
             </div>
@@ -100,7 +100,7 @@ export function LoginPage(): JSX.Element {
 
             <div className="flex items-center justify-center gap-2 pt-2">
               <span className="text-body text-text-secondary">Belum punya akun?</span>
-              <Link to="/registrasi" className="text-h3 text-brand-primary hover:underline">
+              <Link to="/register" className="text-h3 text-brand-primary hover:underline">
                 Daftar
               </Link>
             </div>
