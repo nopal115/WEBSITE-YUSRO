@@ -38,7 +38,7 @@ function DashboardContent({ data }: { data: DashboardData }): JSX.Element {
               <p className="mt-1 text-body text-text-on-brand opacity-75">{data.lastMaterial.stageTitle}</p>
             </div>
           ) : (
-            <p className="mt-2 text-body text-text-on-brand opacity-75">Belum ada materi yang kamu buka. Mulai dari Tahapan 1.</p>
+            <p className="mt-2 text-body text-text-on-brand opacity-75">Belum ada materi yang Anda buka. Mulai dari Tahapan 1.</p>
           )}
 
           {/* Satu-satunya ajakan bertindak utama (SDD 7.7.4). */}
@@ -99,7 +99,7 @@ function DashboardContent({ data }: { data: DashboardData }): JSX.Element {
               <p className="mt-2 text-body-s text-text-secondary">{data.lastAttemptScore.taskTitle}</p>
             </>
           ) : (
-            <p className="mt-4 text-body text-text-secondary">Belum ada nilai. Nilai muncul setelah kamu mengerjakan tugas pertama.</p>
+            <p className="mt-4 text-body text-text-secondary">Belum ada nilai. Nilai muncul setelah Anda mengerjakan tugas pertama.</p>
           )}
         </Card>
       </div>

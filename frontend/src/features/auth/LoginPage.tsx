@@ -65,7 +65,7 @@ export function LoginPage(): JSX.Element {
 
           <form className="flex flex-col gap-5" onSubmit={onSubmit} noValidate>
             <h1 className="text-display text-text-primary">Masuk</h1>
-            <p className="text-body-l text-text-secondary">Lanjutkan pembelajaranmu</p>
+            <p className="text-body-l text-text-secondary">Lanjutkan pembelajaran Anda</p>
 
             {/* [REKOMENDASI] Tidak ada di Figma: kotak pesan sukses. */}
             {typeof notice === 'string' && (

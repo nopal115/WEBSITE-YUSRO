@@ -48,7 +48,7 @@ export function ForgotPasswordPage(): JSX.Element {
         <Pill status="terbuka">Langkah 1</Pill>
       </div>
       <h1 className="text-h1 text-text-primary">Lupa password</h1>
-      <p className="text-body text-text-secondary">Masukkan email akunmu. Kami kirimkan tautan untuk menetapkan password baru.</p>
+      <p className="text-body text-text-secondary">Masukkan email akun Anda. Kami kirimkan tautan untuk menetapkan password baru.</p>
 
       <form className="flex flex-col gap-5" onSubmit={onSubmit} noValidate>
         <TextField label="Email" type="email" autoComplete="email" inputMode="email" error={errors.email?.message} {...register('email')} />
