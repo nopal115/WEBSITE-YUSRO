@@ -6,6 +6,7 @@ import { RegisterPage } from '../features/auth/RegisterPage';
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { StageListPage } from '../features/learning/StageListPage';
+import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { AdminPlaceholderPage } from './AdminPlaceholderPage';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -58,6 +59,10 @@ export const router = createBrowserRouter([
           {
             path: '/belajar',
             element: <StageListPage />,
+          },
+          {
+            path: '/belajar/:stageId',
+            element: <StageMaterialsPage />,
           },
           {
             // Tidak ada di sitemap SDD 12.5; [TBD] menunggu konfirmasi pembimbing.
