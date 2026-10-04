@@ -6,12 +6,14 @@ import { RegisterPage } from '../features/auth/RegisterPage';
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { StageListPage } from '../features/learning/StageListPage';
+import { MaterialDetailPage } from '../features/learning/MaterialDetailPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { AdminPlaceholderPage } from './AdminPlaceholderPage';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
 import { PlaceholderPage } from './PlaceholderPage';
+import { TaskPlaceholderPage } from './TaskPlaceholderPage';
 
 export const router = createBrowserRouter([
   {
@@ -65,6 +67,10 @@ export const router = createBrowserRouter([
             element: <StageMaterialsPage />,
           },
           {
+            path: '/materi/:materialId',
+            element: <MaterialDetailPage />,
+          },
+          {
             // Tidak ada di sitemap SDD 12.5; [TBD] menunggu konfirmasi pembimbing.
             // [TBD] NFR-USE-02 mewajibkan menu Tugas; isi halaman belum didefinisikan SRS/SDD/Figma, menunggu konfirmasi pembimbing.
             path: '/tugas',
@@ -90,6 +96,16 @@ export const router = createBrowserRouter([
         // TODO: Diganti /tugas/:taskId/pilih (SDD 12.5) saat Dengar-Pilih dibangun.
         path: '/quiz/demo',
         element: <DengarPilihPage />,
+      },
+      {
+        // [TBD] Placeholder sesuai SDD 12.5; halamannya dibangun pada tugas berikutnya.
+        path: '/tugas/:taskId/pilih',
+        element: <TaskPlaceholderPage title="Dengar-Pilih" />,
+      },
+      {
+        // [TBD] Placeholder sesuai SDD 12.5; halamannya dibangun pada tugas berikutnya.
+        path: '/tugas/:taskId/tirukan',
+        element: <TaskPlaceholderPage title="Dengar-Tirukan" />,
       },
     ],
   },

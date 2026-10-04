@@ -8,8 +8,8 @@ export const learningKeys = {
   material: (materialId: string) => ['learning', 'material', materialId] as const,
 };
 
-export function useStages() {
-  return useQuery({ queryKey: learningKeys.stages, queryFn: ({ signal }) => learningApi.getStages(signal) });
+export function useStages(enabled = true) {
+  return useQuery({ queryKey: learningKeys.stages, queryFn: ({ signal }) => learningApi.getStages(signal), enabled });
 }
 
 export function useStageMaterials(stageId: string) {

@@ -31,6 +31,11 @@ export function isPathActive(pathname: string, to: string): boolean {
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
+/** Judul halaman yang tidak ada di menu. */
+const EXTRA_TITLES = [{ to: '/materi', title: 'Materi' }];
+
 export function pageTitle(pathname: string): string {
+  const extra = EXTRA_TITLES.find((item) => isPathActive(pathname, item.to));
+  if (extra) return extra.title;
   return NAV_ITEMS.find((item) => isPathActive(pathname, item.to))?.label ?? '';
 }
