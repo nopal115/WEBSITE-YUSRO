@@ -60,7 +60,8 @@
   dan /tugas (placeholder menu Tugas) adalah penyimpangan sitemap yang
   sudah disetujui, berstatus [TBD].
 - Sapaan Dashboard "Assalamu'alaikum, [nama]" (menyimpang dari SDD 7.7.4).
-- Tombol logout belum ditambahkan; menunggu desain.
+- Sisi santri: tombol logout belum ditambahkan; menunggu desain.
+- Sisi admin: tombol logout ada di tata letak admin.
 - Token akses disimpan di sessionStorage, penyimpangan sementara dari SDD
   6.3 (refresh token + cookie HttpOnly), sampai backend menyediakan refresh
   token.

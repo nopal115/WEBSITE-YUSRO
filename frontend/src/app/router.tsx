@@ -15,7 +15,7 @@ import { ProgressPage } from '../features/progress/ProgressPage';
 import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { ListSkeleton } from '../features/learning/QueryStates';
-import { AdminPlaceholderPage } from './AdminPlaceholderPage';
+import { AdminLayout } from './layouts/AdminLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
@@ -51,9 +51,59 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute allowedRoles={['ADMIN']} />,
     children: [
       {
-        // TODO(admin): [TBD] placeholder sampai halaman Admin/Pengajar dirancang.
-        path: '/admin',
-        element: <AdminPlaceholderPage />,
+        // Sitemap SDD 12.5 bagian Admin/Pengajar.
+        element: <AdminLayout />,
+        children: [
+          {
+            path: '/admin',
+            element: <PlaceholderPage>Dashboard</PlaceholderPage>,
+          },
+          {
+            // [TBD] Placeholder; dikerjakan di tugas A2.
+            path: '/admin/santri',
+            element: <PlaceholderPage>Santri</PlaceholderPage>,
+          },
+          {
+            // [TBD] Placeholder; dikerjakan di tugas A2.
+            path: '/admin/santri/:studentId',
+            element: <PlaceholderPage>Detail Santri</PlaceholderPage>,
+          },
+          {
+            // [TBD] Placeholder; dikerjakan di tugas A3.
+            path: '/admin/tahapan',
+            element: <PlaceholderPage>Tahapan</PlaceholderPage>,
+          },
+          {
+            // [TBD] Placeholder; dikerjakan di tugas A3.
+            path: '/admin/materi',
+            element: <PlaceholderPage>Materi</PlaceholderPage>,
+          },
+          {
+            // [TBD] Placeholder; dikerjakan di tugas A3.
+            path: '/admin/materi/:materialId',
+            element: <PlaceholderPage>Editor Materi</PlaceholderPage>,
+          },
+          {
+            // [TBD] Placeholder; dikerjakan di tugas A4.
+            path: '/admin/audio',
+            element: <PlaceholderPage>Audio</PlaceholderPage>,
+          },
+          {
+            // [TBD] Placeholder; dikerjakan di tugas A5.
+            path: '/admin/tugas',
+            element: <PlaceholderPage>Tugas</PlaceholderPage>,
+          },
+          {
+            // [TBD] Placeholder; dikerjakan di tugas A5.
+            path: '/admin/tugas/:taskId',
+            element: <PlaceholderPage>Editor Tugas</PlaceholderPage>,
+          },
+          {
+            // [TBD] Placeholder; dikerjakan di tugas A6.
+            path: '/admin/monitoring',
+            element: <PlaceholderPage>Monitoring</PlaceholderPage>,
+          },
+        ],
       },
     ],
   },
