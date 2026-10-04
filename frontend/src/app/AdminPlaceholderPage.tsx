@@ -7,7 +7,7 @@ export function AdminPlaceholderPage(): JSX.Element {
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-neutral-bg px-6 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-neutral-surface-alt px-6 text-center">
       <h1 className="text-h2 text-text-primary">Halaman Admin/Pengajar belum dibuat</h1>
       <p className="text-body text-text-secondary">Masuk sebagai {user?.name ?? 'Admin'}.</p>
       <Button variant="outline" onClick={() => void logout()}>KELUAR</Button>
