@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { LoginPage } from '../features/auth/LoginPage';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
@@ -10,15 +11,19 @@ import { AttemptDetailPage } from '../features/progress/AttemptDetailPage';
 import { HistoryPage } from '../features/progress/HistoryPage';
 import { ProfilePage } from '../features/profile/ProfilePage';
 import { ProgressPage } from '../features/progress/ProgressPage';
-import { StatisticsPage } from '../features/statistics/StatisticsPage';
 import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
+import { ListSkeleton } from '../features/learning/QueryStates';
 import { AdminPlaceholderPage } from './AdminPlaceholderPage';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
 import { PlaceholderPage } from './PlaceholderPage';
 import { TaskPlaceholderPage } from './TaskPlaceholderPage';
+
+// Statistik memuat Recharts (ukuran besar), jadi dipisah ke chunk sendiri dan hanya diunduh saat dibuka.
+// eslint-disable-next-line react-refresh/only-export-components -- berkas konfigurasi rute, bukan modul fast refresh.
+const StatisticsPage = lazy(() => import('../features/statistics/StatisticsPage').then((module) => ({ default: module.StatisticsPage })));
 
 export const router = createBrowserRouter([
   {
@@ -88,7 +93,17 @@ export const router = createBrowserRouter([
           {
             // Tidak masuk menu; diakses dari halaman Progress (keputusan proyek, sitemap SDD 12.5).
             path: '/statistik',
-            element: <StatisticsPage />,
+            element: (
+              <Suspense
+                fallback={
+                  <div className="mx-auto max-w-[1040px]">
+                    <ListSkeleton rows={2} />
+                  </div>
+                }
+              >
+                <StatisticsPage />
+              </Suspense>
+            ),
           },
           {
             path: '/riwayat',
