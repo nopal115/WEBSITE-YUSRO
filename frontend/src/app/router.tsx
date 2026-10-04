@@ -9,6 +9,7 @@ import { MaterialDetailPage } from '../features/learning/MaterialDetailPage';
 import { AttemptDetailPage } from '../features/progress/AttemptDetailPage';
 import { HistoryPage } from '../features/progress/HistoryPage';
 import { ProgressPage } from '../features/progress/ProgressPage';
+import { StatisticsPage } from '../features/statistics/StatisticsPage';
 import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { AdminPlaceholderPage } from './AdminPlaceholderPage';
@@ -82,6 +83,11 @@ export const router = createBrowserRouter([
           {
             path: '/progress',
             element: <ProgressPage />,
+          },
+          {
+            // Tidak masuk menu; diakses dari halaman Progress (keputusan proyek, sitemap SDD 12.5).
+            path: '/statistik',
+            element: <StatisticsPage />,
           },
           {
             path: '/riwayat',
