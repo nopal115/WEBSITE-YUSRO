@@ -8,6 +8,7 @@ import { StageListPage } from '../features/learning/StageListPage';
 import { MaterialDetailPage } from '../features/learning/MaterialDetailPage';
 import { AttemptDetailPage } from '../features/progress/AttemptDetailPage';
 import { HistoryPage } from '../features/progress/HistoryPage';
+import { ProfilePage } from '../features/profile/ProfilePage';
 import { ProgressPage } from '../features/progress/ProgressPage';
 import { StatisticsPage } from '../features/statistics/StatisticsPage';
 import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
@@ -100,7 +101,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/profil',
-            element: <PlaceholderPage>Profil</PlaceholderPage>,
+            element: <ProfilePage />,
           },
         ],
       },

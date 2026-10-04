@@ -10,14 +10,17 @@ export const passwordSchema = z
   .min(8, 'Password minimal 8 karakter.')
   .refine((value) => LETTER.test(value) && DIGIT.test(value), 'Password harus memuat huruf dan angka.');
 
+/** Nama: 3–100 karakter, huruf (termasuk non-ASCII), spasi, tanda hubung, apostrof. Dipakai juga di Profil. */
+export const nameSchema = z
+  .string()
+  .trim()
+  .min(3, 'Nama minimal 3 karakter.')
+  .max(100, 'Nama maksimal 100 karakter.')
+  .regex(NAME_PATTERN, 'Nama hanya boleh berisi huruf, spasi, tanda hubung, dan apostrof.');
+
 export const registerSchema = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(3, 'Nama minimal 3 karakter.')
-      .max(100, 'Nama maksimal 100 karakter.')
-      .regex(NAME_PATTERN, 'Nama hanya boleh berisi huruf, spasi, tanda hubung, dan apostrof.'),
+    name: nameSchema,
     // Di-trim dan diubah ke huruf kecil sebelum dikirim (SDD 3.2.6).
     email: z.string().trim().toLowerCase().min(1, 'Email wajib diisi.').max(190, 'Email maksimal 190 karakter.').email('Format email tidak valid.'),
     password: passwordSchema,
@@ -47,3 +50,20 @@ export const resetPasswordSchema = z
   });
 
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+
+export const profileNameSchema = z.object({ name: nameSchema });
+
+export type ProfileNameFormValues = z.infer<typeof profileNameSchema>;
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Password lama wajib diisi.'),
+    password: passwordSchema,
+    passwordConfirmation: z.string().min(1, 'Konfirmasi password wajib diisi.'),
+  })
+  .refine((values) => values.password === values.passwordConfirmation, {
+    path: ['passwordConfirmation'],
+    message: 'Konfirmasi password tidak sama.',
+  });
+
+export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
