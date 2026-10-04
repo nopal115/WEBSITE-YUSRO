@@ -6,6 +6,8 @@ import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { StageListPage } from '../features/learning/StageListPage';
 import { MaterialDetailPage } from '../features/learning/MaterialDetailPage';
+import { AttemptDetailPage } from '../features/progress/AttemptDetailPage';
+import { HistoryPage } from '../features/progress/HistoryPage';
 import { ProgressPage } from '../features/progress/ProgressPage';
 import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
@@ -82,9 +84,13 @@ export const router = createBrowserRouter([
             element: <ProgressPage />,
           },
           {
-            // ASUMSI: "Riwayat" = modul report (SDD 3.15), perlu dikonfirmasi
             path: '/riwayat',
-            element: <PlaceholderPage>Riwayat</PlaceholderPage>,
+            element: <HistoryPage />,
+          },
+          {
+            // [TBD] Tidak ada di sitemap SDD 12.5; akan dimasukkan ke revisi SDD.
+            path: '/riwayat/:attemptId',
+            element: <AttemptDetailPage />,
           },
           {
             path: '/profil',
