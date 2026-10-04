@@ -32,8 +32,8 @@ export function EmptyState({ children }: { children: string }): JSX.Element {
   );
 }
 
-/** Galat akses SDD 3.8.6 tidak bisa dicoba ulang; galat lain diberi tombol COBA LAGI. */
-const ACCESS_ERRORS = ['LEARNING_STAGE_LOCKED', 'LEARNING_MATERIAL_LOCKED', 'LEARNING_MATERIAL_INACTIVE'];
+/** Galat akses SDD 3.8.6 dan tugas tidak aktif (3.9.9, 3.10.8) tidak bisa dicoba ulang; galat lain diberi tombol COBA LAGI. */
+const ACCESS_ERRORS = ['LEARNING_STAGE_LOCKED', 'LEARNING_MATERIAL_LOCKED', 'LEARNING_MATERIAL_INACTIVE', 'QUIZ_TASK_INACTIVE', 'TASK_INACTIVE'];
 
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }): JSX.Element {
   const message = error instanceof ApiError ? error.message : 'Terjadi kesalahan. Coba lagi.';

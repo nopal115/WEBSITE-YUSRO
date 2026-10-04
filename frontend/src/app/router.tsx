@@ -1,5 +1,4 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { DengarPilihPage } from '../features/quiz/DengarPilihPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
 import { RegisterPage } from '../features/auth/RegisterPage';
@@ -7,6 +6,7 @@ import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { StageListPage } from '../features/learning/StageListPage';
 import { MaterialDetailPage } from '../features/learning/MaterialDetailPage';
+import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { AdminPlaceholderPage } from './AdminPlaceholderPage';
 import { AppLayout } from './layouts/AppLayout';
@@ -92,15 +92,9 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        // Layar latihan tampil penuh, tanpa sidebar dan bilah bawah (Figma 07–17).
-        // TODO: Diganti /tugas/:taskId/pilih (SDD 12.5) saat Dengar-Pilih dibangun.
-        path: '/quiz/demo',
-        element: <DengarPilihPage />,
-      },
-      {
-        // [TBD] Placeholder sesuai SDD 12.5; halamannya dibangun pada tugas berikutnya.
+        // Dengar-Pilih (SDD 12.5): layar penuh tanpa sidebar dan bilah bawah (Figma 07–09).
         path: '/tugas/:taskId/pilih',
-        element: <TaskPlaceholderPage title="Dengar-Pilih" />,
+        element: <QuizTaskPage />,
       },
       {
         // [TBD] Placeholder sesuai SDD 12.5; halamannya dibangun pada tugas berikutnya.
