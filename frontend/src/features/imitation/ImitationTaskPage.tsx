@@ -24,7 +24,8 @@ import {
 import type { ImitationConstraints, ImitationTask } from './types';
 
 // Kalimat SDD 7.9.
-const UNSUPPORTED_MESSAGE = 'Perangkat atau browser Anda tidak mendukung perekaman suara. Coba gunakan Chrome, Edge, atau Firefox versi terbaru.';
+// Menyimpang dari SDD 7.9: Safari ditambahkan sesuai SRS revisi 2 (NFR-COMP-01); SRS berlaku atas SDD.
+const UNSUPPORTED_MESSAGE = 'Perangkat atau browser Anda tidak mendukung perekaman suara. Coba gunakan Chrome, Edge, Firefox, atau Safari versi terbaru.';
 const PERMISSION_MESSAGE = 'Izin mikrofon belum diberikan. Aktifkan izin mikrofon pada pengaturan browser, lalu muat ulang halaman.';
 const LEAVE_MESSAGE = 'Rekaman belum dikirim dan akan hilang jika halaman ditutup. Tetap tinggalkan halaman?';
 
