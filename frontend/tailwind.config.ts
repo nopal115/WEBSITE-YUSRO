@@ -52,6 +52,16 @@ export default {
 			},
 			// SDD 7.2.3. rounded-full bawaan Tailwind dipakai untuk avatar/indikator bulat.
 			borderRadius: { sm: '8px', md: '14px', lg: '20px' },
+			// [REKOMENDASI] Bilah kemajuan tanpa persentase (unggahan rekaman): fetch tidak melaporkan kemajuan unggah.
+			keyframes: {
+				indeterminate: {
+					'0%': { transform: 'translateX(-100%)' },
+					'100%': { transform: 'translateX(250%)' },
+				},
+			},
+			animation: {
+				indeterminate: 'indeterminate 1.4s ease-in-out infinite',
+			},
 			boxShadow: {
 				card: '0 1px 3px rgba(0,0,0,.08)',
 				raised: '0 4px 12px rgba(0,0,0,.10)',

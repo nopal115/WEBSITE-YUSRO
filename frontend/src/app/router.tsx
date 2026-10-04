@@ -9,6 +9,7 @@ import { StageListPage } from '../features/learning/StageListPage';
 import { MaterialDetailPage } from '../features/learning/MaterialDetailPage';
 import { AttemptDetailPage } from '../features/progress/AttemptDetailPage';
 import { HistoryPage } from '../features/progress/HistoryPage';
+import { ImitationTaskPage } from '../features/imitation/ImitationTaskPage';
 import { ProfilePage } from '../features/profile/ProfilePage';
 import { ProgressPage } from '../features/progress/ProgressPage';
 import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
@@ -19,7 +20,6 @@ import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
 import { PlaceholderPage } from './PlaceholderPage';
-import { TaskPlaceholderPage } from './TaskPlaceholderPage';
 
 // Statistik memuat Recharts (ukuran besar), jadi dipisah ke chunk sendiri dan hanya diunduh saat dibuka.
 // eslint-disable-next-line react-refresh/only-export-components -- berkas konfigurasi rute, bukan modul fast refresh.
@@ -126,9 +126,9 @@ export const router = createBrowserRouter([
         element: <QuizTaskPage />,
       },
       {
-        // [TBD] Placeholder sesuai SDD 12.5; halamannya dibangun pada tugas berikutnya.
+        // Dengar-Tirukan (SDD 12.5): layar penuh tanpa sidebar dan bilah bawah, seperti Dengar-Pilih.
         path: '/tugas/:taskId/tirukan',
-        element: <TaskPlaceholderPage title="Dengar-Tirukan" />,
+        element: <ImitationTaskPage />,
       },
     ],
   },

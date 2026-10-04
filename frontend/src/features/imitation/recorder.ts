@@ -13,6 +13,8 @@ export interface UploadError {
   message: string;
   /** 429: tombol kirim nonaktif sampai waktu ini (ms epoch). */
   cooldownUntil?: number;
+  /** false untuk audio yang ditolak (413/422): harus rekam ulang, bukan mengirim ulang rekaman yang sama. */
+  canResend?: boolean;
 }
 
 /** Mesin keadaan perekam SDD 7.6.2, tanpa CONVERTING (rekaman diunggah dalam format asli perangkat). */
@@ -71,6 +73,7 @@ export function recorderReducer(state: RecorderState, event: RecorderEvent): Rec
       return state.status === 'READY' ? { status: 'IDLE' } : state;
     case 'UPLOAD':
       if (state.status !== 'READY') return state;
+      if (state.error?.canResend === false) return state;
       if (state.error?.cooldownUntil !== undefined && state.error.cooldownUntil > Date.now()) return state;
       return { status: 'UPLOADING', recording: state.recording };
     case 'UPLOAD_FAILED':

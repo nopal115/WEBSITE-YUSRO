@@ -73,6 +73,13 @@ describe('recorderReducer', () => {
     expect(run(failed, { type: 'UPLOAD' }).status).toBe('UPLOADING');
   });
 
+  it('audio ditolak (413/422) tidak bisa dikirim ulang, hanya direkam ulang', () => {
+    const uploading = run(initialRecorderState, { type: 'START' }, recorded(), { type: 'UPLOAD' });
+    const rejected = run(uploading, { type: 'UPLOAD_FAILED', error: { message: 'Rekaman tidak terdengar.', canResend: false } });
+    expect(run(rejected, { type: 'UPLOAD' })).toBe(rejected);
+    expect(run(rejected, { type: 'DISCARD' })).toEqual({ status: 'IDLE' });
+  });
+
   it('UPLOAD ditahan selama hitung mundur 429', () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);

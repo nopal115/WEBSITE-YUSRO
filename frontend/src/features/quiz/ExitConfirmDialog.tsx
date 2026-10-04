@@ -7,10 +7,19 @@ interface ExitConfirmDialogProps {
   onConfirm: () => void;
   /** Tombol pembuka; fokus kembali ke sini saat dialog dibatalkan. */
   returnFocusRef: RefObject<HTMLElement>;
+  title?: string;
+  message?: string;
 }
 
-/** Konfirmasi keluar saat ada jawaban belum terkirim. <dialog> bawaan: modal, Esc membatalkan. */
-export function ExitConfirmDialog({ open, onCancel, onConfirm, returnFocusRef }: ExitConfirmDialogProps): JSX.Element {
+/** Konfirmasi keluar saat ada jawaban/rekaman belum terkirim. <dialog> bawaan: modal, Esc membatalkan. */
+export function ExitConfirmDialog({
+  open,
+  onCancel,
+  onConfirm,
+  returnFocusRef,
+  title = 'Keluar dari latihan?',
+  message = 'Jawaban belum dikirim dan akan hilang jika Anda keluar. Tetap keluar?',
+}: ExitConfirmDialogProps): JSX.Element {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -41,10 +50,10 @@ export function ExitConfirmDialog({ open, onCancel, onConfirm, returnFocusRef }:
     >
       <div className="flex flex-col gap-5 p-6">
         <h2 id="keluar-judul" className="text-h2">
-          Keluar dari latihan?
+          {title}
         </h2>
         <p id="keluar-isi" className="text-body text-text-secondary">
-          Jawaban belum dikirim dan akan hilang jika Anda keluar. Tetap keluar?
+          {message}
         </p>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={() => dialogRef.current?.close()}>
