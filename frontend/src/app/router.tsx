@@ -15,6 +15,7 @@ import { ProgressPage } from '../features/progress/ProgressPage';
 import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { ListSkeleton } from '../features/learning/QueryStates';
+import { AdminDashboardPage } from '../features/admin/dashboard/AdminDashboardPage';
 import { AdminLayout } from './layouts/AdminLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -56,7 +57,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: '/admin',
-            element: <PlaceholderPage>Dashboard</PlaceholderPage>,
+            element: <AdminDashboardPage />,
           },
           {
             // [TBD] Placeholder; dikerjakan di tugas A2.

@@ -266,7 +266,17 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `audio`, `content`, `task`, `student-admin` | masing-masing `*.controller.ts` | stub `501 Not Implemented` | — (admin) |
 | POST `admin/submissions/:id/retry`, GET `admin/evaluation/queue`, GET `monitoring` | `evaluation`, `monitoring` | admin; tidak dirinci | — (admin belum dibangun) |
 
-**Ringkasan status (27 endpoint yang dipanggil frontend):** sesuai 0 · beda 12 · belum ada 15 · tidak dapat dipastikan 0. Ada satu detail yang tidak dapat dipastikan di dalam baris "beda": serialisasi `score`, lihat I3.
+### 2.11 Admin — Dashboard (`src/features/admin/dashboard/api.ts`, `types.ts`; ditambahkan di A1)
+
+| Method + path | Peran | Request | Respons yang diharapkan | Galat yang ditangani frontend | Sumber | Backend |
+| --- | --- | --- | --- | --- | --- | --- |
+| GET `admin/dashboard` | Admin | — | `AdminDashboard { totalStudents, activeStudents, attemptsTotal, averageScore \| null [ASUMSI], averageProgressPct, evaluation { queued, processing, failedLast24h, serviceStatus [ASUMSI], modelVersion } }` | umum (layar galat + coba lagi); 401 → login | SDD 5.18 | **belum ada** (D1) |
+| GET `admin/dashboard/attention` | Admin | — | `AttentionItem[] { studentId, studentCode, name, reasons[], learningProgressPct?, previousBest?, latestBest?, delta?, availableTasks? }` | umum; daftar kosong → pesan keadaan kosong | SDD 5.18, 3.17.3 | **belum ada** (D2) |
+
+- **D1:** tidak ada route `admin/dashboard`. Padanan terdekat untuk kondisi layanan adalah `GET monitoring` (`monitoring.service.ts`, `@Roles(ADMIN)`): `{ status: 'ok' | 'degraded', services { api, ml: 'ok' | 'unavailable' }, checkedAt }`, tanpa angka antrean, versi model, maupun ringkasan santri. Nilai `degraded` akan tampil "Terganggu" menurut AS16.
+- **D2:** tidak ada route `admin/dashboard/attention`. `StatisticsService.getStudentOverviewForAdmin()` menyediakan statistik per santri, tetapi tidak dipanggil route mana pun dan tidak menghitung kriteria SDD 3.17.3.
+
+**Ringkasan status (27 endpoint yang dipanggil frontend):** sesuai 0 · beda 12 · belum ada 15 · tidak dapat dipastikan 0. Ditambah 2 endpoint admin di 2.11 (A1): keduanya belum ada. Ada satu detail yang tidak dapat dipastikan di dalam baris "beda": serialisasi `score`, lihat I3.
 
 ---
 
@@ -289,6 +299,8 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | AS13 | `attemptId` di riwayat = `submissionId` untuk percobaan Dengar-Tirukan, sehingga detailnya dibuka dengan `GET imitation/submissions/:attemptId`. | Contoh SDD 5.10/5.11 memakai id yang sama (`at88…`), tetapi tidak dinyatakan eksplisit. | `src/features/progress/view.ts`, `AttemptDetailPage.tsx` |
 | AS14 | Kode galat `AUTH_RESET_INVALID` untuk token reset tidak berlaku. | SDD 5.6 tidak mencantumkan kode galat reset. | `src/features/auth/ResetPasswordPage.tsx` |
 | AS15 | Percobaan Dengar-Pilih ikut dihitung sebagai hasil valid di `GET statistics` (rata-rata, terbaik, jumlah) dan `GET statistics/chart` (titik grafik). | Keputusan proyek; SDD 3.14.2 tidak tegas (lihat T7). Backend-noval saat ini hanya menghitung IMITATION. | `src/features/statistics/types.ts`, `src/lib/api/mock/db.ts` |
+| AS16 | Pemetaan `evaluation.serviceStatus`: `ok` → "Berjalan normal", `loading` → "Sedang memuat model", nilai lain atau kosong → "Terganggu". | SDD 5.18 hanya mencontohkan `"ok"`; health ML (SDD 8.11.3) mengenal `ok` dan `loading`. Backend-noval memakai `degraded` di `GET monitoring`. | `src/features/admin/dashboard/types.ts`, `view.ts` |
+| AS17 | Dashboard admin: `averageScore` bernilai `null` bila belum ada hasil valid; kode alasan di luar tiga kriteria SDD 3.17.3 tetap tampil sebagai "Perlu diperhatikan". | SDD 5.18 hanya mencontohkan angka dan tiga kode alasan. | `src/features/admin/dashboard/types.ts`, `view.ts` |
 
 Asumsi yang hanya ada di mock (`src/lib/api/mock/`) tidak membentuk kontrak dan tidak dicantumkan, kecuali AS15 yang sudah menjadi keputusan. Contohnya: waktu tiruan evaluasi, rumus `pct` per tahapan, label riwayat SUBMITTED/PROCESSING, dan cara menghitung tren.
 
@@ -332,3 +344,4 @@ Id di route diteruskan apa adanya ke path API (`encodeURIComponent`). Backend-no
 | T7 | Percobaan Dengar-Pilih dihitung sebagai hasil valid untuk statistik dan grafik. Rumus SDD 3.14.2 mensyaratkan `evaluation_status = 'EVALUATED'`, padahal percobaan Dengar-Pilih di SDD 5.11 ber-`evaluationStatus: null`, sehingga SDD tidak tegas. Backend-noval hanya menghitung IMITATION. **Keputusan: dihitung; perlu diperjelas di SDD dan disepakati dengan backend** (AS15). | `src/lib/api/mock/db.ts`, `src/features/statistics/types.ts` |
 | T8 | Halaman Profil dan Riwayat tidak memakai `joinedAt` dan `GET imitation/tasks/:taskId/submissions`, walau keduanya ada di `api.ts`/`types.ts`. Tidak salah, hanya kontrak yang belum dipakai UI. | `src/features/profile/types.ts`, `src/features/imitation/api.ts` |
 | T9 | SDD 5.21 membedakan 400 (tidak dapat diurai) dan 422 (validasi). Frontend menangani galat audio dengan 413/422 + kode, dan memetakan 400 ke pesan umum. Backend-noval mengirim semua galat validasi sebagai 400 tanpa kode, sehingga pembedaan di frontend tidak pernah terpicu (lihat 1.8). | `src/features/imitation/ImitationTaskPage.tsx`, `src/lib/api/ApiError.ts` |
+| T10 | SRS FR-DASH-A-01 meminta kartu "jumlah tugas yang dikerjakan", tetapi API SDD 5.18 hanya menyediakan `attemptsTotal` (jumlah percobaan). **Keputusan:** kartu berlabel "PERCOBAAN TUGAS" dengan nilai `attemptsTotal`, diberi komentar [TBD]; perlu diselaraskan di SDD/API. | `src/features/admin/dashboard/AdminDashboardPage.tsx` |
