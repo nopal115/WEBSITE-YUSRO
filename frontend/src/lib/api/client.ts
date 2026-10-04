@@ -107,7 +107,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return parseSuccess<T>(await readBody(await send(path, options)));
 }
 
-/** Seperti apiRequest, ditambah meta pagination (SDD 5.5). */
+/** Seperti apiRequest, ditambah meta pagination dan message server (SDD 5.5). */
 export async function apiRequestWithMeta<T>(path: string, options: RequestOptions = {}): Promise<ParsedSuccess<T>> {
   return parseSuccessWithMeta<T>(await readBody(await send(path, options)));
 }

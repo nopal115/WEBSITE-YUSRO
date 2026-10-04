@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { TextField } from '../../components/ui/TextField';
 import { useLogin } from '../../lib/hooks/useAuth';
@@ -25,6 +25,8 @@ function BrandLogo(): JSX.Element {
 
 export function LoginPage(): JSX.Element {
   const login = useLogin();
+  // Pesan sukses dari registrasi atau reset password, dibawa lewat state navigasi.
+  const notice = (useLocation().state as { notice?: unknown } | null)?.notice;
   const {
     register,
     handleSubmit,
@@ -65,6 +67,13 @@ export function LoginPage(): JSX.Element {
             <h1 className="text-display text-text-primary">Masuk</h1>
             <p className="text-body-l text-text-secondary">Lanjutkan pembelajaranmu</p>
 
+            {/* [REKOMENDASI] Tidak ada di Figma: kotak pesan sukses. */}
+            {typeof notice === 'string' && (
+              <div className="rounded-md bg-feedback-benar-soft px-5 py-3 text-body-s text-feedback-benar" role="status">
+                {notice}
+              </div>
+            )}
+
             <TextField
               label="Email"
               type="email"
@@ -101,7 +110,7 @@ export function LoginPage(): JSX.Element {
             <div className="flex items-center justify-center gap-2 pt-2">
               <span className="text-body text-text-secondary">Belum punya akun?</span>
               <Link to="/register" className="text-h3 text-brand-primary hover:underline">
-                Daftar
+                Registrasi
               </Link>
             </div>
           </form>

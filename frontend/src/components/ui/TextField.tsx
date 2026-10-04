@@ -1,9 +1,12 @@
-import { forwardRef, useId, type InputHTMLAttributes } from 'react';
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from 'react';
 
 interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'className'> {
   label: string;
-  /** [REKOMENDASI] State error tidak ada di Figma; mengikuti SDD 7.7.1 (pesan di bawah kolom). */
-  error?: string;
+  /**
+   * [REKOMENDASI] State error tidak ada di Figma; mengikuti SDD 7.7.1 (pesan di bawah kolom).
+   * ReactNode agar pesan dapat memuat tautan (mis. AUTH_EMAIL_TAKEN → /login).
+   */
+  error?: ReactNode;
   className?: string;
 }
 

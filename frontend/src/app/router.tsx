@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { DengarPilihPage } from '../features/quiz/DengarPilihPage';
 import { LoginPage } from '../features/auth/LoginPage';
+import { RegisterPage } from '../features/auth/RegisterPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AdminPlaceholderPage } from './AdminPlaceholderPage';
 import { AppLayout } from './layouts/AppLayout';
@@ -17,9 +18,8 @@ export const router = createBrowserRouter([
         element: <LoginPage />,
       },
       {
-        // TODO: registrasi santri (SRS UC 6.4, Figma layar 02), di luar tugas ini.
         path: '/register',
-        element: <PlaceholderPage>Registrasi</PlaceholderPage>,
+        element: <RegisterPage />,
       },
       {
         // TODO: backend belum punya endpoint reset password.

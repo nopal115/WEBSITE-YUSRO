@@ -1,22 +1,24 @@
 import { ApiError } from '../../lib/api/ApiError';
-import { apiRequest } from '../../lib/api/client';
+import { apiRequest, apiRequestWithMeta } from '../../lib/api/client';
+import type { ParsedSuccess } from '../../lib/api/responseFormat';
 import type { ForgotPasswordInput, LoginInput, LoginResponse, RegisterInput, ResetPasswordInput, User } from './types';
 
 // SDD 5.6.
 export const authApi = {
-  register: (input: RegisterInput): Promise<User> =>
-    apiRequest<User>('auth/register', { method: 'POST', body: input, auth: false }),
+  // Register, forgot-password, dan reset-password ikut mengembalikan message server untuk ditampilkan.
+  register: (input: RegisterInput): Promise<ParsedSuccess<User>> =>
+    apiRequestWithMeta<User>('auth/register', { method: 'POST', body: input, auth: false }),
 
   login: (input: LoginInput): Promise<LoginResponse> =>
     apiRequest<LoginResponse>('auth/login', { method: 'POST', body: input, auth: false }),
 
   logout: (): Promise<void> => apiRequest<void>('auth/logout', { method: 'POST' }),
 
-  forgotPassword: (input: ForgotPasswordInput): Promise<void> =>
-    apiRequest<void>('auth/forgot-password', { method: 'POST', body: input, auth: false }),
+  forgotPassword: (input: ForgotPasswordInput): Promise<ParsedSuccess<null>> =>
+    apiRequestWithMeta<null>('auth/forgot-password', { method: 'POST', body: input, auth: false }),
 
-  resetPassword: (input: ResetPasswordInput): Promise<void> =>
-    apiRequest<void>('auth/reset-password', { method: 'POST', body: input, auth: false }),
+  resetPassword: (input: ResetPasswordInput): Promise<ParsedSuccess<null>> =>
+    apiRequestWithMeta<null>('auth/reset-password', { method: 'POST', body: input, auth: false }),
 
   getMe: (signal?: AbortSignal): Promise<User> => apiRequest<User>('auth/me', { signal }),
 };

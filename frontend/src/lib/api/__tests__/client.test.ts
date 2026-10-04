@@ -163,7 +163,7 @@ it('mengirim FormData tanpa Content-Type manual dan meneruskan header tambahan',
     const meta = { page: 2, limit: 10, total: 11, totalPages: 2 };
     fetchMock.mockResolvedValue(jsonResponse(200, { success: true, data: [{ id: 'a' }], meta }));
 
-    await expect(apiRequestWithMeta('progress/history?page=2')).resolves.toEqual({ data: [{ id: 'a' }], meta });
+    await expect(apiRequestWithMeta('progress/history?page=2')).resolves.toEqual({ data: [{ id: 'a' }], meta, message: null });
   });
 
   it('apiRequestBlob mengembalikan berkas dan nama dari Content-Disposition', async () => {

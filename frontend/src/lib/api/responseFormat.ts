@@ -18,6 +18,8 @@ export interface PageMeta {
 export interface ParsedSuccess<T> {
   data: T;
   meta: PageMeta | null;
+  /** Pesan siap tampil dari server (SDD 5.5); null untuk JSON mentah. */
+  message: string | null;
 }
 
 export interface ParsedErrorBody {
@@ -40,10 +42,10 @@ function isPageMeta(value: unknown): value is PageMeta {
 export function parseSuccessWithMeta<T>(body: unknown): ParsedSuccess<T> {
   // Format SDD 5.5: { success: true, data, meta }
   if (isRecord(body) && body.success === true && 'data' in body) {
-    return { data: body.data as T, meta: isPageMeta(body.meta) ? body.meta : null };
+    return { data: body.data as T, meta: isPageMeta(body.meta) ? body.meta : null, message: typeof body.message === 'string' ? body.message : null };
   }
   // Format backend saat ini: JSON mentah.
-  return { data: body as T, meta: null };
+  return { data: body as T, meta: null, message: null };
 }
 
 export function parseSuccess<T>(body: unknown): T {

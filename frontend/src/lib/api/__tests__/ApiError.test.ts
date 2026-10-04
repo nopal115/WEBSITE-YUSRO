@@ -81,7 +81,7 @@ describe('parseSuccess', () => {
 
   it('mengembalikan meta pagination SDD 5.5', () => {
     const meta = { page: 1, limit: 20, total: 137, totalPages: 7 };
-    expect(parseSuccessWithMeta({ success: true, data: [], meta })).toEqual({ data: [], meta });
+    expect(parseSuccessWithMeta({ success: true, message: 'Berhasil', data: [], meta })).toEqual({ data: [], meta, message: 'Berhasil' });
     expect(parseSuccessWithMeta({ success: true, data: [], meta: null }).meta).toBeNull();
   });
 });
