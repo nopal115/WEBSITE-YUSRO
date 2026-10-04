@@ -54,5 +54,12 @@ export interface QuizSubmitResult {
   progress: { learningProgressPct: number; tasksCompleted: number };
 }
 
-/** [ASUMSI] GET /quiz/attempts/:id = data submit tanpa progress, ditambah taskId dan submittedAt. */
-export type QuizAttempt = Omit<QuizSubmitResult, 'progress'> & { taskId: string; submittedAt: string };
+/** Soal pada saat percobaan dikerjakan (tanpa audio dan tanpa kunci). */
+export type QuizQuestionSnapshot = Pick<QuizQuestion, 'id' | 'orderIndex' | 'prompt' | 'options'>;
+
+/**
+ * [ASUMSI] GET /quiz/attempts/:id = data submit tanpa progress, ditambah taskId, submittedAt, dan
+ * snapshot soal (prompt + options) sesuai SDD 5.9 ("diambil dari snapshot"). Kontrak baru yang
+ * perlu disepakati dengan backend.
+ */
+export type QuizAttempt = Omit<QuizSubmitResult, 'progress'> & { taskId: string; submittedAt: string; questions: QuizQuestionSnapshot[] };

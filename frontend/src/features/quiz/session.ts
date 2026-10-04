@@ -1,5 +1,5 @@
 import type { FeedbackCategory } from '../../lib/api/types';
-import type { QuizOption, QuizQuestion, QuizSubmitResult, SubmitQuizInput } from './types';
+import type { QuizOption, QuizQuestion, QuizQuestionSnapshot, QuizSubmitResult, SubmitQuizInput } from './types';
 
 // Alur SDD 3.9.4: jawab semua soal → ringkasan → kirim sekaligus → hasil. Tidak ada
 // benar/salah sebelum pengiriman; kunci jawaban hanya datang dari respons submit.
@@ -9,7 +9,7 @@ export type QuizStep = { kind: 'question'; index: number } | { kind: 'summary' }
 /** Jawaban santri: questionId → optionId. */
 export type Answers = Record<string, string>;
 
-export function sortQuestions(questions: QuizQuestion[]): QuizQuestion[] {
+export function sortQuestions<T extends { orderIndex: number }>(questions: T[]): T[] {
   return [...questions].sort((a, b) => a.orderIndex - b.orderIndex);
 }
 
@@ -43,7 +43,7 @@ export interface ResultRow {
 }
 
 /** Menggabungkan soal dengan rincian hasil dari server (SDD 7.7.9). */
-export function mapResults(questions: QuizQuestion[], result: Pick<QuizSubmitResult, 'results'>): ResultRow[] {
+export function mapResults(questions: QuizQuestionSnapshot[], result: Pick<QuizSubmitResult, 'results'>): ResultRow[] {
   return sortQuestions(questions).map((question, index) => {
     const row = result.results.find((item) => item.questionId === question.id);
     const option = (id: string | undefined) => question.options.find((item) => item.id === id);

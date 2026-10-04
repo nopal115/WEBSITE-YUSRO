@@ -35,16 +35,25 @@ export function EmptyState({ children }: { children: string }): JSX.Element {
 /** Galat akses SDD 3.8.6 dan tugas tidak aktif (3.9.9, 3.10.8) tidak bisa dicoba ulang; galat lain diberi tombol COBA LAGI. */
 const ACCESS_ERRORS = ['LEARNING_STAGE_LOCKED', 'LEARNING_MATERIAL_LOCKED', 'LEARNING_MATERIAL_INACTIVE', 'QUIZ_TASK_INACTIVE', 'TASK_INACTIVE'];
 
-export function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }): JSX.Element {
+interface ErrorStateProps {
+  error: unknown;
+  onRetry: () => void;
+  /** Tujuan tautan kembali untuk galat yang tidak bisa dicoba ulang. */
+  backTo?: string;
+  backLabel?: string;
+}
+
+export function ErrorState({ error, onRetry, backTo = '/belajar', backLabel = 'Kembali ke daftar tahapan' }: ErrorStateProps): JSX.Element {
   const message = error instanceof ApiError ? error.message : 'Terjadi kesalahan. Coba lagi.';
-  const isAccessError = error instanceof ApiError && !!error.code && ACCESS_ERRORS.includes(error.code);
+  // 404: data tidak ada atau bukan milik pemanggil (SDD 6.4.4); mencoba ulang tidak akan berhasil.
+  const isAccessError = error instanceof ApiError && (error.status === 404 || (!!error.code && ACCESS_ERRORS.includes(error.code)));
   return (
     <Card>
       <div className="flex flex-col items-start gap-4" role="alert">
         <p className="text-body-l text-text-primary">{message}</p>
         {isAccessError ? (
-          <Link to="/belajar" className="text-h3 text-brand-primary hover:underline">
-            Kembali ke daftar tahapan
+          <Link to={backTo} className="text-h3 text-brand-primary hover:underline">
+            {backLabel}
           </Link>
         ) : (
           <Button onClick={onRetry}>COBA LAGI</Button>

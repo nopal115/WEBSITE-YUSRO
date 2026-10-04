@@ -1,18 +1,17 @@
-import { CheckCircle2, X, XCircle } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useCallback, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AudioPlayer } from '../../components/audio/AudioPlayer';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { LetterCard } from '../../components/ui/LetterCard';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { ApiError } from '../../lib/api/ApiError';
-import { formatScore } from '../dashboard/view';
 import { ErrorState } from '../learning/QueryStates';
 import { ExitConfirmDialog } from './ExitConfirmDialog';
 import { useQuizTask, useSubmitQuiz } from './hooks';
-import { allAnswered, buildSubmitInput, FEEDBACK_LABEL, mapResults, nextStep, previousStep, sortQuestions, type Answers, type QuizStep } from './session';
-import type { QuizOption, QuizTask } from './types';
+import { ArabicOption, QuizResultView } from './QuizResultView';
+import { allAnswered, buildSubmitInput, nextStep, previousStep, sortQuestions, type Answers, type QuizStep } from './session';
+import type { QuizTask } from './types';
 
 /** Keluar: kembali ke halaman sebelumnya, atau ke /belajar bila tidak ada riwayat. */
 function useExit(): () => void {
@@ -22,18 +21,6 @@ function useExit(): () => void {
     if (historyIndex > 0) navigate(-1);
     else navigate('/belajar');
   }, [navigate]);
-}
-
-function ArabicOption({ option }: { option: QuizOption | undefined }): JSX.Element {
-  if (!option) return <span>—</span>;
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span className="font-arabic text-arabic-s text-text-primary" lang="ar" dir="rtl">
-        {option.arabicLabel}
-      </span>
-      <span>{option.label}</span>
-    </span>
-  );
 }
 
 /** Kerangka layar latihan: header tetap (X, progress, indikator) dan isi terpusat. */
@@ -83,72 +70,27 @@ function QuizSession({ task, onAudioExpired }: { task: QuizTask; onAudioExpired:
   const dialog = <ExitConfirmDialog open={confirmOpen} onCancel={closeConfirm} onConfirm={exit} returnFocusRef={exitRef} />;
 
   if (result) {
-    const rows = mapResults(questions, result);
     // Layar hasil SDD 7.7.9 / SRS UI-QUIZ-02. Kunci jawaban baru terlihat di sini.
     return (
       <QuizFrame indicator="Hasil" value={total} max={total} onExit={handleExit} exitRef={exitRef}>
-        <Card>
-          <p className="flex items-center gap-2 text-h3 text-feedback-benar">
-            <CheckCircle2 size={24} aria-hidden="true" />
-            Tugas selesai
-          </p>
-          <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-2">
-            <p className="text-score text-brand-primary">
-              {formatScore(result.score)}
-              <span className="text-h2 text-text-secondary"> / 100</span>
-            </p>
-            {/* Kategori dari server, ditampilkan sebagai label netral (keputusan e). */}
-            <p className="text-h3 text-text-primary">{FEEDBACK_LABEL[result.feedbackCategory]}</p>
-          </div>
-          <p className="mt-2 text-body text-text-secondary">
-            Jawaban benar {result.correctCount} / {result.questionCount}
-          </p>
-        </Card>
-
-        <section aria-labelledby="rincian-jawaban" className="flex flex-col gap-3">
-          <h2 id="rincian-jawaban" className="text-h3">
-            Rincian jawaban
-          </h2>
-          <ol className="flex flex-col gap-3">
-            {rows.map((row) => (
-              <li key={row.questionId} className="rounded-md border border-neutral-border bg-neutral-surface p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <p className="text-body font-semibold">
-                    Soal {row.number} — {row.prompt}
-                  </p>
-                  {/* Benar/salah dengan ikon + teks, bukan warna saja (SDD 7.3). */}
-                  <span className={`flex shrink-0 items-center gap-1 text-body-s font-semibold ${row.isCorrect ? 'text-feedback-benar' : 'text-feedback-salah'}`}>
-                    {row.isCorrect ? <CheckCircle2 size={18} aria-hidden="true" /> : <XCircle size={18} aria-hidden="true" />}
-                    {row.isCorrect ? 'Benar' : 'Salah'}
-                  </span>
-                </div>
-                <dl className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-3 text-body-s text-text-secondary">
-                  <dt>Jawaban Anda</dt>
-                  <dd className="text-text-primary">
-                    <ArabicOption option={row.selected} />
-                  </dd>
-                  <dt>Kunci jawaban</dt>
-                  <dd className="text-text-primary">
-                    <ArabicOption option={row.correct} />
-                  </dd>
-                </dl>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          {/* Tidak ada batas percobaan (SDD 3.9.5). */}
-          <Button variant="accent" onClick={restart}>
-            KERJAKAN LAGI
-          </Button>
-          <Button variant="outline" onClick={exit}>
-            KEMBALI
-          </Button>
-          <Link to="/riwayat" className="flex min-h-11 items-center px-2 text-body text-brand-primary hover:underline sm:ml-auto">
-            Lihat riwayat
-          </Link>
-        </div>
+        <QuizResultView
+          result={result}
+          questions={questions}
+          actions={
+            <>
+              {/* Tidak ada batas percobaan (SDD 3.9.5). */}
+              <Button variant="accent" onClick={restart}>
+                KERJAKAN LAGI
+              </Button>
+              <Button variant="outline" onClick={exit}>
+                KEMBALI
+              </Button>
+              <Link to="/riwayat" className="flex min-h-11 items-center px-2 text-body text-brand-primary hover:underline sm:ml-auto">
+                Lihat riwayat
+              </Link>
+            </>
+          }
+        />
         {dialog}
       </QuizFrame>
     );

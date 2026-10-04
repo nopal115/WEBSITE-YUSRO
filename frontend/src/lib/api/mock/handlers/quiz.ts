@@ -92,7 +92,10 @@ export const quizRoutes: MockRoute[] = [
       // Percobaan milik pengguna lain dijawab 404, bukan 403 (SDD 6.4.4).
       const attempt = db.quizAttempts.find((a) => a.id === req.params.attemptId && a.userId === req.userId);
       if (!attempt) return fail(404, 'NOT_FOUND', 'Data tidak ditemukan.');
-      return ok({ ...attemptView(attempt), taskId: attempt.taskId, submittedAt: attempt.submittedAt });
+      // [ASUMSI] Snapshot soal ikut dikirim (SDD 5.9); tanpa audio dan tanpa kunci.
+      const task = findTask(attempt.taskId, 'QUIZ');
+      const questions = task.questions.map(({ id, orderIndex, prompt, options }) => ({ id, orderIndex, prompt, options }));
+      return ok({ ...attemptView(attempt), taskId: attempt.taskId, submittedAt: attempt.submittedAt, questions });
     },
   },
 ];
