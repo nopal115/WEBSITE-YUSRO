@@ -1,8 +1,8 @@
 import { Menu, PanelLeftClose, PanelLeftOpen, User } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../lib/hooks/useAuth';
-import { BOTTOM_NAV_ITEMS, isPathActive, NAV_ITEMS, pageTitle } from './navigation';
+import { BOTTOM_NAV_ITEMS, isNavItemActive, isPathActive, NAV_ITEMS, pageTitle, type NavItem } from './navigation';
 import { NavDrawer } from './NavDrawer';
 
 const COLLAPSED_KEY = 'yusro.sidebarCollapsed';
@@ -22,6 +22,22 @@ function writeCollapsed(value: boolean): void {
   } catch {
     // Abaikan: status tetap berlaku sampai halaman dimuat ulang.
   }
+}
+
+// Keadaan aktif dihitung sendiri (bukan NavLink) karena satu butir bisa aktif untuk beberapa path.
+function SidebarLink({ item, active, collapsed, labelClass }: { item: NavItem; active: boolean; collapsed: boolean; labelClass: string }): JSX.Element {
+  return (
+    <Link
+      to={item.to}
+      aria-current={active ? 'page' : undefined}
+      aria-label={collapsed ? item.label : undefined}
+      title={collapsed ? item.label : undefined}
+      className={`flex min-h-14 items-center gap-4 rounded-md border px-4 transition ${collapsed ? 'md:justify-center md:px-0 lg:justify-start lg:px-4' : ''} ${active ? 'border-brand-primary-line bg-brand-primary-soft text-brand-primary' : 'border-transparent text-text-secondary hover:bg-neutral-surface-alt'}`}
+    >
+      <item.icon size={24} className="shrink-0" aria-hidden="true" />
+      <span className={`${active ? 'text-h3' : 'text-body'} ${labelClass}`}>{item.label}</span>
+    </Link>
+  );
 }
 
 // SDD 7.5: mobile < 768 px bilah bawah; tablet 768–1023 px sidebar dapat dilipat;
@@ -57,23 +73,7 @@ export function AppLayout(): JSX.Element {
         </div>
         <nav className="flex flex-col gap-2">
           {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              aria-label={collapsed ? item.label : undefined}
-              title={collapsed ? item.label : undefined}
-              className={({ isActive }) =>
-                `flex min-h-14 items-center gap-4 rounded-md border px-4 transition ${collapsed ? 'md:justify-center md:px-0 lg:justify-start lg:px-4' : ''} ${isActive ? 'border-brand-primary-line bg-brand-primary-soft text-brand-primary' : 'border-transparent text-text-secondary hover:bg-neutral-surface-alt'}`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <item.icon size={24} className="shrink-0" aria-hidden="true" />
-                  <span className={`${isActive ? 'text-h3' : 'text-body'} ${labelClass}`}>{item.label}</span>
-                </>
-              )}
-            </NavLink>
+            <SidebarLink key={item.to} item={item} active={isNavItemActive(pathname, item)} collapsed={collapsed} labelClass={labelClass} />
           ))}
         </nav>
         <div className="flex-1" />

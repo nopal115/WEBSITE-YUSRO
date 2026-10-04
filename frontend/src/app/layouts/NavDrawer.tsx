@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef, type RefObject } from 'react';
-import { NavLink } from 'react-router-dom';
-import { NAV_ITEMS } from './navigation';
+import { Link, useLocation } from 'react-router-dom';
+import { isNavItemActive, NAV_ITEMS } from './navigation';
 
 interface NavDrawerProps {
   open: boolean;
@@ -16,6 +16,7 @@ interface NavDrawerProps {
  */
 export function NavDrawer({ open, onClose, returnFocusRef }: NavDrawerProps): JSX.Element {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const { pathname } = useLocation();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -65,19 +66,17 @@ export function NavDrawer({ open, onClose, returnFocusRef }: NavDrawerProps): JS
         </div>
         <nav className="flex flex-col gap-2" aria-label="Navigasi utama">
           {NAV_ITEMS.map((item) => (
-            <NavLink
+            <Link
               key={item.to}
               to={item.to}
-              end={item.to === '/'}
+              aria-current={isNavItemActive(pathname, item) ? 'page' : undefined}
               // Laci tertutup setelah memilih tujuan.
               onClick={() => dialogRef.current?.close()}
-              className={({ isActive }) =>
-                `flex min-h-14 items-center gap-4 rounded-md border px-4 ${isActive ? 'border-brand-primary-line bg-brand-primary-soft text-brand-primary' : 'border-transparent text-text-secondary hover:bg-neutral-surface-alt'}`
-              }
+              className={`flex min-h-14 items-center gap-4 rounded-md border px-4 ${isNavItemActive(pathname, item) ? 'border-brand-primary-line bg-brand-primary-soft text-brand-primary' : 'border-transparent text-text-secondary hover:bg-neutral-surface-alt'}`}
             >
               <item.icon size={24} className="shrink-0" aria-hidden="true" />
               <span className="text-body">{item.label}</span>
-            </NavLink>
+            </Link>
           ))}
         </nav>
       </div>

@@ -4,6 +4,8 @@ export interface NavItem {
   label: string;
   to: string;
   icon: LucideIcon;
+  /** Halaman lain yang menyalakan butir ini (mis. /statistik untuk Progress). */
+  alsoActiveFor?: string[];
 }
 
 // Enam tujuan sesuai SRS NFR-USE-02; label mengikuti Figma.
@@ -12,7 +14,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Beranda', to: '/', icon: House },
   { label: 'Pembelajaran', to: '/belajar', icon: BookOpen },
   { label: 'Tugas', to: '/tugas', icon: ClipboardList },
-  { label: 'Progress', to: '/progress', icon: TrendingUp },
+  // /statistik tidak masuk menu; diakses dari halaman Progress (keputusan proyek).
+  { label: 'Progress', to: '/progress', icon: TrendingUp, alsoActiveFor: ['/statistik'] },
   { label: 'Riwayat', to: '/riwayat', icon: History },
   { label: 'Profil', to: '/profil', icon: User },
 ];
@@ -21,7 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
 export const BOTTOM_NAV_ITEMS: (NavItem & { activeFor: string[] })[] = [
   { label: 'Beranda', to: '/', icon: House, activeFor: ['/'] },
   { label: 'Belajar', to: '/belajar', icon: BookOpen, activeFor: ['/belajar', '/materi', '/tugas'] },
-  { label: 'Progress', to: '/progress', icon: TrendingUp, activeFor: ['/progress', '/riwayat'] },
+  { label: 'Progress', to: '/progress', icon: TrendingUp, activeFor: ['/progress', '/statistik', '/riwayat'] },
   { label: 'Akun', to: '/profil', icon: User, activeFor: ['/profil'] },
 ];
 
@@ -32,7 +35,14 @@ export function isPathActive(pathname: string, to: string): boolean {
 }
 
 /** Judul halaman yang tidak ada di menu. */
-const EXTRA_TITLES = [{ to: '/materi', title: 'Materi' }];
+const EXTRA_TITLES = [
+  { to: '/materi', title: 'Materi' },
+  { to: '/statistik', title: 'Statistik' },
+];
+
+export function isNavItemActive(pathname: string, item: NavItem): boolean {
+  return isPathActive(pathname, item.to) || (item.alsoActiveFor ?? []).some((path) => isPathActive(pathname, path));
+}
 
 export function pageTitle(pathname: string): string {
   const extra = EXTRA_TITLES.find((item) => isPathActive(pathname, item.to));
