@@ -49,7 +49,7 @@ export function LoginPage(): JSX.Element {
         <div className="flex flex-col gap-6">
           <p className="text-display">Belajar mengaji, satu langkah tiap hari.</p>
           <p className="text-body-l opacity-[0.78]">
-            Dengar contohnya, tirukan bacaannya, dan langsung tahu apakah pelafalanmu sudah tepat.
+            Dengar contohnya, tirukan bacaannya, dan langsung tahu apakah pelafalan Anda sudah tepat.
           </p>
         </div>
         <p className="text-body-s opacity-[0.55]">Badan Riset dan Inovasi Nasional</p>
