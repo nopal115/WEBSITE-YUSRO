@@ -49,6 +49,16 @@ export interface SubmissionFailed {
 
 export type SubmissionStatus = SubmissionPending | SubmissionEvaluated | SubmissionFailed;
 
+export interface PollingStep {
+  intervalMs: number;
+  times: number;
+}
+
+export interface PollingPlan {
+  recommendedSchedule: PollingStep[];
+  stopAfterMs: number;
+}
+
 export interface ImitationTask {
   id: string;
   title: string;
@@ -56,15 +66,14 @@ export interface ImitationTask {
   referenceAudio: { id: string; url: string; durationMs: number };
   arabicText: string;
   constraints: ImitationConstraints;
-  /** [ASUMSI] Bentuknya sama dengan respons status submission. */
-  activeSubmission: SubmissionPending | null;
+  /**
+   * [ASUMSI] Bentuknya sama dengan respons status submission, ditambah objek polling seperti
+   * respons 202. Field polling adalah kontrak baru yang perlu disepakati dengan backend (SDD 5.10
+   * belum memuatnya), agar pemantauan saat halaman dibuka ulang tetap memakai jadwal dari backend.
+   */
+  activeSubmission: (SubmissionPending & { polling: PollingPlan }) | null;
   attemptCount: number;
   bestScore: number | null;
-}
-
-export interface PollingStep {
-  intervalMs: number;
-  times: number;
 }
 
 /** Respons 202 Accepted: bukan hasil nilai; frontend memantau status sesuai jadwal polling. */
@@ -74,7 +83,7 @@ export interface SubmitRecordingResult {
   evaluationStatus: 'SUBMITTED';
   score: null;
   submittedAt: string;
-  polling: { recommendedSchedule: PollingStep[]; stopAfterMs: number };
+  polling: PollingPlan;
 }
 
 /** [ASUMSI] Bentuk butir riwayat submission per tugas tidak dirinci SDD. */
