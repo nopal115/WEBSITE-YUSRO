@@ -82,3 +82,57 @@ export function chartTrend(scores: number[]): ChartTrend {
   if (last < first) return 'DOWN';
   return 'FLAT';
 }
+
+/** Ringkasan aktivitas seorang Santri, bahan dashboard admin dan daftar "perlu diperhatikan". */
+export interface StudentActivity {
+  learningProgressPct: number;
+  /** Jumlah tugas yang tersedia (pada materi yang terbuka) bagi Santri. */
+  availableTasks: number;
+  /** Jumlah seluruh percobaan, apa pun statusnya. */
+  attemptCount: number;
+  /** Nilai terbaik (hasil valid) per tugas beserta waktu percobaan valid terakhir pada tugas itu. */
+  taskBests: { taskId: string; bestScore: number; lastAttemptAt: string }[];
+}
+
+export type AttentionReason = 'LOW_PROGRESS' | 'SCORE_DECLINE' | 'NO_ATTEMPT';
+
+export interface AttentionResult {
+  reasons: AttentionReason[];
+  learningProgressPct?: number;
+  previousBest?: number;
+  latestBest?: number;
+  delta?: number;
+  availableTasks?: number;
+}
+
+const LOW_PROGRESS_BELOW_PCT = 50;
+const SCORE_DECLINE_MIN_POINTS = 10;
+
+/**
+ * Kriteria "Santri yang perlu diperhatikan" SDD 3.17.3 / SRS FR-DASH-A-02:
+ * progress < 50%; nilai terbaik tugas yang paling terakhir dikerjakan lebih rendah ≥ 10 poin dari
+ * nilai terbaik tugas sebelumnya; belum ada percobaan pada tugas yang tersedia.
+ * Field pendukung hanya diisi untuk alasan yang terpenuhi (bentuk contoh SDD 5.18).
+ */
+export function attentionOf(activity: StudentActivity): AttentionResult {
+  const result: AttentionResult = { reasons: [] };
+  if (activity.learningProgressPct < LOW_PROGRESS_BELOW_PCT) {
+    result.reasons.push('LOW_PROGRESS');
+    result.learningProgressPct = activity.learningProgressPct;
+  }
+  const ordered = [...activity.taskBests].sort((a, b) => a.lastAttemptAt.localeCompare(b.lastAttemptAt));
+  if (ordered.length >= 2) {
+    const previous = ordered[ordered.length - 2];
+    const latest = ordered[ordered.length - 1];
+    const delta = round2(latest.bestScore - previous.bestScore);
+    if (delta <= -SCORE_DECLINE_MIN_POINTS) {
+      result.reasons.push('SCORE_DECLINE');
+      Object.assign(result, { previousBest: previous.bestScore, latestBest: latest.bestScore, delta });
+    }
+  }
+  if (activity.availableTasks > 0 && activity.attemptCount === 0) {
+    result.reasons.push('NO_ATTEMPT');
+    result.availableTasks = activity.availableTasks;
+  }
+  return result;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONTENT } from '../data/content';
-import { chartTrend, computeAccess, feedbackCategory, imitationStatusAt, quizScore } from '../rules';
+import { attentionOf, chartTrend, computeAccess, feedbackCategory, imitationStatusAt, quizScore, type StudentActivity } from '../rules';
 
 describe('quizScore (FR-QUIZ-06)', () => {
   it('menghitung (benar / jumlah soal) × 100 dengan dua desimal', () => {
@@ -67,5 +67,40 @@ describe('chartTrend', () => {
     expect(chartTrend([50, 70, 60, 80])).toBe('UP');
     expect(chartTrend([90, 70, 80])).toBe('DOWN');
     expect(chartTrend([80, 70, 80])).toBe('FLAT');
+  });
+});
+
+describe('attentionOf (SDD 3.17.3, FR-DASH-A-02)', () => {
+  const base: StudentActivity = { learningProgressPct: 80, availableTasks: 5, attemptCount: 3, taskBests: [] };
+  const best = (taskId: string, bestScore: number, day: number) => ({ taskId, bestScore, lastAttemptAt: `2026-09-${String(day).padStart(2, '0')}T00:00:00.000Z` });
+
+  it('tidak ada alasan untuk santri yang baik-baik saja', () => {
+    expect(attentionOf(base)).toEqual({ reasons: [] });
+  });
+
+  it('progress rendah bila kurang dari 50%', () => {
+    expect(attentionOf({ ...base, learningProgressPct: 49 })).toEqual({ reasons: ['LOW_PROGRESS'], learningProgressPct: 49 });
+    expect(attentionOf({ ...base, learningProgressPct: 50 }).reasons).toEqual([]);
+  });
+
+  it('nilai menurun: dua tugas terakhir menurut waktu, selisih sekurang-kurangnya 10 poin', () => {
+    const declined = attentionOf({ ...base, taskBests: [best('t3', 71, 15), best('t1', 95, 1), best('t2', 88, 9)] });
+    expect(declined).toEqual({ reasons: ['SCORE_DECLINE'], previousBest: 88, latestBest: 71, delta: -17 });
+    expect(attentionOf({ ...base, taskBests: [best('t1', 80, 1), best('t2', 70, 2)] }).reasons).toEqual(['SCORE_DECLINE']);
+    expect(attentionOf({ ...base, taskBests: [best('t1', 80, 1), best('t2', 70.01, 2)] }).reasons).toEqual([]);
+    expect(attentionOf({ ...base, taskBests: [best('t1', 40, 1)] }).reasons).toEqual([]);
+  });
+
+  it('belum mengerjakan tugas bila tidak ada percobaan pada tugas yang tersedia', () => {
+    expect(attentionOf({ ...base, attemptCount: 0 })).toEqual({ reasons: ['NO_ATTEMPT'], availableTasks: 5 });
+    expect(attentionOf({ ...base, attemptCount: 0, availableTasks: 0 }).reasons).toEqual([]);
+  });
+
+  it('beberapa alasan sekaligus', () => {
+    expect(attentionOf({ learningProgressPct: 18, availableTasks: 6, attemptCount: 0, taskBests: [] })).toEqual({
+      reasons: ['LOW_PROGRESS', 'NO_ATTEMPT'],
+      learningProgressPct: 18,
+      availableTasks: 6,
+    });
   });
 });

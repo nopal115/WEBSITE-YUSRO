@@ -192,3 +192,30 @@ describe('imitation (SDD 3.10, 5.10)', () => {
     expect(big).toMatchObject({ status: 413, body: { errorCode: 'AUDIO_TOO_LARGE', message: 'Ukuran rekaman melebihi 5 MB.' } });
   });
 });
+
+describe('admin dashboard (SDD 5.18)', () => {
+  it('Santri ditolak 403 di endpoint Admin', async () => {
+    expect(await call('GET', 'admin/dashboard')).toMatchObject({ status: 403, body: { errorCode: 'FORBIDDEN_ROLE' } });
+    expect((await call('GET', 'admin/dashboard/attention')).status).toBe(403);
+  });
+
+  it('ringkasan dan daftar perhatian untuk Admin', async () => {
+    await login('admin@yusro.mock', 'admin1234');
+    const dashboard = await call('GET', 'admin/dashboard');
+    expect(dashboard.status).toBe(200);
+    expect(dashboard.body.data).toMatchObject({ totalStudents: 13, activeStudents: 11, evaluation: { serviceStatus: 'ok', modelVersion: expect.any(String) } });
+    expect(typeof dashboard.body.data.averageScore).toBe('number');
+
+    const attention = await call('GET', 'admin/dashboard/attention');
+    const byCode = Object.fromEntries(attention.body.data.map((item: { studentCode: string; reasons: string[] }) => [item.studentCode, item.reasons]));
+    expect(byCode['YSR-000102']).toEqual(['LOW_PROGRESS']);
+    expect(byCode['YSR-000103']).toEqual(['SCORE_DECLINE']);
+    expect(byCode['YSR-000104']).toEqual(['LOW_PROGRESS', 'NO_ATTEMPT']);
+    expect(byCode['YSR-000106']).toEqual(['LOW_PROGRESS', 'SCORE_DECLINE']);
+    // Turun 8 poin (di bawah ambang) dan akun nonaktif tidak masuk daftar.
+    expect(byCode['YSR-000107']).toBeUndefined();
+    expect(byCode['YSR-000109']).toBeUndefined();
+    // Akun demo baru: progress 0% dan belum ada percobaan.
+    expect(byCode['YSR-000001']).toEqual(['LOW_PROGRESS', 'NO_ATTEMPT']);
+  });
+});

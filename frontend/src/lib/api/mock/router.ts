@@ -3,8 +3,8 @@
 import { getDelay, takeFault } from './controls';
 import { fail, MockHttpError, toResponse, type MockRequest, type MockResult } from './http';
 
-/** public: tanpa token; any: semua peran; SANTRI: hanya Santri (endpoint admin tidak ditiru). */
-export type RouteAccess = 'public' | 'any' | 'SANTRI';
+/** public: tanpa token; any: semua peran; SANTRI/ADMIN: hanya peran tersebut. */
+export type RouteAccess = 'public' | 'any' | 'SANTRI' | 'ADMIN';
 
 export interface MockRoute {
   method: string;
@@ -74,7 +74,7 @@ export function createMockFetch(routes: MockRoute[], resolveIdentity: (token: st
     if (found.route.access !== 'public' && !identity) {
       return toResponse(fail(401, 'AUTH_TOKEN_EXPIRED', 'Sesi berakhir. Silakan masuk kembali.'));
     }
-    if (found.route.access === 'SANTRI' && identity?.role !== 'SANTRI') {
+    if ((found.route.access === 'SANTRI' || found.route.access === 'ADMIN') && identity?.role !== found.route.access) {
       return toResponse(fail(403, 'FORBIDDEN_ROLE', 'Anda tidak memiliki akses ke data ini.'));
     }
 
