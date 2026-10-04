@@ -76,16 +76,19 @@ function acceptedView(submission: SubmissionRecord) {
     evaluationStatus: 'SUBMITTED' as const,
     score: null,
     submittedAt: iso(submission.submittedAtMs),
-    polling: {
-      recommendedSchedule: [
-        { intervalMs: 3000, times: 5 },
-        { intervalMs: 10000, times: 6 },
-        { intervalMs: 30000, times: 6 },
-      ],
-      stopAfterMs: 300000,
-    },
+    polling: POLLING,
   };
 }
+
+// Jadwal contoh SDD 5.10.
+const POLLING = {
+  recommendedSchedule: [
+    { intervalMs: 3000, times: 5 },
+    { intervalMs: 10000, times: 6 },
+    { intervalMs: 30000, times: 6 },
+  ],
+  stopAfterMs: 300000,
+};
 
 const ACCEPTED = { status: 202, message: 'Rekaman diterima dan sedang dievaluasi.' };
 
@@ -106,7 +109,8 @@ export const imitationRoutes: MockRoute[] = [
         referenceAudio: { id: `ref-${task.id}`, url: mockAudioUrl(`reference:${task.id}`, task.referenceDurationMs), durationMs: task.referenceDurationMs },
         arabicText: task.arabicText,
         constraints: IMITATION_CONSTRAINTS,
-        activeSubmission: active ? statusView(active) : null,
+        // [ASUMSI] Kontrak baru: polling ikut dikirim agar pemantauan saat halaman dibuka ulang memakai jadwal backend.
+        activeSubmission: active ? { ...statusView(active), polling: POLLING } : null,
         attemptCount: attemptCount(userId, task),
         bestScore: bestScore(userId, task.id),
       });
