@@ -22,9 +22,11 @@
 ## Acuan dokumen
 - SDD: ../../SDD.md (versi terbaru). SRS: ../../SRS.md. Keduanya di luar repo;
   jangan salin isi atau berkasnya ke dalam repo.
-- Urutan acuan: SDD dulu; Figma kalau SDD tidak mengatur. Kalau SDD
-  bertentangan dengan dirinya sendiri, SRS yang berlaku (Ketentuan Penggunaan
-  Dokumen SDD).
+- Urutan acuan: SDD dulu; Figma kalau SDD tidak mengatur.
+- Kalau SDD bertentangan dengan SRS, SRS yang berlaku (Ketentuan
+  Penggunaan Dokumen SDD).
+- Kalau SDD bertentangan dengan dirinya sendiri, berhenti dan tanya;
+  keputusan diambil per kasus.
 - Setiap penyimpangan dari SDD yang sudah disetujui diberi komentar di kode.
 
 ## Integrasi dengan backend (agar mudah di-merge)
@@ -54,6 +56,9 @@
 - Dengar-Pilih: semua jawaban dikirim sekaligus; hasil dan kunci jawaban
   hanya tampil setelah dikirim.
 - Route mengikuti sitemap SDD 12.5.
+- /riwayat/:attemptId (detail percobaan; tidak ada di sitemap SDD 12.5)
+  dan /tugas (placeholder menu Tugas) adalah penyimpangan sitemap yang
+  sudah disetujui, berstatus [TBD].
 - Sapaan Dashboard "Assalamu'alaikum, [nama]" (menyimpang dari SDD 7.7.4).
 - Tombol logout belum ditambahkan; menunggu desain.
 
