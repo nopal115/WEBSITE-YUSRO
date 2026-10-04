@@ -34,7 +34,8 @@ export function DashboardPage(): JSX.Element {
     // dengan kartu pertama tanpa offset.
     <div className="mx-auto grid max-w-[1380px] grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1040px)_300px] lg:gap-x-10 lg:gap-y-8">
       <header className="lg:col-span-2">
-        <h1 className="break-words text-display">Assalamu&apos;alaikum, {dummyDashboardData.name}</h1>
+        {/* [REKOMENDASI] SDD belum mengatur tipografi mobile: H1 di bawah 768 px, Display di atasnya. */}
+        <h1 className="break-words text-h1 md:text-display">Assalamu&apos;alaikum, {dummyDashboardData.name}</h1>
         <p className="mt-2 text-body-l text-text-secondary">{dummyDashboardData.idSantri} · {dummyDashboardData.activeStage}</p>
       </header>
       <div className="min-w-0 space-y-6 lg:space-y-8">
