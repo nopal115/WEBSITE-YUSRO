@@ -3,6 +3,7 @@ import type { AccountStatus, UserRole } from '../../../features/auth/types';
 import type { QuizQuestionResult } from '../../../features/quiz/types';
 import type { EvaluationStatus } from '../types';
 import { CONTENT, type MockImitationTask, type MockMaterial, type MockQuizTask, type MockStage, type MockTask } from './data/content';
+import { seedSampleSubmissions } from './data/submissions';
 import { seedSampleStudents, type SampleStudent } from './data/students';
 import { httpError } from './http';
 import { computeAccess, imitationStatusAt, type AccessState } from './rules';
@@ -40,6 +41,12 @@ export interface SubmissionRecord {
   outcome: 'EVALUATED' | 'FAILED';
   /** Skor yang akan muncul bila EVALUATED; selalu null untuk FAILED. */
   score: number | null;
+  /** [DATA CONTOH] Status SUBMITTED/PROCESSING yang dibekukan untuk submission contoh Monitoring. */
+  pinnedStatus?: 'SUBMITTED' | 'PROCESSING';
+  /** Waktu retry Admin; status dihitung ulang dari waktu ini, waktu kirim dan attemptNo tetap (BR-ML-07). */
+  retriedAtMs?: number;
+  /** Kode teknis kegagalan (hanya untuk Admin). */
+  errorCode?: string | null;
 }
 
 /** Akun contoh, hanya ada di mode mock. */
@@ -50,14 +57,17 @@ function seedUsers(): MockUser[] {
   ];
 }
 
+const initialStudents = seedSampleStudents();
+
 export const db = {
   users: seedUsers(),
   materialCompletions: new Map<string, Map<string, string>>(),
   lastOpened: new Map<string, string>(),
   quizAttempts: [] as QuizAttemptRecord[],
-  submissions: [] as SubmissionRecord[],
+  /** Submission Dengar-Tirukan; berisi [DATA CONTOH] santri contoh untuk Monitoring sejak awal. */
+  submissions: seedSampleSubmissions(initialStudents) as SubmissionRecord[],
   /** [DATA CONTOH] Santri contoh untuk halaman Admin; status dapat diubah Admin. */
-  sampleStudents: seedSampleStudents() as SampleStudent[],
+  sampleStudents: initialStudents as SampleStudent[],
 };
 
 export function resetDb(): void {
@@ -65,8 +75,8 @@ export function resetDb(): void {
   db.materialCompletions.clear();
   db.lastOpened.clear();
   db.quizAttempts = [];
-  db.submissions = [];
   db.sampleStudents = seedSampleStudents();
+  db.submissions = seedSampleSubmissions(db.sampleStudents);
 }
 
 export const newId = (prefix: string): string => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
@@ -126,7 +136,7 @@ export const submissionsOf = (userId: string, taskId?: string) =>
   db.submissions.filter((s) => s.userId === userId && (!taskId || s.taskId === taskId));
 
 export const submissionStatus = (submission: SubmissionRecord, now = Date.now()): EvaluationStatus =>
-  imitationStatusAt(submission.submittedAtMs, submission.outcome, now);
+  submission.pinnedStatus ?? imitationStatusAt(submission.retriedAtMs ?? submission.submittedAtMs, submission.outcome, now);
 
 /** SDD 3.13.3: QUIZ selesai bila ada percobaan; IMITATION selesai bila ada submission, apa pun statusnya. */
 export function isTaskCompleted(userId: string, task: MockTask): boolean {

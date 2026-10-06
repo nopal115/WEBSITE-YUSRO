@@ -5,7 +5,7 @@ import type { AccountStatus } from '../../../features/auth/types';
 import type { HistoryItem, Progress } from '../../../features/progress/types';
 import type { Statistics, StatisticsChart } from '../../../features/statistics/types';
 import { CONTENT } from './data/content';
-import { accessFor, db, progressSnapshot, quizAttemptsOf, submissionsOf, validResults } from './db';
+import { accessFor, db, progressSnapshot, quizAttemptsOf, submissionsOf, submissionStatus, validResults } from './db';
 import { httpError } from './http';
 import { chartTrend, round2, type StudentActivity } from './rules';
 import { chartView, historyItems, progressView, statisticsView, taskInfo } from './views';
@@ -18,8 +18,29 @@ export interface StudentRecord {
   status: AccountStatus;
   joinedAt: string;
   highestStageIndex: number;
+  /** Ringkasan aktivitas lengkap, termasuk submission Dengar-Tirukan di db.submissions. */
   activity: StudentActivity;
+  /** Santri contoh: ringkasan tulisan tangan/bangkitan (bahan riwayat sintetis), tanpa submission. */
+  syntheticActivity?: StudentActivity;
   live: boolean;
+}
+
+/** Menggabungkan submission Dengar-Tirukan santri contoh ke ringkasan aktivitasnya (Q2 A3). */
+function withSubmissions(activity: StudentActivity, userId: string): StudentActivity {
+  const submissions = submissionsOf(userId);
+  if (submissions.length === 0) return activity;
+  const bests = new Map(activity.taskBests.map((item) => [item.taskId, { ...item }]));
+  for (const submission of submissions) {
+    if (submissionStatus(submission) !== 'EVALUATED' || submission.score === null) continue;
+    const at = new Date(submission.submittedAtMs).toISOString();
+    const current = bests.get(submission.taskId);
+    bests.set(submission.taskId, {
+      taskId: submission.taskId,
+      bestScore: Math.max(current?.bestScore ?? 0, submission.score),
+      lastAttemptAt: current && current.lastAttemptAt > at ? current.lastAttemptAt : at,
+    });
+  }
+  return { ...activity, attemptCount: activity.attemptCount + submissions.length, taskBests: [...bests.values()] };
 }
 
 /** Aktivitas akun demo dari data mock yang sedang berjalan. */
@@ -63,7 +84,7 @@ export function studentRecords(): StudentRecord[] {
       activity: liveActivity(user.id),
       live: true,
     }));
-  return [...db.sampleStudents.map((item) => ({ ...item, live: false })), ...live];
+  return [...db.sampleStudents.map((item) => ({ ...item, activity: withSubmissions(item.activity, item.id), syntheticActivity: item.activity, live: false })), ...live];
 }
 
 export function findStudentRecord(id: string): StudentRecord {
@@ -98,11 +119,12 @@ const HOUR_MS = 60 * 60 * 1000;
  * taskBests (percobaan terbaik pada lastAttemptAt), percobaan lain bernilai lebih rendah dan lebih awal.
  */
 function sampleHistory(record: StudentRecord): HistoryItem[] {
-  const bests = [...record.activity.taskBests].sort((a, b) => a.lastAttemptAt.localeCompare(b.lastAttemptAt));
+  const synthetic = record.syntheticActivity ?? record.activity;
+  const bests = [...synthetic.taskBests].sort((a, b) => a.lastAttemptAt.localeCompare(b.lastAttemptAt));
   const tasks = openTasks(record.highestStageIndex);
   if (bests.length === 0 || tasks.length === 0) return [];
   const raw: { taskIndex: number; score: number; atMs: number }[] = bests.map((best, index) => ({ taskIndex: index, score: best.bestScore, atMs: Date.parse(best.lastAttemptAt) }));
-  const extra = Math.max(0, record.activity.attemptCount - bests.length);
+  const extra = Math.max(0, synthetic.attemptCount - bests.length);
   for (let k = 0; k < extra; k += 1) {
     const index = k % bests.length;
     const round = 1 + Math.floor(k / bests.length);
@@ -129,8 +151,10 @@ function sampleHistory(record: StudentRecord): HistoryItem[] {
   return items.reverse();
 }
 
+/** Riwayat terbaru lebih dulu. Santri contoh: riwayat sintetis + submission Dengar-Tirukan di db. */
 export function recordHistory(record: StudentRecord): HistoryItem[] {
-  return record.live ? historyItems(record.id) : sampleHistory(record);
+  if (record.live) return historyItems(record.id);
+  return [...sampleHistory(record), ...historyItems(record.id)].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
 }
 
 const bestAverage = (record: StudentRecord): number | null => {
@@ -172,15 +196,15 @@ export function recordStatistics(record: StudentRecord): Statistics {
     averageScore: bestAverage(record),
     bestScore: bests.length > 0 ? Math.max(...bests) : null,
     learningProgressPct: progress.learningProgressPct,
-    evaluatedAttempts: sampleHistory(record).length,
-    failedAttempts: 0,
+    evaluatedAttempts: recordHistory(record).filter((item) => item.score !== null).length,
+    failedAttempts: recordHistory(record).filter((item) => item.evaluationStatus === 'FAILED').length,
   };
 }
 
 export function recordChart(record: StudentRecord): StatisticsChart {
   if (record.live) return chartView(record.id);
-  const points = sampleHistory(record)
-    .slice()
+  const points = recordHistory(record)
+    .filter((item) => item.score !== null)
     .reverse()
     .map((item, index) => ({ sequence: index + 1, attemptId: item.attemptId, taskTitle: item.taskTitle, score: item.score as number, submittedAt: item.submittedAt }));
   return { points, trend: chartTrend(points.map((point) => point.score)) };

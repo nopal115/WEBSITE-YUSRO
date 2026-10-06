@@ -1,9 +1,7 @@
 // Endpoint Admin yang ditiru: dashboard (SDD 5.18), manajemen santri (SDD 5.14 + riwayat [ASUMSI]),
-// dan daftar tahapan minimal (SDD 5.15). Endpoint admin lain belum ditiru (dijawab 404).
+// dan daftar tahapan minimal (SDD 5.15). Monitoring ada di handlers/monitoring.ts; endpoint admin lain belum ditiru.
 import type { AccountStatus } from '../../../../features/auth/types';
 import { CONTENT } from '../data/content';
-import { SAMPLE_EVALUATION } from '../data/students';
-import { db, submissionStatus } from '../db';
 import { fail, ok, paginate, type MockRequest } from '../http';
 import { mockPdf } from '../media';
 import type { MockRoute } from '../router';
@@ -20,20 +18,17 @@ import {
   studentRecords,
   type StudentRecord,
 } from '../students';
+import { queueCounts, serviceHealth } from './monitoring';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 const MAX_REASON_LENGTH = 255;
 
-function evaluationSummary(now = Date.now()) {
-  const statuses = db.submissions.map((submission) => ({ status: submissionStatus(submission, now), submittedAtMs: submission.submittedAtMs }));
-  return {
-    ...SAMPLE_EVALUATION,
-    queued: SAMPLE_EVALUATION.queued + statuses.filter((s) => s.status === 'SUBMITTED').length,
-    processing: SAMPLE_EVALUATION.processing + statuses.filter((s) => s.status === 'PROCESSING').length,
-    failedLast24h: SAMPLE_EVALUATION.failedLast24h + statuses.filter((s) => s.status === 'FAILED' && now - s.submittedAtMs < DAY_MS).length,
-  };
+/** Ringkasan layanan evaluasi untuk dashboard (SDD 5.18): dari submission di db dan kondisi layanan tiruan. */
+function evaluationSummary() {
+  const { counts } = queueCounts();
+  const health = serviceHealth();
+  return { queued: counts.SUBMITTED, processing: counts.PROCESSING, failedLast24h: counts.FAILED, serviceStatus: health.serviceStatus, modelVersion: health.modelVersion };
 }
 
 /** Butir daftar Santri (contoh SDD 5.14) + data internal untuk penyaringan. */

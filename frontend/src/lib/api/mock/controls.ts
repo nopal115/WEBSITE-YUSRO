@@ -14,6 +14,14 @@ const REVOKED_KEY = 'yusro.mock.revoked';
 let delayMs: number | null = null;
 let nextEvaluation: 'EVALUATED' | 'FAILED' | null = null;
 
+export type EvaluationServiceState = 'ok' | 'loading' | 'down';
+let evaluationService: EvaluationServiceState = 'ok';
+
+/** Kondisi layanan Machine Learning tiruan (dashboard dan Monitoring Admin). */
+export function getEvaluationService(): EvaluationServiceState {
+  return evaluationService;
+}
+
 function readList<T>(key: string): T[] {
   try {
     return JSON.parse(globalThis.sessionStorage?.getItem(key) ?? '[]') as T[];
@@ -83,11 +91,16 @@ export const mockControls = {
   nextEvaluation(status: 'EVALUATED' | 'FAILED'): void {
     nextEvaluation = status;
   },
+  /** Mengatur kondisi layanan evaluasi tiruan: 'ok', 'loading' (model dimuat), atau 'down' (terganggu). */
+  setEvaluationService(state: EvaluationServiceState): void {
+    evaluationService = state;
+  },
   /** Menghapus semua galat tertunda dan pengaturan. */
   reset(): void {
     writeList(FAULTS_KEY, []);
     delayMs = null;
     nextEvaluation = null;
+    evaluationService = 'ok';
   },
 };
 
@@ -97,6 +110,6 @@ export function installMockControls(): void {
   console.info(
     '[mock] Mode mock aktif. Akun: santri@yusro.mock / santri123, admin@yusro.mock / admin1234. ' +
       'Kontrol: window.__yusroMock.failNext(500, "GET progress*"), failNext("network"), expireSession(), ' +
-      'setDelay(ms), nextEvaluation("FAILED"), reset().',
+      'setDelay(ms), nextEvaluation("FAILED"), setEvaluationService("down"), reset().',
   );
 }

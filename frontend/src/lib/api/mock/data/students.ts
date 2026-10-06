@@ -154,5 +154,3 @@ export function seedSampleStudents(): SampleStudent[] {
   return [...HANDCRAFTED, ...Array.from({ length: GENERATED_COUNT }, (_, offset) => generated(13 + offset))].map((item) => ({ ...item, activity: { ...item.activity } }));
 }
 
-/** [DATA CONTOH] Kondisi layanan evaluasi di luar submission akun demo. */
-export const SAMPLE_EVALUATION = { queued: 1, processing: 0, failedLast24h: 2, serviceStatus: 'ok', modelVersion: 'yusro-mlp-v1.2.0' };

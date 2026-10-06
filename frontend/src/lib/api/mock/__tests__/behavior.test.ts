@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockControls } from '../controls';
 import { CONTENT, type MockQuizTask } from '../data/content';
+import { formatDateStamp } from '../../../utils/format';
 import { resetDb } from '../db';
 import { resolveIdentity, routes } from '../handlers';
 import { createMockFetch } from '../router';
@@ -319,5 +320,89 @@ describe('akun dinonaktifkan saat sesi aktif (SDD 3.16.5)', () => {
     await call('PATCH', 'admin/students/usr-santri/status', { status: 'INACTIVE' });
     token = santriToken;
     expect(await call('GET', 'learning/stages')).toMatchObject({ status: 403, body: { errorCode: 'AUTH_ACCOUNT_INACTIVE' } });
+  });
+});
+
+describe('admin monitoring (SDD 5.18, 3.11.7)', () => {
+  type Item = { submissionId: string; attemptNo: number; studentId: string; studentName: string; taskId: string; evaluationStatus: string; score: number | null; submittedAt: string };
+  const list = async (query = '') => {
+    const response = await call('GET', `admin/submissions?limit=100${query ? `&${query}` : ''}`);
+    return { items: response.body.data as Item[], meta: response.body.meta, status: response.status, body: response.body };
+  };
+
+  beforeEach(async () => {
+    await login('admin@yusro.mock', 'admin1234');
+  });
+
+  it('Santri ditolak 403', async () => {
+    await login('santri@yusro.mock', 'santri123');
+    expect((await call('GET', 'admin/submissions')).status).toBe(403);
+    expect((await call('GET', 'admin/evaluation/health')).status).toBe(403);
+  });
+
+  it('daftar terbaru dulu, keempat status ada, filter status/santri/tugas/tanggal', async () => {
+    const all = await list();
+    expect(all.items.length).toBeGreaterThan(20);
+    expect(all.items.map((i) => i.submittedAt)).toEqual([...all.items.map((i) => i.submittedAt)].sort().reverse());
+    expect(new Set(all.items.map((i) => i.evaluationStatus))).toEqual(new Set(['SUBMITTED', 'PROCESSING', 'EVALUATED', 'FAILED']));
+    expect((await call('GET', 'admin/submissions')).body.meta).toMatchObject({ page: 1, limit: 20, totalPages: 2 });
+
+    const failed = await list('status=FAILED');
+    expect(failed.items.length).toBeGreaterThanOrEqual(6);
+    expect(failed.items.every((i) => i.evaluationStatus === 'FAILED' && i.score === null)).toBe(true);
+    expect((await list('status=PROCESSING')).items).toHaveLength(1);
+
+    const byStudent = await list('studentId=usr-contoh-11');
+    expect(byStudent.items.map((i) => i.evaluationStatus).sort()).toEqual(['FAILED', 'PROCESSING']);
+    const taskId = all.items[0].taskId;
+    expect((await list(`taskId=${taskId}`)).items.every((i) => i.taskId === taskId)).toBe(true);
+    expect((await list(`status=FAILED&studentId=usr-contoh-11`)).items).toHaveLength(1);
+
+    const today = formatDateStamp(new Date());
+    const todayItems = await list(`from=${today}&to=${today}`);
+    expect(todayItems.items.length).toBeGreaterThan(0);
+    expect(todayItems.items.every((i) => formatDateStamp(new Date(i.submittedAt)) === today)).toBe(true);
+    expect((await list('from=2026-10-05&to=2026-10-01')).status).toBe(422);
+  });
+
+  it('retry: 202 bentuk SDD, status FAILED → SUBMITTED → PROCESSING → hasil, attemptNo tetap; 409 bila bukan FAILED', async () => {
+    const target = (await list('status=FAILED')).items[0];
+    const retried = await call('POST', `admin/submissions/${target.submissionId}/retry`);
+    expect(retried.status).toBe(202);
+    expect(retried.body.data).toMatchObject({ submissionId: target.submissionId, evaluationStatus: 'SUBMITTED', attemptNo: target.attemptNo, isRetry: true, jobId: expect.any(String) });
+    const status = async () => (await call('GET', `admin/submissions/${target.submissionId}`)).body.data;
+    expect(await status()).toMatchObject({ evaluationStatus: 'SUBMITTED', attemptNo: target.attemptNo, submittedAt: target.submittedAt });
+    expect(await call('POST', `admin/submissions/${target.submissionId}/retry`)).toMatchObject({ status: 409, body: { errorCode: 'EVAL_RETRY_NOT_ALLOWED' } });
+    vi.setSystemTime(Date.now() + 3000);
+    expect((await status()).evaluationStatus).toBe('PROCESSING');
+    vi.setSystemTime(Date.now() + 6000);
+    expect(await status()).toMatchObject({ evaluationStatus: 'EVALUATED', score: expect.any(Number), attemptNo: target.attemptNo, errorCode: null });
+
+    const second = (await list('status=FAILED')).items[0];
+    mockControls.nextEvaluation('FAILED');
+    await call('POST', `admin/submissions/${second.submissionId}/retry`);
+    vi.setSystemTime(Date.now() + 9000);
+    expect(await call('GET', `admin/submissions/${second.submissionId}`)).toMatchObject({ body: { data: { evaluationStatus: 'FAILED', score: null, errorCode: expect.any(String) } } });
+  });
+
+  it('URL rekaman, antrean, layanan, dan daftar tugas', async () => {
+    const id = (await list()).items[0].submissionId;
+    expect((await call('GET', `admin/submissions/${id}/recording-url`)).body.data).toMatchObject({ url: expect.any(String), expiresInSeconds: 300 });
+    const queue = (await call('GET', 'admin/evaluation/queue')).body.data;
+    expect(queue.counts).toMatchObject({ SUBMITTED: 2, PROCESSING: 1 });
+    expect(queue.oldestWaitingSince).toEqual(expect.any(String));
+    expect((await call('GET', 'admin/evaluation/health')).body.data).toMatchObject({ serviceStatus: 'ok', modelVersion: 'yusro-mlp-v1.2.0', modelLoaded: true });
+    mockControls.setEvaluationService('down');
+    expect((await call('GET', 'admin/evaluation/health')).body.data).toMatchObject({ serviceStatus: 'down', modelVersion: null, modelLoaded: false });
+    expect((await call('GET', 'admin/dashboard')).body.data.evaluation).toMatchObject({ serviceStatus: 'down', queued: 2, processing: 1 });
+    const tasks = (await call('GET', 'admin/tasks?type=IMITATION')).body.data as { type: string }[];
+    expect(tasks.length).toBeGreaterThan(0);
+    expect(tasks.every((task) => task.type === 'IMITATION')).toBe(true);
+  });
+
+  it('riwayat dan statistik Detail Santri memuat submission contoh (konsisten dengan Monitoring)', async () => {
+    const history = (await call('GET', 'admin/students/usr-contoh-11/history?limit=100')).body.data as { evaluationStatus: string | null; taskType: string }[];
+    expect(history.filter((item) => item.taskType === 'IMITATION').map((item) => item.evaluationStatus)).toEqual(expect.arrayContaining(['FAILED', 'PROCESSING']));
+    expect((await call('GET', 'admin/students/usr-contoh-11/statistics')).body.data.failedAttempts).toBe(1);
   });
 });
