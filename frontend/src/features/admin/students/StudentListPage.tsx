@@ -18,6 +18,15 @@ function StatusPill({ status }: { status: StudentListItem['status'] }): JSX.Elem
   return <Pill status={status === 'ACTIVE' ? 'selesai' : 'terkunci'}>{status === 'ACTIVE' ? 'Aktif' : 'Nonaktif'}</Pill>;
 }
 
+/** Email panjang dipotong dengan elipsis; teks lengkap tetap ada di DOM (dibaca pembaca layar) dan di title. */
+function EmailText({ email, className = '' }: { email: string; className?: string }): JSX.Element {
+  return (
+    <span className={`block truncate ${className}`} title={email}>
+      {email}
+    </span>
+  );
+}
+
 function NameLink({ item }: { item: StudentListItem }): JSX.Element {
   return (
     <Link to={`/admin/santri/${encodeURIComponent(item.id)}`} className="text-body font-semibold text-brand-primary hover:underline">
@@ -65,7 +74,7 @@ export function StudentListPage(): JSX.Element {
   const columns: DataColumn<StudentListItem>[] = [
     { header: 'ID', render: (item) => item.studentCode, cellClassName: 'whitespace-nowrap text-body-s text-text-secondary' },
     { header: 'NAMA', render: (item) => <NameLink item={item} /> },
-    { header: 'EMAIL', render: (item) => item.email, cellClassName: 'max-w-[16rem] break-words text-body-s text-text-secondary' },
+    { header: 'EMAIL', render: (item) => <EmailText email={item.email} className="max-w-[14rem]" />, cellClassName: 'text-body-s text-text-secondary' },
     { header: 'TAHAPAN', render: (item) => item.currentStage ?? '—', cellClassName: 'max-w-[14rem] text-body-s' },
     { header: 'PROGRESS', render: (item) => `${item.learningProgressPct}%`, cellClassName: 'text-body' },
     { header: 'NILAI', render: scoreText, cellClassName: 'text-h3' },
@@ -106,7 +115,7 @@ export function StudentListPage(): JSX.Element {
                 <div className="min-w-0">
                   <NameLink item={item} />
                   <p className="text-body-s text-text-secondary">{item.studentCode}</p>
-                  <p className="break-words text-body-s text-text-secondary">{item.email}</p>
+                  <EmailText email={item.email} className="text-body-s text-text-secondary" />
                 </div>
                 <StatusPill status={item.status} />
               </div>
