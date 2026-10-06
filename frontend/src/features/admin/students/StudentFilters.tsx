@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useId, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../../components/ui/Button';
+import { SelectField } from '../../../components/ui/SelectField';
 import { TextField } from '../../../components/ui/TextField';
+import { useDraft } from '../../../lib/hooks/useDraft';
 import type { AccountStatus } from '../../auth/types';
 import { useStages } from './hooks';
 import { hasActiveFilters, parsePercent, validateRange, type StudentQuery } from './query';
@@ -8,33 +10,7 @@ import { hasActiveFilters, parsePercent, validateRange, type StudentQuery } from
 const SEARCH_DELAY_MS = 300;
 const RANGE_DELAY_MS = 400;
 
-/** Isian lokal yang mengikuti URL bila URL berubah dari luar (mis. tombol Back). */
-function useDraft(value: string): [string, (next: string) => void] {
-  const [draft, setDraft] = useState(value);
-  const [source, setSource] = useState(value);
-  if (value !== source) {
-    setSource(value);
-    setDraft(value);
-  }
-  return [draft, setDraft];
-}
-
 const asText = (value: number | null) => (value === null ? '' : String(value));
-
-export function SelectField({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: ReactNode }): JSX.Element {
-  const id = useId();
-  return (
-    <label htmlFor={id} className="flex flex-col gap-1 rounded-sm border-2 border-neutral-border-strong bg-neutral-surface px-5 py-3 focus-within:border-brand-primary">
-      <span id={`${id}-label`} className="text-body-s text-text-muted">
-        {label}
-      </span>
-      {/* aria-labelledby: nama kontrol hanya teks label, tanpa teks opsi yang terpilih. */}
-      <select id={id} aria-labelledby={`${id}-label`} value={value} onChange={(event) => onChange(event.target.value)} className="w-full bg-transparent text-body-l text-text-primary outline-none">
-        {children}
-      </select>
-    </label>
-  );
-}
 
 /** Dua isian rentang (min–maks, 0–100) yang diterapkan setelah jeda ketik bila valid. */
 function RangeFields({ label, min, max, onApply }: { label: string; min: number | null; max: number | null; onApply: (min: number | null, max: number | null) => void }): JSX.Element {

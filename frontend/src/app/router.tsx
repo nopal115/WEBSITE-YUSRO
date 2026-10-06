@@ -17,6 +17,7 @@ import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { ListSkeleton } from '../features/learning/QueryStates';
 import { AdminDashboardPage } from '../features/admin/dashboard/AdminDashboardPage';
 import { StudentListPage } from '../features/admin/students/StudentListPage';
+import { MonitoringPage } from '../features/admin/monitoring/MonitoringPage';
 import { AdminLayout } from './layouts/AdminLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -112,9 +113,8 @@ export const router = createBrowserRouter([
             element: <PlaceholderPage>Editor Tugas</PlaceholderPage>,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A3 (Monitoring).
             path: '/admin/monitoring',
-            element: <PlaceholderPage>Monitoring</PlaceholderPage>,
+            element: <MonitoringPage />,
           },
         ],
       },

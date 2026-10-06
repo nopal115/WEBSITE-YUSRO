@@ -4,11 +4,12 @@ import { Button } from '../../../components/ui/Button';
 import { DataTable, type DataColumn } from '../../../components/ui/DataTable';
 import { Pagination } from '../../../components/ui/Pagination';
 import { Pill } from '../../../components/ui/Pill';
+import { SelectField } from '../../../components/ui/SelectField';
 import { formatScore } from '../../dashboard/view';
 import { ErrorState, ListSkeleton } from '../../learning/QueryStates';
 import { useStudents } from './hooks';
 import { DEFAULT_SORT, hasActiveFilters, parseStudentQuery, SORT_OPTIONS, toSearchParams, type StudentQuery } from './query';
-import { StudentFilters, SelectField } from './StudentFilters';
+import { StudentFilters } from './StudentFilters';
 import type { StudentListItem } from './types';
 import { useStatusChange } from './useStatusChange';
 
