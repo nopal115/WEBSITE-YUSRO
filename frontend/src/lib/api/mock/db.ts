@@ -3,6 +3,7 @@ import type { AccountStatus, UserRole } from '../../../features/auth/types';
 import type { QuizQuestionResult } from '../../../features/quiz/types';
 import type { EvaluationStatus } from '../types';
 import { CONTENT, type MockImitationTask, type MockMaterial, type MockQuizTask, type MockStage, type MockTask } from './data/content';
+import { seedSampleStudents, type SampleStudent } from './data/students';
 import { httpError } from './http';
 import { computeAccess, imitationStatusAt, type AccessState } from './rules';
 
@@ -55,6 +56,8 @@ export const db = {
   lastOpened: new Map<string, string>(),
   quizAttempts: [] as QuizAttemptRecord[],
   submissions: [] as SubmissionRecord[],
+  /** [DATA CONTOH] Santri contoh untuk halaman Admin; status dapat diubah Admin. */
+  sampleStudents: seedSampleStudents() as SampleStudent[],
 };
 
 export function resetDb(): void {
@@ -63,6 +66,7 @@ export function resetDb(): void {
   db.lastOpened.clear();
   db.quizAttempts = [];
   db.submissions = [];
+  db.sampleStudents = seedSampleStudents();
 }
 
 export const newId = (prefix: string): string => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;

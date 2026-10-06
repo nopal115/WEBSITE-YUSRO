@@ -203,7 +203,7 @@ describe('admin dashboard (SDD 5.18)', () => {
     await login('admin@yusro.mock', 'admin1234');
     const dashboard = await call('GET', 'admin/dashboard');
     expect(dashboard.status).toBe(200);
-    expect(dashboard.body.data).toMatchObject({ totalStudents: 13, activeStudents: 11, evaluation: { serviceStatus: 'ok', modelVersion: expect.any(String) } });
+    expect(dashboard.body.data).toMatchObject({ totalStudents: 48, activeStudents: 41, evaluation: { serviceStatus: 'ok', modelVersion: expect.any(String) } });
     expect(typeof dashboard.body.data.averageScore).toBe('number');
 
     const attention = await call('GET', 'admin/dashboard/attention');
@@ -217,5 +217,96 @@ describe('admin dashboard (SDD 5.18)', () => {
     expect(byCode['YSR-000109']).toBeUndefined();
     // Akun demo baru: progress 0% dan belum ada percobaan.
     expect(byCode['YSR-000001']).toEqual(['LOW_PROGRESS', 'NO_ATTEMPT']);
+  });
+});
+
+describe('admin santri (SDD 5.14, 3.16)', () => {
+  type Row = { id: string; studentCode: string; name: string; email: string; currentStage: string | null; learningProgressPct: number; averageScore: number | null; status: string };
+  const list = async (query: string) => {
+    const response = await call('GET', `admin/students?${query}`);
+    return { rows: response.body.data as Row[], meta: response.body.meta, status: response.status };
+  };
+
+  beforeEach(async () => {
+    await login('admin@yusro.mock', 'admin1234');
+  });
+
+  it('Santri ditolak 403', async () => {
+    await login('santri@yusro.mock', 'santri123');
+    expect((await call('GET', 'admin/students')).status).toBe(403);
+    expect((await call('GET', 'admin/stages')).status).toBe(403);
+  });
+
+  it('pencarian nama dan email (mengandung), ID Santri (cocok tepat, tanpa peka huruf)', async () => {
+    expect((await list('q=budi')).rows.map((r) => r.studentCode)).toEqual(['YSR-000103']);
+    expect((await list('q=siti.aisyah%40contoh')).rows.map((r) => r.studentCode)).toEqual(['YSR-000102']);
+    expect((await list('q=ysr-000104')).rows.map((r) => r.name)).toEqual(['Rina Marlina']);
+    expect((await list('q=YSR-0001')).rows).toEqual([]);
+  });
+
+  it('filter status, progress, nilai, tahapan, dan gabungannya', async () => {
+    const inactive = await list('status=INACTIVE&limit=100');
+    expect(inactive.rows.length).toBe(7);
+    expect(inactive.rows.every((r) => r.status === 'INACTIVE')).toBe(true);
+    const progress = await list('progressMin=40&progressMax=60&limit=100');
+    expect(progress.rows.length).toBeGreaterThan(0);
+    expect(progress.rows.every((r) => r.learningProgressPct >= 40 && r.learningProgressPct <= 60)).toBe(true);
+    const score = await list('scoreMin=80&scoreMax=90&limit=100');
+    expect(score.rows.length).toBeGreaterThan(0);
+    expect(score.rows.every((r) => r.averageScore !== null && r.averageScore >= 80 && r.averageScore <= 90)).toBe(true);
+    const stages = (await call('GET', 'admin/stages')).body.data as { id: string; title: string }[];
+    const byStage = await list(`stageId=${stages[1].id}&limit=100`);
+    expect(byStage.rows.length).toBeGreaterThan(0);
+    expect(byStage.rows.every((r) => r.currentStage === stages[1].title)).toBe(true);
+    const combined = await list('status=ACTIVE&progressMax=49&limit=100');
+    expect(combined.rows.every((r) => r.status === 'ACTIVE' && r.learningProgressPct <= 49)).toBe(true);
+    expect(combined.rows.map((r) => r.studentCode)).toContain('YSR-000102');
+    expect(combined.rows.map((r) => r.studentCode)).not.toContain('YSR-000109');
+  });
+
+  it('urutan dan pagination dengan batas limit', async () => {
+    const byProgress = (await list('sort=progress:desc&limit=100')).rows.map((r) => r.learningProgressPct);
+    expect(byProgress).toEqual([...byProgress].sort((a, b) => b - a));
+    const byScore = (await list('sort=averageScore:asc&limit=100')).rows.map((r) => r.averageScore);
+    const firstNull = byScore.indexOf(null);
+    expect(byScore.slice(firstNull).every((value) => value === null)).toBe(true);
+    const scored = byScore.slice(0, firstNull) as number[];
+    expect(scored).toEqual([...scored].sort((a, b) => a - b));
+    const names = (await list('limit=100')).rows.map((r) => r.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'id')));
+
+    const page3 = await list('page=3');
+    expect(page3.meta).toEqual({ page: 3, limit: 20, total: 48, totalPages: 3 });
+    expect(page3.rows.length).toBe(8);
+    expect((await list('limit=500')).meta.limit).toBe(100);
+  });
+
+  it('detail, statistik, grafik, riwayat, laporan', async () => {
+    const detail = await call('GET', 'admin/students/usr-contoh-3');
+    expect(detail.body.data).toMatchObject({ studentCode: 'YSR-000103', status: 'ACTIVE', progress: { learningProgressPct: 64 } });
+    expect((await call('GET', 'admin/students/tidak-ada')).status).toBe(404);
+    const stats = await call('GET', 'admin/students/usr-contoh-3/statistics');
+    expect(stats.body.data).toMatchObject({ bestScore: 88, averageScore: 79.67, evaluatedAttempts: 9 });
+    const chart = await call('GET', 'admin/students/usr-contoh-3/chart');
+    expect(chart.body.data.points).toHaveLength(9);
+    const history = await call('GET', 'admin/students/usr-contoh-1/history?page=1');
+    expect(history.body.meta).toEqual({ page: 1, limit: 20, total: 14, totalPages: 1 });
+    expect(history.body.data[0]).toMatchObject({ taskTitle: expect.any(String), displayStatus: 'Selesai' });
+    const pdf = await mockFetch('GET', 'admin/students/usr-contoh-1/report/pdf', { headers: { Authorization: `Bearer ${token}` }, body: undefined });
+    expect(pdf.headers.get('Content-Disposition')).toContain('Laporan-YSR-000101-');
+  });
+
+  it('nonaktifkan: santri gagal login dan hilang dari daftar perhatian; aktifkan lagi', async () => {
+    expect((await call('PATCH', 'admin/students/usr-santri/status', { status: 'INACTIVE', reason: 'x'.repeat(256) })).status).toBe(422);
+    expect((await call('PATCH', 'admin/students/usr-santri/status', { status: 'NONAKTIF' })).body.errors[0].field).toBe('status');
+    expect((await call('PATCH', 'admin/students/usr-santri/status', { status: 'INACTIVE', reason: 'Tidak aktif satu semester' })).status).toBe(200);
+    const attention = (await call('GET', 'admin/dashboard/attention')).body.data as { studentCode: string }[];
+    expect(attention.map((item) => item.studentCode)).not.toContain('YSR-000001');
+    expect((await list('q=YSR-000001')).rows[0].status).toBe('INACTIVE');
+    expect(await login('santri@yusro.mock', 'santri123')).toMatchObject({ success: false, errorCode: 'AUTH_ACCOUNT_INACTIVE' });
+
+    await login('admin@yusro.mock', 'admin1234');
+    expect((await call('PATCH', 'admin/students/usr-santri/status', { status: 'ACTIVE' })).status).toBe(200);
+    expect(await login('santri@yusro.mock', 'santri123')).toMatchObject({ success: true });
   });
 });
