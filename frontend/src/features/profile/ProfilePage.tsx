@@ -7,7 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { TextField } from '../../components/ui/TextField';
 import { ApiError } from '../../lib/api/ApiError';
 import { AUTH_ME_QUERY_KEY } from '../../lib/hooks/useAuth';
-import { formatDateStamp } from '../../lib/utils/format';
+import { reportFileName, saveBlob } from '../../lib/utils/download';
 import { changePasswordSchema, profileNameSchema, type ChangePasswordFormValues, type ProfileNameFormValues } from '../auth/authSchemas';
 import { ErrorState, ListSkeleton } from '../learning/QueryStates';
 import { reportApi } from '../report/api';
@@ -127,18 +127,7 @@ function PasswordForm(): JSX.Element {
 function ReportSection({ studentCode }: { studentCode: string }): JSX.Element {
   const mutation = useMutation({
     mutationFn: () => reportApi.downloadPdf(),
-    onSuccess: ({ blob, filename }) => {
-      // Nama dari Content-Disposition; cadangan mengikuti pola SDD 5.13 dengan tanggal lokal perangkat.
-      const name = filename ?? `Laporan-${studentCode}-${formatDateStamp(new Date())}.pdf`;
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = name;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-    },
+    onSuccess: ({ blob, filename }) => saveBlob(blob, reportFileName(filename, studentCode)),
   });
   return (
     <div className="flex flex-col gap-4">

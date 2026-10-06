@@ -26,3 +26,10 @@ export function formatDateStamp(date: Date, timeZone?: string): string {
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
+
+/** [REKOMENDASI] Tanggal saja format Indonesia, mis. "2 Sep 2026". timeZone dapat diatur (dipakai test). */
+export function formatDate(iso: string, timeZone?: string): string {
+  const parts = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone }).formatToParts(new Date(iso));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('day')} ${part('month')} ${part('year')}`;
+}

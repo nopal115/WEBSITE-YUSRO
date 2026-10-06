@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateStamp, formatDateTime } from '../../../lib/utils/format';
+import { formatDate, formatDateStamp, formatDateTime } from '../../../lib/utils/format';
 import { shouldShowChart, TREND_LABEL } from '../../statistics/view';
 import { historyLink, historyTone } from '../view';
 
@@ -14,6 +14,13 @@ describe('formatDateStamp (nama berkas laporan)', () => {
 
   it('format YYYY-MM-DD dengan nol di depan', () => {
     expect(formatDateStamp(new Date('2026-01-05T03:00:00.000Z'), 'Asia/Jakarta')).toBe('2026-01-05');
+  });
+});
+
+describe('formatDate', () => {
+  it('tanggal saja menurut zona waktu', () => {
+    expect(formatDate('2026-09-01T23:30:00.000Z', 'Asia/Jakarta')).toBe('2 Sep 2026');
+    expect(formatDate('2026-09-01T23:30:00.000Z', 'UTC')).toBe('1 Sep 2026');
   });
 });
 

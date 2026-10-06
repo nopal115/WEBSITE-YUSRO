@@ -23,7 +23,9 @@ import { AuthLayout } from './layouts/AuthLayout';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
 import { PlaceholderPage } from './PlaceholderPage';
 
-// Statistik memuat Recharts (ukuran besar), jadi dipisah ke chunk sendiri dan hanya diunduh saat dibuka.
+// Statistik dan Detail Santri memuat Recharts (ukuran besar), jadi dipisah ke chunk sendiri dan hanya diunduh saat dibuka.
+// eslint-disable-next-line react-refresh/only-export-components -- berkas konfigurasi rute, bukan modul fast refresh.
+const StudentDetailPage = lazy(() => import('../features/admin/students/StudentDetailPage').then((module) => ({ default: module.StudentDetailPage })));
 // eslint-disable-next-line react-refresh/only-export-components -- berkas konfigurasi rute, bukan modul fast refresh.
 const StatisticsPage = lazy(() => import('../features/statistics/StatisticsPage').then((module) => ({ default: module.StatisticsPage })));
 
@@ -65,42 +67,52 @@ export const router = createBrowserRouter([
             element: <StudentListPage />,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A2.
+            // Dimuat terpisah: grafik Recharts (keputusan A2).
             path: '/admin/santri/:studentId',
-            element: <PlaceholderPage>Detail Santri</PlaceholderPage>,
+            element: (
+              <Suspense
+                fallback={
+                  <div className="mx-auto max-w-[1040px]">
+                    <ListSkeleton rows={3} />
+                  </div>
+                }
+              >
+                <StudentDetailPage />
+              </Suspense>
+            ),
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A3.
+            // [TBD] Placeholder; dikerjakan di tugas A4 (Tahapan & Materi).
             path: '/admin/tahapan',
             element: <PlaceholderPage>Tahapan</PlaceholderPage>,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A3.
+            // [TBD] Placeholder; dikerjakan di tugas A4 (Tahapan & Materi).
             path: '/admin/materi',
             element: <PlaceholderPage>Materi</PlaceholderPage>,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A3.
+            // [TBD] Placeholder; dikerjakan di tugas A4 (Tahapan & Materi).
             path: '/admin/materi/:materialId',
             element: <PlaceholderPage>Editor Materi</PlaceholderPage>,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A4.
+            // [TBD] Placeholder; dikerjakan di tugas A5 (Audio).
             path: '/admin/audio',
             element: <PlaceholderPage>Audio</PlaceholderPage>,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A5.
+            // [TBD] Placeholder; dikerjakan di tugas A6 (Tugas & Soal).
             path: '/admin/tugas',
             element: <PlaceholderPage>Tugas</PlaceholderPage>,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A5.
+            // [TBD] Placeholder; dikerjakan di tugas A6 (Tugas & Soal).
             path: '/admin/tugas/:taskId',
             element: <PlaceholderPage>Editor Tugas</PlaceholderPage>,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A6.
+            // [TBD] Placeholder; dikerjakan di tugas A3 (Monitoring).
             path: '/admin/monitoring',
             element: <PlaceholderPage>Monitoring</PlaceholderPage>,
           },
