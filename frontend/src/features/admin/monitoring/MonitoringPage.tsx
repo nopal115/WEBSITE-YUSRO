@@ -132,6 +132,7 @@ export function MonitoringPage(): JSX.Element {
           rows={data}
           rowKey={(item) => item.submissionId}
           caption="Daftar submission Dengar-Tirukan"
+          compact
           renderCard={(item) => (
             <div className="flex flex-col gap-3 rounded-md border border-neutral-border bg-neutral-surface p-4">
               <div className="flex items-start justify-between gap-3">
@@ -170,13 +171,11 @@ export function MonitoringPage(): JSX.Element {
   }
 
   return (
-    // Desktop: panel status sebagai rail kanan 300 px; layar sempit: panel di atas tabel (SDD 7.5).
-    <div className="mx-auto grid max-w-[1364px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+    // Panel status di atas tabel selebar penuh: rail kanan 300 px membuat tabel 8 kolom terlalu sempit (temuan QA A3).
+    <div className="mx-auto flex max-w-[1364px] flex-col gap-6">
       <h1 className="sr-only">Monitoring Evaluasi</h1>
-      <div className="lg:col-start-2 lg:row-start-1">
-        <EvaluationPanel />
-      </div>
-      <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1">
+      <EvaluationPanel />
+      <div className="flex min-w-0 flex-col gap-6">
         <MonitoringFilters query={query} onChange={update} onReset={reset} />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="text-body-s text-text-secondary" aria-live="polite">

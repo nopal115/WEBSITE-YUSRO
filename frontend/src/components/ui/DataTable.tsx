@@ -15,13 +15,16 @@ interface DataTableProps<T> {
   caption: string;
   /** Kartu untuk layar < 768 px. */
   renderCard: (row: T) => ReactNode;
+  /** Padding sel lebih rapat untuk tabel dengan banyak kolom (tabel Admin). */
+  compact?: boolean;
 }
 
 /**
  * Tabel data bersama: ≥ 768 px berupa tabel (digulir mendatar bila tidak muat, SDD 7.5.1),
  * < 768 px berupa daftar kartu tanpa gulir mendatar (SDD 7.7.13, 7.7.17).
  */
-export function DataTable<T>({ columns, rows, rowKey, caption, renderCard }: DataTableProps<T>): JSX.Element {
+export function DataTable<T>({ columns, rows, rowKey, caption, renderCard, compact = false }: DataTableProps<T>): JSX.Element {
+  const padX = compact ? 'px-3' : 'px-5';
   return (
     <>
       <div className="hidden overflow-x-auto rounded-md border border-neutral-border bg-neutral-surface md:block">
@@ -30,7 +33,7 @@ export function DataTable<T>({ columns, rows, rowKey, caption, renderCard }: Dat
           <thead className="border-b border-neutral-border text-label text-text-muted">
             <tr>
               {columns.map((column) => (
-                <th key={column.header} scope="col" className="px-5 py-3 font-medium">
+                <th key={column.header} scope="col" className={`${padX} py-3 font-medium`}>
                   {column.header}
                 </th>
               ))}
@@ -40,7 +43,7 @@ export function DataTable<T>({ columns, rows, rowKey, caption, renderCard }: Dat
             {rows.map((row) => (
               <tr key={rowKey(row)}>
                 {columns.map((column) => (
-                  <td key={column.header} className={`px-5 py-4 ${column.cellClassName ?? ''}`}>
+                  <td key={column.header} className={`${padX} py-4 ${column.cellClassName ?? ''}`}>
                     {column.render(row)}
                   </td>
                 ))}

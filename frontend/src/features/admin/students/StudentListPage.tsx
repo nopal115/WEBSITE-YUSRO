@@ -110,6 +110,7 @@ export function StudentListPage(): JSX.Element {
           rows={data}
           rowKey={(item) => item.id}
           caption="Daftar santri"
+          compact
           renderCard={(item) => (
             <div className="flex flex-col gap-3 rounded-md border border-neutral-border bg-neutral-surface p-4">
               <div className="flex items-start justify-between gap-3">
