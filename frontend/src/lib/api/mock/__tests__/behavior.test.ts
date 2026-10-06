@@ -310,3 +310,14 @@ describe('admin santri (SDD 5.14, 3.16)', () => {
     expect(await login('santri@yusro.mock', 'santri123')).toMatchObject({ success: true });
   });
 });
+
+describe('akun dinonaktifkan saat sesi aktif (SDD 3.16.5)', () => {
+  it('request berikutnya dari sesi santri ditolak 403 AUTH_ACCOUNT_INACTIVE', async () => {
+    const santriToken = token;
+    expect((await call('GET', 'learning/stages')).status).toBe(200);
+    await login('admin@yusro.mock', 'admin1234');
+    await call('PATCH', 'admin/students/usr-santri/status', { status: 'INACTIVE' });
+    token = santriToken;
+    expect(await call('GET', 'learning/stages')).toMatchObject({ status: 403, body: { errorCode: 'AUTH_ACCOUNT_INACTIVE' } });
+  });
+});

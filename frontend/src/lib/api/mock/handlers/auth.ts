@@ -23,8 +23,8 @@ const bearer = (req: MockRequest): string | null => req.headers.Authorization?.r
 export function resolveIdentity(token: string): MockIdentity | null {
   const [prefix, userId] = token.split('.');
   if (prefix !== 'mock' || isRevoked(token)) return null;
-  const user = db.users.find((item) => item.id === userId && item.status === 'ACTIVE');
-  return user ? { id: user.id, role: user.role } : null;
+  const user = db.users.find((item) => item.id === userId);
+  return user ? { id: user.id, role: user.role, status: user.status } : null;
 }
 
 /** Memvalidasi password baru + konfirmasinya (SDD 3.2.6). */

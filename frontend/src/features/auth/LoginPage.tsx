@@ -25,8 +25,10 @@ function BrandLogo(): JSX.Element {
 
 export function LoginPage(): JSX.Element {
   const login = useLogin();
-  // Pesan sukses dari registrasi atau reset password, dibawa lewat state navigasi.
-  const notice = (useLocation().state as { notice?: unknown } | null)?.notice;
+  // Pesan dari registrasi/reset password (sukses) atau dari sesi yang diakhiri karena akun dinonaktifkan (peringatan).
+  const navState = useLocation().state as { notice?: unknown; noticeTone?: unknown } | null;
+  const notice = navState?.notice;
+  const noticeClass = navState?.noticeTone === 'warning' ? 'bg-semantic-warning-soft text-semantic-warning' : 'bg-feedback-benar-soft text-feedback-benar';
   const {
     register,
     handleSubmit,
@@ -69,7 +71,7 @@ export function LoginPage(): JSX.Element {
 
             {/* [REKOMENDASI] Tidak ada di Figma: kotak pesan sukses. */}
             {typeof notice === 'string' && (
-              <div className="rounded-md bg-feedback-benar-soft px-5 py-3 text-body-s text-feedback-benar" role="status">
+              <div className={`rounded-md px-5 py-3 text-body-s ${noticeClass}`} role="status">
                 {notice}
               </div>
             )}

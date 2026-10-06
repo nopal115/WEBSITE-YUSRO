@@ -16,6 +16,7 @@ export interface MockRoute {
 export interface MockIdentity {
   id: string;
   role: 'SANTRI' | 'ADMIN';
+  status: 'ACTIVE' | 'INACTIVE';
 }
 
 export interface MockFetchInit {
@@ -73,6 +74,10 @@ export function createMockFetch(routes: MockRoute[], resolveIdentity: (token: st
     const identity = token ? resolveIdentity(token) : null;
     if (found.route.access !== 'public' && !identity) {
       return toResponse(fail(401, 'AUTH_TOKEN_EXPIRED', 'Sesi berakhir. Silakan masuk kembali.'));
+    }
+    // Akun dinonaktifkan saat sesinya masih aktif: request berikutnya ditolak (SDD 3.16.5).
+    if (found.route.access !== 'public' && identity?.status === 'INACTIVE') {
+      return toResponse(fail(403, 'AUTH_ACCOUNT_INACTIVE', 'Akun Anda dinonaktifkan. Hubungi pengajar.'));
     }
     if ((found.route.access === 'SANTRI' || found.route.access === 'ADMIN') && identity?.role !== found.route.access) {
       return toResponse(fail(403, 'FORBIDDEN_ROLE', 'Anda tidak memiliki akses ke data ini.'));

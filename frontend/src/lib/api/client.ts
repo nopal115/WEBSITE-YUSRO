@@ -14,11 +14,14 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
-type UnauthorizedHandler = () => void;
+/** Alasan sesi diakhiri: 401 (token tidak berlaku) atau 403 AUTH_ACCOUNT_INACTIVE (akun dinonaktifkan, SDD 3.16.5). */
+export type SessionEnd = { reason: 'unauthorized' } | { reason: 'inactive'; message: string };
+
+type UnauthorizedHandler = (end: SessionEnd) => void;
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 
-/** Didaftarkan sekali di AppProviders; dipanggil saat request terautentikasi mendapat 401. */
+/** Didaftarkan sekali di AppProviders; dipanggil saat request terautentikasi mendapat 401 atau 403 AUTH_ACCOUNT_INACTIVE. */
 export function setUnauthorizedHandler(handler: UnauthorizedHandler): () => void {
   unauthorizedHandler = handler;
   return () => {
@@ -93,11 +96,14 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
 
   if (!response.ok) {
     const payload = await readBody(response);
-    if (response.status === 401 && auth) {
+    const error = createApiError(response.status, payload);
+    // Sesi berakhir: token tidak berlaku, atau akun dinonaktifkan saat sesi masih aktif (SDD 3.16.5).
+    const inactive = response.status === 403 && error.code === 'AUTH_ACCOUNT_INACTIVE';
+    if (auth && (response.status === 401 || inactive)) {
       tokenStore.clear();
-      unauthorizedHandler?.();
+      unauthorizedHandler?.(inactive ? { reason: 'inactive', message: error.message } : { reason: 'unauthorized' });
     }
-    throw createApiError(response.status, payload);
+    throw error;
   }
   return response;
 }

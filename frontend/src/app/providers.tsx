@@ -25,9 +25,14 @@ export function AppProviders({ children }: { children: ReactNode }): JSX.Element
 
   useEffect(
     () =>
-      setUnauthorizedHandler(() => {
+      setUnauthorizedHandler((end) => {
         queryClient.clear();
         const { pathname, search, hash } = window.location;
+        if (end.reason === 'inactive') {
+          // Akun dinonaktifkan: pesan server ditampilkan di halaman login, tanpa kembali ke halaman semula.
+          void router.navigate('/login', { replace: true, state: { notice: end.message, noticeTone: 'warning' } });
+          return;
+        }
         if (pathname === '/login') return;
         void router.navigate('/login', { replace: true, state: { from: `${pathname}${search}${hash}` } });
       }),

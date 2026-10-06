@@ -99,6 +99,43 @@ describe('apiRequest', () => {
     unregister();
   });
 
+  it('saat 403 AUTH_ACCOUNT_INACTIVE dari endpoint mana pun: hapus token dan kirim pesan server ke handler', async () => {
+    const handler = vi.fn();
+    const unregister = setUnauthorizedHandler(handler);
+    tokenStore.set('token-santri');
+    fetchMock.mockResolvedValue(jsonResponse(403, { success: false, message: 'Akun Anda dinonaktifkan. Hubungi pengajar.', errorCode: 'AUTH_ACCOUNT_INACTIVE' }));
+
+    await expect(apiRequest('learning/stages')).rejects.toMatchObject({ status: 403, code: 'AUTH_ACCOUNT_INACTIVE' });
+
+    expect(tokenStore.get()).toBeNull();
+    expect(handler).toHaveBeenCalledWith({ reason: 'inactive', message: 'Akun Anda dinonaktifkan. Hubungi pengajar.' });
+    unregister();
+  });
+
+  it('403 lain (mis. materi terkunci) tidak mengakhiri sesi', async () => {
+    const handler = vi.fn();
+    const unregister = setUnauthorizedHandler(handler);
+    tokenStore.set('token-santri');
+    fetchMock.mockResolvedValue(jsonResponse(403, { success: false, message: 'Materi ini belum terbuka.', errorCode: 'LEARNING_MATERIAL_LOCKED' }));
+
+    await expect(apiRequest('learning/materials/x')).rejects.toMatchObject({ status: 403 });
+
+    expect(tokenStore.get()).toBe('token-santri');
+    expect(handler).not.toHaveBeenCalled();
+    unregister();
+  });
+
+  it('403 AUTH_ACCOUNT_INACTIVE pada login (endpoint publik) tidak memanggil handler', async () => {
+    const handler = vi.fn();
+    const unregister = setUnauthorizedHandler(handler);
+    fetchMock.mockResolvedValue(jsonResponse(403, { success: false, message: 'Akun Anda dinonaktifkan. Hubungi pengajar.', errorCode: 'AUTH_ACCOUNT_INACTIVE' }));
+
+    await expect(apiRequest('auth/login', { method: 'POST', body: {}, auth: false })).rejects.toMatchObject({ status: 403 });
+
+    expect(handler).not.toHaveBeenCalled();
+    unregister();
+  });
+
   it('saat 401 pada request publik (login): tidak hapus token dan tidak redirect', async () => {
     const handler = vi.fn();
     const unregister = setUnauthorizedHandler(handler);

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockControls } from '../controls';
 import { ok } from '../http';
-import { createMockFetch, matchRoute, type MockRoute } from '../router';
+import { createMockFetch, matchRoute, type MockIdentity, type MockRoute } from '../router';
 
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -22,9 +22,10 @@ const routes: MockRoute[] = [
   { method: 'POST', pattern: '/auth/login', access: 'public', handler: (req) => ok(req.body) },
 ];
 
-const identities: Record<string, { id: string; role: 'SANTRI' | 'ADMIN' }> = {
-  santri: { id: 'u1', role: 'SANTRI' },
-  admin: { id: 'u2', role: 'ADMIN' },
+const identities: Record<string, MockIdentity> = {
+  santri: { id: 'u1', role: 'SANTRI', status: 'ACTIVE' },
+  admin: { id: 'u2', role: 'ADMIN', status: 'ACTIVE' },
+  nonaktif: { id: 'u3', role: 'SANTRI', status: 'INACTIVE' },
 };
 const mockFetch = createMockFetch(routes, (token) => identities[token] ?? null);
 const auth = (token: string) => ({ headers: { Authorization: `Bearer ${token}` }, body: undefined });
@@ -67,6 +68,13 @@ describe('createMockFetch', () => {
   it('menjawab 401 tanpa token yang valid dan 403 untuk peran selain Santri', async () => {
     expect((await mockFetch('GET', 'learning/stages/x/materials', { headers: {}, body: undefined })).status).toBe(401);
     expect((await mockFetch('GET', 'learning/stages/x/materials', auth('admin'))).status).toBe(403);
+  });
+
+  it('akun nonaktif dengan sesi aktif mendapat 403 AUTH_ACCOUNT_INACTIVE, endpoint publik tetap jalan', async () => {
+    const response = await mockFetch('GET', 'learning/stages/x/materials', auth('nonaktif'));
+    expect(response.status).toBe(403);
+    expect((await response.json()).errorCode).toBe('AUTH_ACCOUNT_INACTIVE');
+    expect((await mockFetch('POST', 'auth/login', { headers: auth('nonaktif').headers, body: '{}' })).status).toBe(200);
   });
 
   it('failNext menghasilkan status galat sekali saja untuk pola yang cocok', async () => {
