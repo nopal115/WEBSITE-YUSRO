@@ -15,15 +15,16 @@ export function Pagination({ page, totalPages, total, onChange, label }: Paginat
   const totalText = total === undefined ? null : `${total} data`;
   if (totalPages <= 1) return totalText ? <p className="text-body-s text-text-secondary">{totalText}</p> : null;
   return (
-    <nav className="flex flex-wrap items-center justify-between gap-3" aria-label={label}>
-      <Button variant="outline" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+    // Layar < 640 px: teks halaman di baris sendiri, dua tombol berdampingan; lebih lebar: satu baris.
+    <nav className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-between" aria-label={label}>
+      <Button variant="outline" className="w-full max-sm:px-4 sm:w-auto" disabled={page <= 1} onClick={() => onChange(page - 1)}>
         SEBELUMNYA
       </Button>
-      <span className="text-body-s text-text-secondary">
+      <span className="order-first col-span-2 text-center text-body-s text-text-secondary sm:order-none">
         Halaman {page} dari {totalPages}
         {totalText && ` · ${totalText}`}
       </span>
-      <Button variant="outline" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
+      <Button variant="outline" className="w-full max-sm:px-4 sm:w-auto" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
         BERIKUTNYA
       </Button>
     </nav>
