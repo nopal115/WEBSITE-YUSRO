@@ -16,6 +16,7 @@ import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { ListSkeleton } from '../features/learning/QueryStates';
 import { AdminDashboardPage } from '../features/admin/dashboard/AdminDashboardPage';
+import { StudentListPage } from '../features/admin/students/StudentListPage';
 import { AdminLayout } from './layouts/AdminLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -60,9 +61,8 @@ export const router = createBrowserRouter([
             element: <AdminDashboardPage />,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A2.
             path: '/admin/santri',
-            element: <PlaceholderPage>Santri</PlaceholderPage>,
+            element: <StudentListPage />,
           },
           {
             // [TBD] Placeholder; dikerjakan di tugas A2.
