@@ -406,3 +406,111 @@ describe('admin monitoring (SDD 5.18, 3.11.7)', () => {
     expect((await call('GET', 'admin/students/usr-contoh-11/statistics')).body.data.failedAttempts).toBe(1);
   });
 });
+
+describe('admin konten (SDD 5.15, 3.5) dan dampaknya ke Santri', () => {
+  let santri = '';
+  const asSantri = async <T,>(fn: () => Promise<T>): Promise<T> => {
+    const admin = token;
+    token = santri;
+    const result = await fn();
+    token = admin;
+    return result;
+  };
+
+  beforeEach(async () => {
+    santri = token;
+    await login('admin@yusro.mock', 'admin1234');
+  });
+
+  it('Santri ditolak 403 di endpoint konten admin', async () => {
+    token = santri;
+    expect((await call('GET', 'admin/stages')).status).toBe(403);
+    expect((await call('PUT', 'admin/materials/mat-l001m001/blocks', { blocks: [] })).status).toBe(403);
+  });
+
+  it('daftar tahapan lengkap (termasuk DRAFT) dengan field lama tetap ada', async () => {
+    const stages = (await call('GET', 'admin/stages')).body.data as { id: string; code: string; orderIndex: number; status: string; materialCount: number; isReferenced: boolean }[];
+    expect(stages).toHaveLength(11);
+    expect(stages[0]).toMatchObject({ id: 'stg-l001', code: 'l001', orderIndex: 1, status: 'ACTIVE', materialCount: 10, isReferenced: true });
+    expect(stages[10]).toMatchObject({ status: 'DRAFT', isReferenced: false });
+    expect((await asSantri(() => call('GET', 'learning/stages'))).body.data).toHaveLength(10);
+  });
+
+  it('tambah tahapan (DRAFT, kode server), aktifkan, transisi tidak sah 409', async () => {
+    const created = await call('POST', 'admin/stages', { title: 'Tahapan baru', description: 'Uji' });
+    expect(created).toMatchObject({ status: 201, body: { data: { code: 'l012', status: 'DRAFT', orderIndex: 12 } } });
+    expect((await call('POST', 'admin/stages', { title: '  ' })).body.errors[0].field).toBe('title');
+    const id = created.body.data.id;
+    expect(await call('PATCH', `admin/stages/${id}`, { status: 'INACTIVE' })).toMatchObject({ status: 409, body: { errorCode: 'CONTENT_INVALID_TRANSITION' } });
+    expect((await call('PATCH', `admin/stages/${id}`, { status: 'ACTIVE', title: 'Tahapan 12' })).body.data).toMatchObject({ status: 'ACTIVE', title: 'Tahapan 12' });
+    expect((await asSantri(() => call('GET', 'learning/stages'))).body.data).toHaveLength(11);
+    // Tahapan yang sudah dirujuk tidak bisa dikembalikan ke draf.
+    expect(await call('PATCH', 'admin/stages/stg-l001', { status: 'DRAFT' })).toMatchObject({ status: 409, body: { errorCode: 'CONTENT_INVALID_TRANSITION' } });
+  });
+
+  it('hapus hanya DRAFT yang belum dirujuk; selain itu 409 CONTENT_IN_USE', async () => {
+    expect(await call('DELETE', 'admin/stages/stg-l011')).toMatchObject({ status: 409, body: { errorCode: 'CONTENT_IN_USE' } });
+    expect((await call('DELETE', 'admin/materials/mat-l011m001')).status).toBe(200);
+    expect((await call('DELETE', 'admin/stages/stg-l011')).status).toBe(200);
+    expect(await call('DELETE', 'admin/materials/mat-l001m003')).toMatchObject({ status: 409, body: { errorCode: 'CONTENT_IN_USE' } });
+  });
+
+  it('reorder: daftar tidak lengkap 422; urutan baru berlaku di halaman Santri', async () => {
+    const stages = (await call('GET', 'admin/stages')).body.data as { id: string }[];
+    expect(await call('PATCH', 'admin/stages/reorder', { orderedIds: stages.slice(1).map((s) => s.id) })).toMatchObject({ status: 422, body: { errorCode: 'CONTENT_REORDER_INCOMPLETE' } });
+    const swapped = [stages[1].id, stages[0].id, ...stages.slice(2).map((s) => s.id)];
+    expect((await call('PATCH', 'admin/stages/reorder', { orderedIds: swapped })).status).toBe(200);
+    const santriStages = (await asSantri(() => call('GET', 'learning/stages'))).body.data as { id: string; access: string }[];
+    expect(santriStages.map((s) => s.id).slice(0, 2)).toEqual(['stg-l002', 'stg-l001']);
+    expect(santriStages[0].access).toBe('UNLOCKED');
+
+    const materials = (await call('GET', 'admin/materials?stageId=stg-l001')).body.data as { id: string }[];
+    expect(await call('PATCH', 'admin/materials/reorder', { orderedIds: materials.slice(0, 3).map((m) => m.id) })).toMatchObject({ status: 422 });
+    const reordered = [materials[1].id, materials[0].id, ...materials.slice(2).map((m) => m.id)];
+    expect((await call('PATCH', 'admin/materials/reorder', { orderedIds: reordered })).status).toBe(200);
+    const after = (await call('GET', 'admin/materials?stageId=stg-l001')).body.data as { id: string; orderIndex: number }[];
+    expect(after.slice(0, 2).map((m) => [m.id, m.orderIndex])).toEqual([
+      ['mat-l001m002', 1],
+      ['mat-l001m001', 2],
+    ]);
+  });
+
+  it('materi NONAKTIF: tidak tampil, akses langsung 409, tugasnya 409 TASK_INACTIVE; DRAFT 404', async () => {
+    expect((await call('PATCH', 'admin/materials/mat-l001m001', { status: 'INACTIVE' })).body.data.status).toBe('INACTIVE');
+    await asSantri(async () => {
+      const list = (await call('GET', 'learning/stages/stg-l001/materials')).body.data.materials as { id: string; status: string }[];
+      expect(list.map((m) => m.id)).not.toContain('mat-l001m001');
+      expect(list[0]).toMatchObject({ id: 'mat-l001m002', status: 'AVAILABLE' });
+      expect(await call('GET', 'learning/materials/mat-l001m001')).toMatchObject({ status: 409, body: { errorCode: 'LEARNING_MATERIAL_INACTIVE' } });
+      expect(await call('GET', 'quiz/tasks/tsk-l001m001-quiz')).toMatchObject({ status: 409, body: { errorCode: 'TASK_INACTIVE' } });
+      expect((await call('GET', 'learning/materials/mat-l011m001')).status).toBe(404);
+    });
+  });
+
+  it('blok: validasi 422 per blok, gambar lama tetap utuh, tampil di materi Santri; audio list + url', async () => {
+    const blocks = (await call('GET', 'admin/materials/mat-l001m002/blocks')).body.data as { id: string; type: string; imageUrl: string | null }[];
+    const image = blocks.find((b) => b.type === 'IMAGE');
+    expect(image?.imageUrl).toMatch(/^data:image\/svg/);
+    const invalid = await call('PUT', 'admin/materials/mat-l001m002/blocks', { blocks: [{ type: 'TEXT' }, { type: 'AUDIO' }] });
+    expect(invalid.status).toBe(422);
+    expect(invalid.body.errors.map((e: { field: string }) => e.field)).toEqual(['blocks.0.textContent', 'blocks.1.audioId']);
+    const audios = (await call('GET', 'admin/audio?kind=LEARNING')).body.data as { id: string }[];
+    expect(audios.length).toBeGreaterThan(68);
+    expect((await call('GET', `admin/audio/${audios[0].id}/url`)).body.data).toMatchObject({ url: expect.any(String), expiresInSeconds: 900 });
+    const saved = await call('PUT', 'admin/materials/mat-l001m002/blocks', {
+      blocks: [
+        { type: 'TEXT', arabicContent: 'بَ تَ', transliteration: 'ba ta' },
+        { id: image?.id, type: 'IMAGE', imageUrl: image?.imageUrl },
+        { type: 'AUDIO', audioId: 'aud-contoh-1' },
+        { type: 'TEXT', textContent: 'Penutup.' },
+      ],
+    });
+    expect(saved.body.data.map((b: { type: string }) => b.type)).toEqual(['TEXT', 'IMAGE', 'AUDIO', 'TEXT']);
+    token = santri;
+    await call('POST', 'learning/materials/mat-l001m001/complete');
+    const detail = (await call('GET', 'learning/materials/mat-l001m002')).body.data;
+    expect(detail.blocks.map((b: { type: string; orderIndex: number }) => `${b.orderIndex}:${b.type}`)).toEqual(['1:TEXT', '2:IMAGE', '3:AUDIO', '4:TEXT']);
+    expect(detail.blocks[0]).toMatchObject({ arabicContent: 'بَ تَ', transliteration: 'ba ta' });
+    expect(detail.blocks[2]).toMatchObject({ audioUrl: expect.any(String), durationMs: 3200 });
+  });
+});

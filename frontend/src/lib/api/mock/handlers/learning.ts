@@ -3,13 +3,16 @@ import type { ContinueTarget, MaterialBlock, MaterialSummary, StageSummary } fro
 import { CONTENT } from '../data/content';
 import {
   accessFor,
+  activeMaterials,
+  activeStages,
   assertMaterialOpen,
   attemptCount,
   bestScore,
   completions,
   db,
-  findMaterial,
   findStage,
+  findStudentMaterial,
+  findStudentStage,
   findUser,
   isTaskCompleted,
   progressSnapshot,
@@ -20,7 +23,8 @@ import { httpError, ok } from '../http';
 import { mockAudioUrl } from '../media';
 import type { MockRoute } from '../router';
 
-const materialsOf = (stageId: string) => CONTENT.materials.filter((m) => m.stageId === stageId);
+// Hanya konten AKTIF yang terlihat Santri, sesuai urutan terbaru (SDD 3.5.3, 3.5.4).
+const materialsOf = (stageId: string) => activeMaterials().filter((m) => m.stageId === stageId);
 
 function tasksCompletedIn(userId: string, materialId: string): number {
   return tasksOf(materialId).filter((task) => isTaskCompleted(userId, task)).length;
@@ -31,8 +35,8 @@ function continueTarget(userId: string): ContinueTarget {
   const { materialStatus } = accessFor(userId);
   const lastId = db.lastOpened.get(userId);
   const candidate =
-    (lastId && materialStatus.get(lastId) === 'AVAILABLE' ? CONTENT.materials.find((m) => m.id === lastId) : undefined) ??
-    CONTENT.materials.find((m) => materialStatus.get(m.id) === 'AVAILABLE');
+    (lastId && materialStatus.get(lastId) === 'AVAILABLE' ? activeMaterials().find((m) => m.id === lastId) : undefined) ??
+    activeMaterials().find((m) => materialStatus.get(m.id) === 'AVAILABLE');
   return candidate ? { materialId: candidate.id, materialTitle: candidate.title, stageTitle: findStage(candidate.stageId).title } : null;
 }
 
@@ -45,7 +49,7 @@ export const learningRoutes: MockRoute[] = [
       const userId = req.userId as string;
       const { stageAccess } = accessFor(userId);
       const done = completions(userId);
-      const stages: StageSummary[] = CONTENT.stages.map((stage, index) => {
+      const stages: StageSummary[] = activeStages().map((stage, index) => {
         const materials = materialsOf(stage.id);
         const access = stageAccess.get(stage.id) ?? 'LOCKED';
         return {
@@ -69,7 +73,7 @@ export const learningRoutes: MockRoute[] = [
     access: 'SANTRI',
     handler: (req) => {
       const userId = req.userId as string;
-      const stage = findStage(req.params.stageId);
+      const stage = findStudentStage(req.params.stageId);
       const { stageAccess, materialStatus } = accessFor(userId);
       if (stageAccess.get(stage.id) === 'LOCKED') throw httpError(403, 'LEARNING_STAGE_LOCKED', 'Tahapan ini belum terbuka.');
       const materials: MaterialSummary[] = materialsOf(stage.id).map((m) => {
@@ -88,19 +92,24 @@ export const learningRoutes: MockRoute[] = [
     access: 'SANTRI',
     handler: (req) => {
       const userId = req.userId as string;
-      const material = findMaterial(req.params.id);
+      const material = findStudentMaterial(req.params.id);
       assertMaterialOpen(userId, material.id);
       db.lastOpened.set(userId, material.id);
       const { materialStatus } = accessFor(userId);
-      const index = CONTENT.materials.indexOf(material);
-      const previous = CONTENT.materials[index - 1];
-      const next = CONTENT.materials[index + 1];
-      const blocks: MaterialBlock[] = [
-        { type: 'TEXT', orderIndex: 1, textContent: `[DATA CONTOH] Penjelasan materi ${material.code}.` },
-        { type: 'TEXT', orderIndex: 2, arabicContent: material.letters.map((l) => l.arabic).join('  '), transliteration: material.letters.map((l) => l.label).join(', ') },
-        ...material.practice.map((line, i) => ({ type: 'TEXT' as const, orderIndex: 3 + i, arabicContent: line })),
-        { type: 'AUDIO', orderIndex: 3 + material.practice.length, audioUrl: mockAudioUrl(`material:${material.code}`, 2000), durationMs: 2000 },
-      ];
+      const ordered = activeMaterials();
+      const index = ordered.indexOf(material);
+      const previous = ordered[index - 1];
+      const next = ordered[index + 1];
+      // Blok yang disimpan Admin (PUT /admin/materials/:id/blocks), urutan = urutan array.
+      const blocks: MaterialBlock[] = material.blocks.flatMap((block, i): MaterialBlock[] => {
+        const orderIndex = i + 1;
+        if (block.type === 'AUDIO') {
+          const audio = CONTENT.audio.find((item) => item.id === block.audioId);
+          return audio ? [{ type: 'AUDIO', orderIndex, audioUrl: mockAudioUrl(`audio:${audio.id}`, audio.durationMs), durationMs: audio.durationMs }] : [];
+        }
+        if (block.type === 'IMAGE') return block.imageUrl ? [{ type: 'IMAGE', orderIndex, imageUrl: block.imageUrl }] : [];
+        return [{ type: 'TEXT', orderIndex, textContent: block.textContent, arabicContent: block.arabicContent, transliteration: block.transliteration }];
+      });
       return ok({
         id: material.id,
         code: material.code,
@@ -130,14 +139,14 @@ export const learningRoutes: MockRoute[] = [
     access: 'SANTRI',
     handler: (req) => {
       const userId = req.userId as string;
-      const material = findMaterial(req.params.id);
+      const material = findStudentMaterial(req.params.id);
       // SDD 3.8.4: backend hanya memverifikasi materi terbuka bagi Santri ini.
       assertMaterialOpen(userId, material.id);
       const before = accessFor(userId).stageAccess;
       const done = completions(userId);
       if (!done.has(material.id)) done.set(material.id, new Date().toISOString()); // idempoten
       const after = accessFor(userId).stageAccess;
-      const unlocked = CONTENT.stages.find((s) => before.get(s.id) === 'LOCKED' && after.get(s.id) === 'UNLOCKED');
+      const unlocked = activeStages().find((s) => before.get(s.id) === 'LOCKED' && after.get(s.id) === 'UNLOCKED');
       const { learningProgressPct, materialsCompleted, materialsTotal, tasksCompleted, tasksTotal } = progressSnapshot(userId);
       return ok(
         {
@@ -161,9 +170,9 @@ export const learningRoutes: MockRoute[] = [
       const { materialStatus } = accessFor(userId);
       const progress = progressSnapshot(userId);
       const lastId = db.lastOpened.get(userId);
-      const last = lastId ? CONTENT.materials.find((m) => m.id === lastId) : undefined;
+      const last = lastId ? activeMaterials().find((m) => m.id === lastId) : undefined;
       // [ASUMSI] Tugas belum selesai dari materi yang terbuka, maksimal 5.
-      const unfinishedTasks = CONTENT.materials
+      const unfinishedTasks = activeMaterials()
         .filter((m) => materialStatus.get(m.id) !== 'LOCKED')
         .flatMap((m) => tasksOf(m.id).filter((t) => !isTaskCompleted(userId, t)).map((t) => ({ id: t.id, title: t.title, materialTitle: m.title })))
         .slice(0, 5);

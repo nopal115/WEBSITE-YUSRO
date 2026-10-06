@@ -8,11 +8,27 @@ export interface Letter {
   label: string;
 }
 
+/** SDD 4.5.5 content_status. */
+export type ContentStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE';
+
 export interface MockStage {
   id: string;
   code: string;
   title: string;
+  description: string | null;
   orderIndex: number;
+  status: ContentStatus;
+}
+
+/** Blok konten materi (SDD 4.5.7); urutan = urutan array. */
+export interface MockBlock {
+  id: string;
+  type: 'TEXT' | 'AUDIO' | 'IMAGE';
+  textContent?: string;
+  arabicContent?: string;
+  transliteration?: string;
+  audioId?: string;
+  imageUrl?: string;
 }
 
 export interface MockMaterial {
@@ -20,10 +36,22 @@ export interface MockMaterial {
   code: string;
   stageId: string;
   title: string;
+  summary: string | null;
   orderIndex: number;
   isRequired: boolean;
+  status: ContentStatus;
+  blocks: MockBlock[];
   letters: Letter[];
   practice: string[];
+}
+
+/** [DATA CONTOH] Audio pembelajaran (SDD 4.5.8 audio_assets, kind LEARNING). Suaranya sintetis. */
+export interface MockAudio {
+  id: string;
+  kind: 'LEARNING' | 'REFERENCE';
+  originalName: string;
+  durationMs: number;
+  status: 'ACTIVE' | 'ARCHIVED';
 }
 
 export interface MockQuestion {
@@ -119,10 +147,25 @@ function buildQuestions(material: MockMaterial, seed: number): MockQuestion[] {
   });
 }
 
+/** [DATA CONTOH] Gambar sederhana (SVG data URI) untuk blok IMAGE contoh; tidak butuh jaringan. */
+const SAMPLE_IMAGE_URL =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="120" viewBox="0 0 320 120"><rect width="320" height="120" rx="12" fill="#E6F0F2"/><text x="160" y="72" font-size="40" text-anchor="middle" fill="#0F4C5C" font-family="serif">بَ مَ فَ</text></svg>');
+
+function materialBlocks(code: string, letters: Letter[], practice: string[]): MockBlock[] {
+  return [
+    { id: `blk-${code}-t1`, type: 'TEXT', textContent: `[DATA CONTOH] Penjelasan materi ${code}.` },
+    { id: `blk-${code}-t2`, type: 'TEXT', arabicContent: letters.map((l) => l.arabic).join('  '), transliteration: letters.map((l) => l.label).join(', ') },
+    ...practice.map((line, i): MockBlock => ({ id: `blk-${code}-p${i + 1}`, type: 'TEXT', arabicContent: line })),
+    { id: `blk-${code}-a1`, type: 'AUDIO', audioId: `aud-${code}` },
+  ];
+}
+
 function buildContent() {
   const stages: MockStage[] = [];
   const materials: MockMaterial[] = [];
   const tasks: MockTask[] = [];
+  const audio: MockAudio[] = [];
   let globalIndex = 0;
 
   MATERIAL_COUNTS.forEach((count, stageIndex) => {
@@ -131,7 +174,9 @@ function buildContent() {
       id: `stg-l${pad(stageNo)}`,
       code: `l${pad(stageNo)}`,
       title: STAGE_TITLES[stageNo] ?? `[DATA CONTOH] Tahapan ${stageNo}`,
+      description: null,
       orderIndex: stageNo,
+      status: 'ACTIVE',
     };
     stages.push(stage);
 
@@ -139,17 +184,23 @@ function buildContent() {
       const code = `${stage.code}m${pad(materialNo)}`;
       const generic = [0, 1, 2].map((offset) => LETTER_POOL[(globalIndex * 3 + offset) % LETTER_POOL.length]);
       const special = SPECIAL_MATERIALS[code];
+      const letters = special?.letters ?? generic;
+      const practice = special?.practice ?? [generic.map((item) => item.arabic).join(' ')];
       const material: MockMaterial = {
         id: `mat-${code}`,
         code,
         stageId: stage.id,
         title: `[DATA CONTOH] Materi ${materialNo}`,
+        summary: null,
         orderIndex: materialNo,
         isRequired: true,
-        letters: special?.letters ?? generic,
-        practice: special?.practice ?? [generic.map((item) => item.arabic).join(' ')],
+        status: 'ACTIVE',
+        blocks: materialBlocks(code, letters, practice),
+        letters,
+        practice,
       };
       materials.push(material);
+      audio.push({ id: `aud-${code}`, kind: 'LEARNING', originalName: `audio-materi-${code}.wav`, durationMs: 2000, status: 'ACTIVE' });
       tasks.push(
         {
           id: `tsk-${code}-quiz`,
@@ -173,7 +224,42 @@ function buildContent() {
     }
   });
 
-  return { stages, materials, tasks };
+  // [DATA CONTOH] Blok gambar lama pada satu materi (penyunting A4 tidak boleh menghapusnya diam-diam).
+  const withImage = materials.find((material) => material.code === 'l001m002');
+  withImage?.blocks.splice(1, 0, { id: 'blk-l001m002-img', type: 'IMAGE', imageUrl: SAMPLE_IMAGE_URL });
+
+  // [DATA CONTOH] Konten NONAKTIF dan DRAFT di bagian akhir, agar halaman Santri yang sudah diuji tidak berubah.
+  const lastStage = stages[stages.length - 1];
+  const inactiveCode = `${lastStage.code}m${pad(materials.filter((m) => m.stageId === lastStage.id).length + 1)}`;
+  materials.push({
+    id: `mat-${inactiveCode}`, code: inactiveCode, stageId: lastStage.id, title: '[DATA CONTOH] Materi lama (nonaktif)', summary: null,
+    orderIndex: materials.filter((m) => m.stageId === lastStage.id).length + 1, isRequired: false, status: 'INACTIVE',
+    blocks: [{ id: `blk-${inactiveCode}-t1`, type: 'TEXT', textContent: '[DATA CONTOH] Materi ini sudah dinonaktifkan.' }], letters: [], practice: [],
+  });
+  const draftNo = stages.length + 1;
+  const draftStage: MockStage = { id: `stg-l${pad(draftNo)}`, code: `l${pad(draftNo)}`, title: `[DATA CONTOH] Tahapan ${draftNo} (draf)`, description: 'Tahapan yang sedang disusun.', orderIndex: draftNo, status: 'DRAFT' };
+  stages.push(draftStage);
+  materials.push({
+    id: `mat-${draftStage.code}m001`, code: `${draftStage.code}m001`, stageId: draftStage.id, title: '[DATA CONTOH] Materi draf', summary: null,
+    orderIndex: 1, isRequired: true, status: 'DRAFT', blocks: [{ id: `blk-${draftStage.code}m001-t1`, type: 'TEXT', textContent: '[DATA CONTOH] Konten sedang disusun.' }], letters: [], practice: [],
+  });
+
+  audio.push(
+    { id: 'aud-contoh-1', kind: 'LEARNING', originalName: 'contoh-bacaan-fathah.wav', durationMs: 3200, status: 'ACTIVE' },
+    { id: 'aud-contoh-2', kind: 'LEARNING', originalName: 'contoh-bacaan-kasrah.wav', durationMs: 2800, status: 'ACTIVE' },
+    { id: 'aud-contoh-3', kind: 'LEARNING', originalName: 'contoh-bacaan-dammah.wav', durationMs: 3000, status: 'ACTIVE' },
+  );
+
+  return { stages, materials, tasks, audio };
 }
 
+/** Konten mock yang dapat diubah Admin (A4); direset di tempat agar semua impor tetap menunjuk objek yang sama. */
 export const CONTENT = buildContent();
+
+export function resetContent(): void {
+  const fresh = buildContent();
+  CONTENT.stages.splice(0, CONTENT.stages.length, ...fresh.stages);
+  CONTENT.materials.splice(0, CONTENT.materials.length, ...fresh.materials);
+  CONTENT.tasks.splice(0, CONTENT.tasks.length, ...fresh.tasks);
+  CONTENT.audio.splice(0, CONTENT.audio.length, ...fresh.audio);
+}

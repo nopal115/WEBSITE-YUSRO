@@ -2,7 +2,7 @@
 import type { AccountStatus, UserRole } from '../../../features/auth/types';
 import type { QuizQuestionResult } from '../../../features/quiz/types';
 import type { EvaluationStatus } from '../types';
-import { CONTENT, type MockImitationTask, type MockMaterial, type MockQuizTask, type MockStage, type MockTask } from './data/content';
+import { CONTENT, resetContent, type MockImitationTask, type MockMaterial, type MockQuizTask, type MockStage, type MockTask } from './data/content';
 import { seedSampleSubmissions } from './data/submissions';
 import { seedSampleStudents, type SampleStudent } from './data/students';
 import { httpError } from './http';
@@ -71,6 +71,7 @@ export const db = {
 };
 
 export function resetDb(): void {
+  resetContent();
   db.users = seedUsers();
   db.materialCompletions.clear();
   db.lastOpened.clear();
@@ -118,12 +119,46 @@ export function completions(userId: string): Map<string, string> {
   return map;
 }
 
-export function accessFor(userId: string): AccessState {
-  return computeAccess(CONTENT.stages, CONTENT.materials, new Set(completions(userId).keys()));
+const byOrder = <T extends { orderIndex: number }>(a: T, b: T) => a.orderIndex - b.orderIndex;
+
+/**
+ * [ASUMSI] Visibilitas Santri (SDD 3.5.3, 3.8): hanya tahapan dan materi AKTIF yang tampil dan dihitung
+ * untuk aturan buka; DRAFT tidak terlihat sama sekali, NONAKTIF tidak dapat dipakai untuk aktivitas baru.
+ */
+export function activeStages(): MockStage[] {
+  return CONTENT.stages.filter((stage) => stage.status === 'ACTIVE').sort(byOrder);
 }
 
-/** SDD 3.8.6: tugas dan materi terkunci ditolak dengan 403. */
+/** Materi AKTIF pada tahapan AKTIF, urut tahapan lalu urutan materi. */
+export function activeMaterials(): MockMaterial[] {
+  return activeStages().flatMap((stage) => CONTENT.materials.filter((m) => m.stageId === stage.id && m.status === 'ACTIVE').sort(byOrder));
+}
+
+export function accessFor(userId: string): AccessState {
+  return computeAccess(activeStages(), activeMaterials(), new Set(completions(userId).keys()));
+}
+
+/** Tahapan untuk Santri: DRAFT/NONAKTIF dijawab 404 (tidak terlihat). */
+export function findStudentStage(id: string): MockStage {
+  const stage = findStage(id);
+  if (stage.status !== 'ACTIVE') throw NOT_FOUND();
+  return stage;
+}
+
+/**
+ * Materi untuk Santri: DRAFT atau tahapannya tidak AKTIF → 404; NONAKTIF → 409 dengan kode sesuai konteks
+ * (LEARNING_MATERIAL_INACTIVE untuk materi, TASK_INACTIVE untuk tugasnya; SDD 3.8, 3.10.8).
+ */
+export function findStudentMaterial(id: string, inactive: { code: string; message: string } = { code: 'LEARNING_MATERIAL_INACTIVE', message: 'Materi ini sedang tidak tersedia.' }): MockMaterial {
+  const material = findMaterial(id);
+  if (material.status === 'DRAFT' || findStage(material.stageId).status !== 'ACTIVE') throw NOT_FOUND();
+  if (material.status === 'INACTIVE') throw httpError(409, inactive.code, inactive.message);
+  return material;
+}
+
+/** SDD 3.8.6: tugas dan materi terkunci ditolak dengan 403; tugas pada materi NONAKTIF ditolak 409. */
 export function assertMaterialOpen(userId: string, materialId: string): void {
+  findStudentMaterial(materialId, { code: 'TASK_INACTIVE', message: 'Tugas ini sedang tidak tersedia.' });
   if (accessFor(userId).materialStatus.get(materialId) === 'LOCKED') {
     throw httpError(403, 'LEARNING_MATERIAL_LOCKED', 'Materi ini belum terbuka. Selesaikan materi sebelumnya.');
   }
@@ -174,13 +209,17 @@ export function attemptCount(userId: string, task: MockTask): number {
 }
 
 /**
- * SDD 3.13.2: progress pembelajaran = (materi selesai + tugas selesai) / (total materi + total tugas),
- * dengan penyebut materi dan tugas pada tahapan yang telah terbuka.
+ * SDD 3.13.2: progress pembelajaran = (materi selesai + tugas selesai) / (total materi + total tugas).
+ * Penyebut: materi dan tugas AKTIF pada tahapan yang telah terbuka, ditambah materi yang sudah diselesaikan
+ * walau kini NONAKTIF, agar progress tidak turun saat Admin menonaktifkan materi (NFR-DATA-02).
  */
 export function progressSnapshot(userId: string) {
   const { stageAccess } = accessFor(userId);
   const done = completions(userId);
-  const materials = CONTENT.materials.filter((m) => stageAccess.get(m.stageId) === 'UNLOCKED');
+  const materials = [
+    ...activeMaterials().filter((m) => stageAccess.get(m.stageId) === 'UNLOCKED'),
+    ...CONTENT.materials.filter((m) => m.status === 'INACTIVE' && done.has(m.id)),
+  ];
   const tasks = materials.flatMap((m) => tasksOf(m.id));
   const materialsCompleted = materials.filter((m) => done.has(m.id)).length;
   const tasksCompleted = tasks.filter((t) => isTaskCompleted(userId, t)).length;

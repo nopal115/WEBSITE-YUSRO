@@ -1,5 +1,5 @@
 // Endpoint Admin yang ditiru: dashboard (SDD 5.18), manajemen santri (SDD 5.14 + riwayat [ASUMSI]),
-// dan daftar tahapan minimal (SDD 5.15). Monitoring ada di handlers/monitoring.ts; endpoint admin lain belum ditiru.
+// Monitoring ada di handlers/monitoring.ts, konten (SDD 5.15) dan audio di handlers/content.ts.
 import type { AccountStatus } from '../../../../features/auth/types';
 import { CONTENT } from '../data/content';
 import { fail, ok, paginate, type MockRequest } from '../http';
@@ -225,12 +225,5 @@ export const adminRoutes: MockRoute[] = [
         headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="Laporan-${record.studentCode}-${date}.pdf"` },
       };
     },
-  },
-  {
-    // [ASUMSI] Bentuk minimal untuk filter tahapan; SDD 5.15 tidak merinci respons.
-    method: 'GET',
-    pattern: '/admin/stages',
-    access: 'ADMIN',
-    handler: () => ok(CONTENT.stages.map((stage) => ({ id: stage.id, code: stage.code, title: stage.title, orderIndex: stage.orderIndex, status: 'ACTIVE' }))),
   },
 ];

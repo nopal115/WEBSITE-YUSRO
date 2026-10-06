@@ -5,7 +5,7 @@ import type { AccountStatus } from '../../../features/auth/types';
 import type { HistoryItem, Progress } from '../../../features/progress/types';
 import type { Statistics, StatisticsChart } from '../../../features/statistics/types';
 import { CONTENT } from './data/content';
-import { accessFor, db, progressSnapshot, quizAttemptsOf, submissionsOf, submissionStatus, validResults } from './db';
+import { accessFor, activeStages, db, progressSnapshot, quizAttemptsOf, submissionsOf, submissionStatus, validResults } from './db';
 import { httpError } from './http';
 import { chartTrend, round2, type StudentActivity } from './rules';
 import { chartView, historyItems, progressView, statisticsView, taskInfo } from './views';
@@ -177,7 +177,8 @@ export function recordProgress(record: StudentRecord): Progress {
     learningProgressPct: pct,
     materials: ratio(materialsTotal),
     tasks: ratio(tasksTotal),
-    stages: CONTENT.stages.map((stage, index) => ({
+    // [DATA CONTOH] Tahapan tertinggi santri contoh dihitung dari indeks; hanya tahapan AKTIF yang ditampilkan.
+    stages: activeStages().map((stage, index) => ({
       id: stage.id,
       title: stage.title,
       access: index <= record.highestStageIndex ? 'UNLOCKED' : 'LOCKED',
@@ -217,4 +218,16 @@ export function recordAverageScore(record: StudentRecord): number | null {
 
 export function recordLastActivity(record: StudentRecord): string | null {
   return recordHistory(record)[0]?.submittedAt ?? null;
+}
+
+/**
+ * Tugas yang pernah dirujuk percobaan: percobaan/submission di db ditambah riwayat sintetis santri contoh.
+ * Dipakai aturan hapus dan "kembalikan ke draf" konten (SDD 3.5.3, BR-DELETE-02).
+ */
+export function referencedTaskIds(): Set<string> {
+  const ids = new Set<string>([...db.quizAttempts.map((attempt) => attempt.taskId), ...db.submissions.map((submission) => submission.taskId)]);
+  for (const record of studentRecords()) {
+    if (!record.live) for (const item of sampleHistory(record)) ids.add(item.taskId);
+  }
+  return ids;
 }

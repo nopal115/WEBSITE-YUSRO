@@ -4,7 +4,7 @@ import type { HistoryItem, Progress } from '../../../features/progress/types';
 import type { Statistics, StatisticsChart } from '../../../features/statistics/types';
 import type { EvaluationStatus } from '../types';
 import { CONTENT } from './data/content';
-import { accessFor, completions, findMaterial, isTaskCompleted, progressSnapshot, quizAttemptsOf, submissionsOf, submissionStatus, tasksOf, validResults } from './db';
+import { accessFor, activeMaterials, activeStages, completions, findMaterial, isTaskCompleted, progressSnapshot, quizAttemptsOf, submissionsOf, submissionStatus, tasksOf, validResults } from './db';
 import { chartTrend, round2 } from './rules';
 
 /** [ASUMSI] Label riwayat untuk SUBMITTED dan PROCESSING tidak dirinci SDD. */
@@ -28,12 +28,14 @@ export function progressView(userId: string): Progress {
     learningProgressPct: snapshot.learningProgressPct,
     materials: { completed: snapshot.materialsCompleted, total: snapshot.materialsTotal, pct: snapshot.materialsPct },
     tasks: { completed: snapshot.tasksCompleted, total: snapshot.tasksTotal, pct: snapshot.tasksPct },
-    stages: CONTENT.stages.map((stage) => {
+    // Hanya tahapan dan materi AKTIF (SDD 3.5.3).
+    stages: activeStages().map((stage) => {
       // [ASUMSI] pct per tahapan = (materi + tugas selesai) / (materi + tugas) pada tahapan itu.
-      const materials = CONTENT.materials.filter((m) => m.stageId === stage.id);
+      const materials = activeMaterials().filter((m) => m.stageId === stage.id);
       const tasks = materials.flatMap((m) => tasksOf(m.id));
       const finished = materials.filter((m) => done.has(m.id)).length + tasks.filter((t) => isTaskCompleted(userId, t)).length;
-      return { id: stage.id, title: stage.title, access: stageAccess.get(stage.id) ?? 'LOCKED', pct: Math.round((finished / (materials.length + tasks.length)) * 100) };
+      const total = materials.length + tasks.length;
+      return { id: stage.id, title: stage.title, access: stageAccess.get(stage.id) ?? 'LOCKED', pct: total > 0 ? Math.round((finished / total) * 100) : 0 };
     }),
   };
 }
