@@ -100,8 +100,10 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     // Sesi berakhir: token tidak berlaku, atau akun dinonaktifkan saat sesi masih aktif (SDD 3.16.5).
     const inactive = response.status === 403 && error.code === 'AUTH_ACCOUNT_INACTIVE';
     if (auth && (response.status === 401 || inactive)) {
-      tokenStore.clear();
+      // Handler (navigasi ke /login) dipanggil sebelum token dihapus, agar pengalihan ProtectedRoute
+      // tidak menimpa state navigasi (mis. pesan akun dinonaktifkan).
       unauthorizedHandler?.(inactive ? { reason: 'inactive', message: error.message } : { reason: 'unauthorized' });
+      tokenStore.clear();
     }
     throw error;
   }

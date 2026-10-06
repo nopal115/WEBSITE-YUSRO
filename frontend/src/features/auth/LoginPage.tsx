@@ -1,8 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { TextField } from '../../components/ui/TextField';
+import { sessionNotice } from '../../lib/auth/sessionNotice';
 import { useLogin } from '../../lib/hooks/useAuth';
 import { getLoginErrorMessage } from './api';
 import { loginSchema, type LoginFormValues } from './loginSchema';
@@ -25,10 +27,13 @@ function BrandLogo(): JSX.Element {
 
 export function LoginPage(): JSX.Element {
   const login = useLogin();
-  // Pesan dari registrasi/reset password (sukses) atau dari sesi yang diakhiri karena akun dinonaktifkan (peringatan).
-  const navState = useLocation().state as { notice?: unknown; noticeTone?: unknown } | null;
-  const notice = navState?.notice;
-  const noticeClass = navState?.noticeTone === 'warning' ? 'bg-semantic-warning-soft text-semantic-warning' : 'bg-feedback-benar-soft text-feedback-benar';
+  // Pesan sukses dari registrasi/reset password (state navigasi), atau peringatan sesi yang diakhiri karena akun
+  // dinonaktifkan (sessionNotice; dibaca sekali lalu dihapus).
+  const [endedNotice] = useState(sessionNotice.peek);
+  useEffect(() => sessionNotice.clear(), []);
+  const navNotice = (useLocation().state as { notice?: unknown } | null)?.notice;
+  const notice = endedNotice ?? navNotice;
+  const noticeClass = endedNotice ? 'bg-semantic-warning-soft text-semantic-warning' : 'bg-feedback-benar-soft text-feedback-benar';
   const {
     register,
     handleSubmit,

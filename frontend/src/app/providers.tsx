@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApiError } from '../lib/api/ApiError';
 import { setUnauthorizedHandler } from '../lib/api/client';
+import { sessionNotice } from '../lib/auth/sessionNotice';
 import { router } from './router';
 
 const MAX_QUERY_RETRIES = 2;
@@ -30,7 +31,8 @@ export function AppProviders({ children }: { children: ReactNode }): JSX.Element
         const { pathname, search, hash } = window.location;
         if (end.reason === 'inactive') {
           // Akun dinonaktifkan: pesan server ditampilkan di halaman login, tanpa kembali ke halaman semula.
-          void router.navigate('/login', { replace: true, state: { notice: end.message, noticeTone: 'warning' } });
+          sessionNotice.set(end.message);
+          void router.navigate('/login', { replace: true });
           return;
         }
         if (pathname === '/login') return;
