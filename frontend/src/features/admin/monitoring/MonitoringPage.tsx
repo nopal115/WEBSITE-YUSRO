@@ -12,11 +12,13 @@ import { ErrorState, ListSkeleton } from '../../learning/QueryStates';
 import { EvaluationStatusLabel } from './EvaluationStatusLabel';
 import { adminMonitoringKeys, useRetrySubmission, useSubmissions } from './hooks';
 import { MonitoringFilters } from './MonitoringFilters';
+import { RecordingPlayer } from './RecordingPlayer';
 import { hasMonitoringFilters, parseMonitoringQuery, toMonitoringParams, type MonitoringQuery } from './query';
 import type { AdminSubmission } from './types';
 
 const scoreText = (item: AdminSubmission) => (item.score === null ? '—' : formatScore(item.score));
 const WAITING = new Set(['SUBMITTED', 'PROCESSING']);
+const recordingLabel = (item: AdminSubmission) => `rekaman percobaan ke-${item.attemptNo} ${item.studentName}`;
 
 // Monitoring Evaluasi (SDD 7.7.20, UI-ADMIN-MONITOR-01–03). Filter dan halaman di URL query; tanpa polling.
 // [REKOMENDASI] Tidak ada desain Figma untuk admin.
@@ -99,6 +101,7 @@ export function MonitoringPage(): JSX.Element {
     { header: 'PERCOBAAN', render: (item) => `Ke-${item.attemptNo}`, cellClassName: 'whitespace-nowrap text-body' },
     { header: 'STATUS', render: (item) => <EvaluationStatusLabel status={item.evaluationStatus} /> },
     { header: 'NILAI', render: scoreText, cellClassName: 'text-h3' },
+    { header: 'REKAMAN', render: (item) => <RecordingPlayer submissionId={item.submissionId} label={recordingLabel(item)} /> },
     { header: 'AKSI', render: action },
   ];
 
@@ -155,6 +158,7 @@ export function MonitoringPage(): JSX.Element {
                   <dd className="text-h3 text-text-primary">{scoreText(item)}</dd>
                 </div>
               </dl>
+              <RecordingPlayer submissionId={item.submissionId} label={recordingLabel(item)} />
               <div className="-mx-3 px-3">{action(item)}</div>
             </div>
           )}

@@ -10,6 +10,11 @@ interface AudioPlayerProps {
    * 15 menit, SDD 5.8 / 7.6.1). Setelah itu pemuatan dicoba sekali lagi sebelum galat tampil.
    */
   onExpired?: () => Promise<unknown>;
+  /**
+   * Langsung memutar begitu audio siap. Hanya untuk pemutar yang dibuka atas tindakan pengguna
+   * (mis. tombol Putar rekaman di Monitoring), sehingga tetap tidak ada autoplay (SDD 7.11).
+   */
+  playOnLoad?: boolean;
 }
 
 type PlayerStatus = 'loading' | 'ready' | 'playing' | 'error';
@@ -25,9 +30,10 @@ function formatTime(seconds: number): string {
  * dengan papan ketik (Tab, Spasi/Enter, panah). Audio tidak pernah diputar otomatis.
  * [REKOMENDASI] Tampilan menunggu Figma.
  */
-export function AudioPlayer({ src, label, onExpired }: AudioPlayerProps): JSX.Element {
+export function AudioPlayer({ src, label, onExpired, playOnLoad = false }: AudioPlayerProps): JSX.Element {
   const audioRef = useRef<HTMLAudioElement>(null);
   const retriedRef = useRef(false);
+  const startedRef = useRef(false);
   const [status, setStatus] = useState<PlayerStatus>('loading');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -73,6 +79,10 @@ export function AudioPlayer({ src, label, onExpired }: AudioPlayerProps): JSX.El
         onLoadedMetadata={(event) => {
           setDuration(event.currentTarget.duration);
           setStatus('ready');
+          if (playOnLoad && !startedRef.current) {
+            startedRef.current = true;
+            void event.currentTarget.play().catch(() => undefined);
+          }
         }}
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
         onPlay={() => setStatus('playing')}
