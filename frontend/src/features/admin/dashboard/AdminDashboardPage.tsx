@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, CheckCircle2, ChevronRight, Hourglass } from 'lucide-react';
+import { ArrowRight, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '../../../components/ui/Card';
 import { Pill } from '../../../components/ui/Pill';
@@ -7,7 +7,8 @@ import { formatScore } from '../../dashboard/view';
 import { EmptyState, ErrorState, ListSkeleton } from '../../learning/QueryStates';
 import { useAdminAttention, useAdminDashboard } from './hooks';
 import type { AdminDashboard, AttentionItem, EvaluationHealth } from './types';
-import { attentionDetails, reasonLabel, serviceStatusView, type ServiceTone } from './view';
+import { ServiceStatusLabel } from './ServiceStatusLabel';
+import { attentionDetails, reasonLabel } from './view';
 
 function SummaryCards({ data }: { data: AdminDashboard }): JSX.Element {
   return (
@@ -21,16 +22,8 @@ function SummaryCards({ data }: { data: AdminDashboard }): JSX.Element {
   );
 }
 
-const SERVICE_ICON: Record<ServiceTone, { icon: typeof CheckCircle2; className: string }> = {
-  ok: { icon: CheckCircle2, className: 'text-feedback-benar' },
-  loading: { icon: Hourglass, className: 'text-state-processing' },
-  down: { icon: AlertTriangle, className: 'text-state-failed' },
-};
-
 /** Kondisi layanan evaluasi (SDD 7.7.16, NFR-AVAIL-02). */
 function EvaluationCard({ evaluation }: { evaluation: EvaluationHealth }): JSX.Element {
-  const status = serviceStatusView(evaluation.serviceStatus);
-  const { icon: StatusIcon, className } = SERVICE_ICON[status.tone];
   const rows: [string, string][] = [
     ['Antrean', String(evaluation.queued)],
     ['Sedang diproses', String(evaluation.processing)],
@@ -48,10 +41,8 @@ function EvaluationCard({ evaluation }: { evaluation: EvaluationHealth }): JSX.E
         ))}
         <div className="flex flex-col gap-1">
           <dt className="text-text-secondary">Status layanan</dt>
-          {/* Ikon + teks, bukan warna saja (SDD 7.11). */}
-          <dd className={`flex items-center gap-2 font-semibold ${className}`}>
-            <StatusIcon size={18} aria-hidden="true" />
-            {status.label}
+          <dd>
+            <ServiceStatusLabel status={evaluation.serviceStatus} />
           </dd>
         </div>
         <div className="flex flex-col gap-1">

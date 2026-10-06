@@ -9,6 +9,7 @@ import { ApiError } from '../../../lib/api/ApiError';
 import { formatDateTime } from '../../../lib/utils/format';
 import { formatScore } from '../../dashboard/view';
 import { ErrorState, ListSkeleton } from '../../learning/QueryStates';
+import { EvaluationPanel } from './EvaluationPanel';
 import { EvaluationStatusLabel } from './EvaluationStatusLabel';
 import { adminMonitoringKeys, useRetrySubmission, useSubmissions } from './hooks';
 import { MonitoringFilters } from './MonitoringFilters';
@@ -169,27 +170,33 @@ export function MonitoringPage(): JSX.Element {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1364px] flex-col gap-6">
+    // Desktop: panel status sebagai rail kanan 300 px; layar sempit: panel di atas tabel (SDD 7.5).
+    <div className="mx-auto grid max-w-[1364px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
       <h1 className="sr-only">Monitoring Evaluasi</h1>
-      <MonitoringFilters query={query} onChange={update} onReset={reset} />
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="text-body-s text-text-secondary" aria-live="polite">
-          {submissions.data?.meta ? `${submissions.data.meta.total} submission` : ''}
-        </p>
-        <Button variant="outline" onClick={reload} isLoading={submissions.isFetching && !submissions.isPending} loadingText="MEMUAT ULANG…">
-          <RefreshCw size={18} className="mr-2" aria-hidden="true" />
-          MUAT ULANG
-        </Button>
+      <div className="lg:col-start-2 lg:row-start-1">
+        <EvaluationPanel />
       </div>
-      {notice && (
-        <p
-          className={`rounded-md px-5 py-3 text-body-s ${notice.tone === 'success' ? 'bg-feedback-benar-soft text-feedback-benar' : 'bg-feedback-salah-soft text-feedback-salah'}`}
-          role={notice.tone === 'success' ? 'status' : 'alert'}
-        >
-          {notice.text}
-        </p>
-      )}
-      {content}
+      <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1">
+        <MonitoringFilters query={query} onChange={update} onReset={reset} />
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <p className="text-body-s text-text-secondary" aria-live="polite">
+            {submissions.data?.meta ? `${submissions.data.meta.total} submission` : ''}
+          </p>
+          <Button variant="outline" onClick={reload} isLoading={submissions.isFetching && !submissions.isPending} loadingText="MEMUAT ULANG…">
+            <RefreshCw size={18} className="mr-2" aria-hidden="true" />
+            MUAT ULANG
+          </Button>
+        </div>
+        {notice && (
+          <p
+            className={`rounded-md px-5 py-3 text-body-s ${notice.tone === 'success' ? 'bg-feedback-benar-soft text-feedback-benar' : 'bg-feedback-salah-soft text-feedback-salah'}`}
+            role={notice.tone === 'success' ? 'status' : 'alert'}
+          >
+            {notice.text}
+          </p>
+        )}
+        {content}
+      </div>
     </div>
   );
 }
