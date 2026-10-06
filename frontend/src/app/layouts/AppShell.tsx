@@ -1,5 +1,5 @@
 import { Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import type { NavItem } from './navigation';
 import { NavDrawer } from './NavDrawer';
@@ -23,14 +23,30 @@ function writeCollapsed(value: boolean): void {
   }
 }
 
+const TABLET_QUERY = '(min-width: 768px) and (max-width: 1023px)';
+
+/** true di lebar tablet, satu-satunya lebar tempat sidebar dapat terlipat. */
+function useIsTablet(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia(TABLET_QUERY);
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(TABLET_QUERY).matches,
+    () => false,
+  );
+}
+
 // Keadaan aktif dihitung sendiri (bukan NavLink) karena satu butir bisa aktif untuk beberapa path.
-function SidebarLink({ item, active, collapsed, labelClass }: { item: NavItem; active: boolean; collapsed: boolean; labelClass: string }): JSX.Element {
+function SidebarLink({ item, active, collapsed, iconOnly, labelClass }: { item: NavItem; active: boolean; collapsed: boolean; iconOnly: boolean; labelClass: string }): JSX.Element {
   return (
     <Link
       to={item.to}
       aria-current={active ? 'page' : undefined}
-      aria-label={collapsed ? item.label : undefined}
-      title={collapsed ? item.label : undefined}
+      // aria-label/title hanya saat sidebar benar-benar terlipat (tablet); di desktop label teks terlihat.
+      aria-label={iconOnly ? item.label : undefined}
+      title={iconOnly ? item.label : undefined}
       className={`flex min-h-14 items-center gap-4 rounded-md border px-4 transition ${collapsed ? 'md:justify-center md:px-0 lg:justify-start lg:px-4' : ''} ${active ? 'border-brand-primary-line bg-brand-primary-soft text-brand-primary' : 'border-transparent text-text-secondary hover:bg-neutral-surface-alt'}`}
     >
       <item.icon size={24} className="shrink-0" aria-hidden="true" />
@@ -42,6 +58,8 @@ function SidebarLink({ item, active, collapsed, labelClass }: { item: NavItem; a
 /** Konteks isi bawah sidebar; labelClass menyembunyikan label saat terlipat di tablet. */
 export interface SidebarFooterContext {
   collapsed: boolean;
+  /** Sidebar sedang terlipat dan hanya menampilkan ikon (tablet). */
+  iconOnly: boolean;
   labelClass: string;
 }
 
@@ -66,6 +84,8 @@ interface AppShellProps {
 export function AppShell({ items, isActive, title, headerEnd, sidebarFooter, drawerFooter, bottomNav }: AppShellProps): JSX.Element {
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const isTablet = useIsTablet();
+  const iconOnly = collapsed && isTablet;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -93,11 +113,11 @@ export function AppShell({ items, isActive, title, headerEnd, sidebarFooter, dra
         </div>
         <nav className="flex flex-col gap-2">
           {items.map((item) => (
-            <SidebarLink key={item.to} item={item} active={isActive(pathname, item)} collapsed={collapsed} labelClass={labelClass} />
+            <SidebarLink key={item.to} item={item} active={isActive(pathname, item)} collapsed={collapsed} iconOnly={iconOnly} labelClass={labelClass} />
           ))}
         </nav>
         <div className="flex-1" />
-        {sidebarFooter?.({ collapsed, labelClass })}
+        {sidebarFooter?.({ collapsed, iconOnly, labelClass })}
         <button
           type="button"
           onClick={toggleCollapsed}

@@ -5,15 +5,15 @@ import { useAuth } from '../../lib/hooks/useAuth';
 import { AppShell } from './AppShell';
 import { ADMIN_NAV_ITEMS, adminPageTitle, isAdminNavItemActive } from './navigation';
 
-function LogoutButton({ onLogout, pending, collapsed = false, labelClass = '' }: { onLogout: () => void; pending: boolean; collapsed?: boolean; labelClass?: string }): JSX.Element {
+function LogoutButton({ onLogout, pending, collapsed = false, iconOnly = false, labelClass = '' }: { onLogout: () => void; pending: boolean; collapsed?: boolean; iconOnly?: boolean; labelClass?: string }): JSX.Element {
   return (
     <button
       type="button"
       onClick={onLogout}
       disabled={pending}
       aria-busy={pending || undefined}
-      aria-label={collapsed ? 'Keluar' : undefined}
-      title={collapsed ? 'Keluar' : undefined}
+      aria-label={iconOnly ? 'Keluar' : undefined}
+      title={iconOnly ? 'Keluar' : undefined}
       className={`flex min-h-14 w-full items-center gap-4 rounded-md border border-transparent px-4 text-text-secondary transition hover:bg-neutral-surface-alt disabled:cursor-not-allowed disabled:text-text-muted ${collapsed ? 'md:justify-center md:px-0 lg:justify-start lg:px-4' : ''}`}
     >
       <LogOut size={24} className="shrink-0" aria-hidden="true" />
@@ -50,9 +50,9 @@ export function AdminLayout(): JSX.Element {
           <span className="max-w-40 truncate">{user?.name ?? 'Admin'}</span>
         </span>
       }
-      sidebarFooter={({ collapsed, labelClass }) => (
+      sidebarFooter={({ collapsed, iconOnly, labelClass }) => (
         <div className="mb-4">
-          <LogoutButton onLogout={onLogout} pending={pending} collapsed={collapsed} labelClass={labelClass} />
+          <LogoutButton onLogout={onLogout} pending={pending} collapsed={collapsed} iconOnly={iconOnly} labelClass={labelClass} />
         </div>
       )}
       drawerFooter={
