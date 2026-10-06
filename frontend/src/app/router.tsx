@@ -18,6 +18,7 @@ import { ListSkeleton } from '../features/learning/QueryStates';
 import { AdminDashboardPage } from '../features/admin/dashboard/AdminDashboardPage';
 import { StudentListPage } from '../features/admin/students/StudentListPage';
 import { MonitoringPage } from '../features/admin/monitoring/MonitoringPage';
+import { MaterialEditorPage } from '../features/admin/content/MaterialEditorPage';
 import { MaterialManagementPage } from '../features/admin/content/MaterialManagementPage';
 import { StageManagementPage } from '../features/admin/content/StageManagementPage';
 import { AdminLayout } from './layouts/AdminLayout';
@@ -93,9 +94,8 @@ export const router = createBrowserRouter([
             element: <MaterialManagementPage />,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A4 (Tahapan & Materi).
             path: '/admin/materi/:materialId',
-            element: <PlaceholderPage>Editor Materi</PlaceholderPage>,
+            element: <MaterialEditorPage />,
           },
           {
             // [TBD] Placeholder; dikerjakan di tugas A5 (Audio).

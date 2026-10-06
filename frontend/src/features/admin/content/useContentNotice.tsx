@@ -16,5 +16,6 @@ export function useContentNotice() {
       {notice.text}
     </p>
   ) : null;
-  return { element, success, failure, clear: () => setNotice(null) };
+  const failureText = (text: string) => setNotice({ tone: 'error', text });
+  return { element, success, failure, failureText, clear: () => setNotice(null) };
 }
