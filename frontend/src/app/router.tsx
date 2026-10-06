@@ -18,6 +18,7 @@ import { ListSkeleton } from '../features/learning/QueryStates';
 import { AdminDashboardPage } from '../features/admin/dashboard/AdminDashboardPage';
 import { StudentListPage } from '../features/admin/students/StudentListPage';
 import { MonitoringPage } from '../features/admin/monitoring/MonitoringPage';
+import { StageManagementPage } from '../features/admin/content/StageManagementPage';
 import { AdminLayout } from './layouts/AdminLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -83,9 +84,8 @@ export const router = createBrowserRouter([
             ),
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A4 (Tahapan & Materi).
             path: '/admin/tahapan',
-            element: <PlaceholderPage>Tahapan</PlaceholderPage>,
+            element: <StageManagementPage />,
           },
           {
             // [TBD] Placeholder; dikerjakan di tugas A4 (Tahapan & Materi).
