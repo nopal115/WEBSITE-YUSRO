@@ -59,7 +59,7 @@ export function HistoryList({ items, meta, onPageChange, linkFor = noLink, label
         columns={columns}
         rows={items}
         rowKey={(item) => item.attemptId}
-        caption={label}
+        caption="Riwayat percobaan"
         renderCard={(item) => {
           const link = linkFor(item);
           return (
