@@ -264,6 +264,7 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `evaluation` | `evaluation/evaluation.controller.ts` | kesiapan layanan ML; tanpa `@Roles` | — (admin, SDD 5.18 `admin/evaluation/health`) |
 | GET `ml-client/health` | `ml-client/ml-client.controller.ts` | kesehatan layanan ML | — |
 | GET `audio`, `content`, `task`, `student-admin` | masing-masing `*.controller.ts` | stub `501 Not Implemented` | — (admin) |
+| GET `monitoring/students` | `monitoring/monitoring.controller.ts` | `@Roles(ADMIN)`; semua santri dengan statistik ringkas, tanpa pagination, pencarian, maupun filter | `GET admin/students` (2.12, S2-1) |
 | POST `admin/submissions/:id/retry`, GET `admin/evaluation/queue`, GET `monitoring` | `evaluation`, `monitoring` | admin; tidak dirinci | — (admin belum dibangun) |
 
 ### 2.11 Admin — Dashboard (`src/features/admin/dashboard/api.ts`, `types.ts`; ditambahkan di A1)
@@ -274,9 +275,26 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `admin/dashboard/attention` | Admin | — | `AttentionItem[] { studentId, studentCode, name, reasons[], learningProgressPct?, previousBest?, latestBest?, delta?, availableTasks? }` | umum; daftar kosong → pesan keadaan kosong | SDD 5.18, 3.17.3 | **belum ada** (D2) |
 
 - **D1:** tidak ada route `admin/dashboard`. Padanan terdekat untuk kondisi layanan adalah `GET monitoring` (`monitoring.service.ts`, `@Roles(ADMIN)`): `{ status: 'ok' | 'degraded', services { api, ml: 'ok' | 'unavailable' }, checkedAt }`, tanpa angka antrean, versi model, maupun ringkasan santri. Nilai `degraded` akan tampil "Terganggu" menurut AS16.
-- **D2:** tidak ada route `admin/dashboard/attention`. `StatisticsService.getStudentOverviewForAdmin()` menyediakan statistik per santri, tetapi tidak dipanggil route mana pun dan tidak menghitung kriteria SDD 3.17.3.
+- **D2:** tidak ada route `admin/dashboard/attention`. `StatisticsService.getStudentOverviewForAdmin()` menyediakan statistik per santri lewat `GET monitoring/students` (lihat 2.10 dan S2-1), tetapi tidak menghitung kriteria SDD 3.17.3. *(Koreksi A2: versi A1 dokumen ini keliru menulis fungsi itu tidak dipanggil route mana pun.)*
 
-**Ringkasan status (27 endpoint yang dipanggil frontend):** sesuai 0 · beda 12 · belum ada 15 · tidak dapat dipastikan 0. Ditambah 2 endpoint admin di 2.11 (A1): keduanya belum ada. Ada satu detail yang tidak dapat dipastikan di dalam baris "beda": serialisasi `score`, lihat I3.
+### 2.12 Admin — Santri (`src/features/admin/students/api.ts`, `types.ts`; ditambahkan di A2)
+
+| Method + path | Peran | Request | Respons yang diharapkan | Galat yang ditangani frontend | Sumber | Backend |
+| --- | --- | --- | --- | --- | --- | --- |
+| GET `admin/students` | Admin | query `page, limit (maks 100), q, stageId, progressMin, progressMax, scoreMin, scoreMax, status, sort` (`name \| progress \| averageScore \| lastActivity` + `:asc \| :desc`) | `StudentListItem[] { id, studentCode, name, email, currentStage (judul) \| null, learningProgressPct, averageScore \| null [ASUMSI], status, lastActivityAt \| null }` + `meta` | umum (layar galat + coba lagi); daftar kosong → pesan + HAPUS FILTER | SDD 5.14, 3.16.3, 3.16.4 | **belum ada** (S2-1) |
+| GET `admin/students/:id` | Admin | — | `StudentDetail { id, studentCode, name, email, status, joinedAt, lastActivityAt \| null, currentStage { id, title } \| null, progress: Progress }` [ASUMSI] | 404 → "Kembali ke daftar santri", tanpa coba lagi | SDD 5.14 (isi [ASUMSI]) | **belum ada** |
+| PATCH `admin/students/:id/status` | Admin | body `{ status: ACTIVE \| INACTIVE, reason? }` (reason maks 255 [ASUMSI]) | tidak dibaca; daftar, detail, dan dashboard diinvalidasi | `errors[]` field `reason` di bawah kolom; pesan server di dialog | SDD 5.14, 3.16.5 | **belum ada** |
+| GET `admin/students/:id/statistics` | Admin | — | `Statistics`, sama dengan `GET statistics` sisi Santri [ASUMSI] | umum | SDD 5.14 (isi [ASUMSI]) | **belum ada** |
+| GET `admin/students/:id/chart` | Admin | — | `StatisticsChart`, sama dengan `GET statistics/chart` sisi Santri [ASUMSI] | umum | SDD 5.14 (isi [ASUMSI]) | **belum ada** |
+| GET `admin/students/:id/history` | Admin | query `?page=&limit=` | `HistoryItem[]` + `meta`, sama dengan `GET progress/history` | umum; kosong → "Belum ada riwayat pengerjaan tugas." | **[ASUMSI] endpoint baru**, tidak ada di SDD | **belum ada** |
+| GET `admin/students/:id/report/pdf` | Admin | — | `application/pdf` sebagai Blob; nama dari `Content-Disposition`, cadangan `Laporan-<studentCode>-<YYYY-MM-DD>.pdf` (tanggal lokal) | pesan galat ditampilkan | SDD 5.14, FR-REPORT-03 | **belum ada** |
+| GET `admin/stages` | Admin | — | `StageOption[] { id, code, title, orderIndex, status }` tanpa pagination [ASUMSI]; dipakai filter tahapan (akan dipakai lagi di A4) | gagal → filter tahapan tidak tersedia, daftar tetap tampil | SDD 5.15 (isi [ASUMSI]) | **belum ada** (S2-2) |
+
+- **S2-1:** tidak ada route `admin/students`. Padanan terdekat `GET monitoring/students` (`@Roles(ADMIN)`) mengembalikan seluruh santri `{ id, studentId, name, email, status, statistics { materialsCompleted, tasksCompleted, progress, averageScore, bestScore, validEvaluationCount } }` tanpa pagination, pencarian, filter, urutan, tahapan, maupun aktivitas terakhir. Nama field berbeda: `studentId` ≠ `studentCode`, `statistics.progress` ≠ `learningProgressPct`. Statistik di sana hanya menghitung IMITATION (lihat AS15).
+- **S2-2:** tidak ada route `admin/stages`. Padanan terdekat `GET learning/stages` (lihat L1) hanya untuk konteks santri dan menyertakan status buka per pengguna.
+- Endpoint 5.14 lainnya tidak punya padanan; ubah status akun dan laporan per santri belum ada di backend.
+
+**Ringkasan status (27 endpoint yang dipanggil frontend):** sesuai 0 · beda 12 · belum ada 15 · tidak dapat dipastikan 0. Ditambah 2 endpoint admin di 2.11 (A1) dan 8 endpoint admin di 2.12 (A2): semuanya belum ada. Ada satu detail yang tidak dapat dipastikan di dalam baris "beda": serialisasi `score`, lihat I3.
 
 ---
 
@@ -301,6 +319,13 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | AS15 | Percobaan Dengar-Pilih ikut dihitung sebagai hasil valid di `GET statistics` (rata-rata, terbaik, jumlah) dan `GET statistics/chart` (titik grafik). | Keputusan proyek; SDD 3.14.2 tidak tegas (lihat T7). Backend-noval saat ini hanya menghitung IMITATION. | `src/features/statistics/types.ts`, `src/lib/api/mock/db.ts` |
 | AS16 | Pemetaan `evaluation.serviceStatus`: `ok` → "Berjalan normal", `loading` → "Sedang memuat model", nilai lain atau kosong → "Terganggu". | SDD 5.18 hanya mencontohkan `"ok"`; health ML (SDD 8.11.3) mengenal `ok` dan `loading`. Backend-noval memakai `degraded` di `GET monitoring`. | `src/features/admin/dashboard/types.ts`, `view.ts` |
 | AS17 | Dashboard admin: `averageScore` bernilai `null` bila belum ada hasil valid; kode alasan di luar tiga kriteria SDD 3.17.3 tetap tampil sebagai "Perlu diperhatikan". | SDD 5.18 hanya mencontohkan angka dan tiga kode alasan. | `src/features/admin/dashboard/types.ts`, `view.ts` |
+| AS18 | Bentuk `GET admin/students/:id`: profil (termasuk `joinedAt` dan `lastActivityAt`), `currentStage { id, title }`, dan `progress` berbentuk sama dengan `GET /progress`. | SDD 5.14 tidak merinci isi detail santri. Tanggal bergabung dan aktivitas terakhir ditampilkan atas keputusan proyek (SRS UI-ADMIN-STUDENT-03 tidak merinci isi profil). | `src/features/admin/students/types.ts`, `StudentDetailPage.tsx` |
+| AS19 | `GET admin/students/:id/statistics` dan `/chart` berbentuk sama dengan `GET statistics` dan `GET statistics/chart` sisi Santri. | SDD 5.14 hanya mencantumkan path. Komponen statistik dan grafik santri dipakai ulang. | `src/features/admin/students/api.ts`, `src/features/statistics/StatisticsView.tsx` |
+| AS20 | Endpoint baru `GET admin/students/:id/history?page=&limit=`, bentuk sama dengan `GET progress/history` termasuk `meta`. | SRS FR-STUDENT-06/FR-MONITOR-04 meminta riwayat tugas santri, tetapi SDD 5.14 tidak menyediakan endpoint-nya. | `src/features/admin/students/api.ts`, `StudentDetailPage.tsx` |
+| AS21 | `PATCH admin/students/:id/status`: `reason` maksimal 255 karakter; respons tidak dibaca frontend. | SDD 5.14 hanya menyebut alasan bersifat opsional dan dicatat di audit_logs. | `src/features/admin/students/types.ts`, `StudentStatusDialog.tsx` |
+| AS22 | Bentuk minimal `GET admin/stages`: `[{ id, code, title, orderIndex, status }]` tanpa pagination. | SDD 5.15 tidak merinci respons daftar tahapan. | `src/features/admin/students/types.ts`, `StudentFilters.tsx` |
+| AS23 | Butir daftar santri: `averageScore` bernilai `null` bila belum ada hasil valid; `currentStage` berupa judul tahapan (string) atau `null`. Filter rentang nilai tidak memuat santri tanpa nilai. | Contoh SDD 5.14 hanya memuat angka dan judul. | `src/features/admin/students/types.ts`, `StudentListPage.tsx` |
+| AS24 | Daftar "perlu diperhatikan" (`GET admin/dashboard/attention`) hanya memuat santri berstatus ACTIVE. | SDD 3.17.3 tidak mengatur akun nonaktif. | `src/lib/api/mock/handlers/admin.ts` (diharapkan sama di backend) |
 
 Asumsi yang hanya ada di mock (`src/lib/api/mock/`) tidak membentuk kontrak dan tidak dicantumkan, kecuali AS15 yang sudah menjadi keputusan. Contohnya: waktu tiruan evaluasi, rumus `pct` per tahapan, label riwayat SUBMITTED/PROCESSING, dan cara menghitung tren.
 
