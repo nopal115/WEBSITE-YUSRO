@@ -10,6 +10,7 @@ import { ContentFormDialog } from './ContentFormDialog';
 import { ContentStatusActions, ContentStatusPill } from './ContentStatusActions';
 import { useAdminStages, useStageMutations } from './hooks';
 import type { AdminStage } from './types';
+import { isContentInUse, useConflictFocus } from './conflictFocus';
 import { useContentNotice } from './useContentNotice';
 import { ACTION_TARGET, STATUS_LABEL, type ContentAction } from './view';
 
@@ -25,17 +26,23 @@ export function StageManagementPage(): JSX.Element {
   const [deleting, setDeleting] = useState<AdminStage | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const restoreFocus = () => triggerRef.current?.focus();
   const closeForm = useCallback((saved: boolean) => {
     setForm(null);
     if (!saved) triggerRef.current?.focus();
   }, []);
+  const [deleteConflict, setDeleteConflict] = useState(false);
+  const focusAfterConflict = useConflictFocus(stages.isFetching, headingRef);
   const closeDelete = useCallback(() => {
+    // 409 CONTENT_IN_USE: tombol Hapus nonaktif setelah daftar dimuat ulang, jadi fokus dipindah ke "Ubah" baris yang sama.
+    if (deleteConflict && deleting) focusAfterConflict(deleting.id);
+    else triggerRef.current?.focus();
     setDeleting(null);
     setDeleteError(null);
-    triggerRef.current?.focus();
-  }, []);
+    setDeleteConflict(false);
+  }, [deleteConflict, deleting, focusAfterConflict]);
 
   const onAction = (stage: AdminStage, action: ContentAction, trigger: HTMLElement) => {
     triggerRef.current = trigger;
@@ -74,7 +81,10 @@ export function StageManagementPage(): JSX.Element {
         setDeleting(null);
         setDeleteError(null);
       },
-      onError: (error) => setDeleteError(error instanceof ApiError ? error.message : 'Data gagal dihapus. Silakan coba lagi.'),
+      onError: (error) => {
+        setDeleteError(error instanceof ApiError ? error.message : 'Data gagal dihapus. Silakan coba lagi.');
+        setDeleteConflict(isContentInUse(error));
+      },
     });
   };
 
@@ -122,6 +132,7 @@ export function StageManagementPage(): JSX.Element {
                   setForm({ mode: 'edit', stage });
                 }}
                 aria-label={`Ubah: ${stage.title}`}
+                data-edit
                 className="min-h-11 rounded-md px-3 text-body text-brand-primary hover:bg-neutral-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary disabled:text-text-muted"
               >
                 Ubah
@@ -143,7 +154,9 @@ export function StageManagementPage(): JSX.Element {
 
   return (
     <div className="mx-auto flex max-w-[1040px] flex-col gap-6">
-      <h1 className="sr-only">Manajemen Tahapan</h1>
+      <h1 ref={headingRef} tabIndex={-1} className="sr-only">
+        Manajemen Tahapan
+      </h1>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-body-s text-text-secondary">{stages.data ? `${stages.data.length} tahapan` : ''}</p>
         <Button
