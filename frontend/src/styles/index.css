@@ -1,3 +1,28 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Laci navigasi mobile; dimatikan saat prefers-reduced-motion (SDD 7.11). */
+@keyframes drawer-in {
+	from {
+		transform: translateX(-100%);
+	}
+	to {
+		transform: none;
+	}
+}
+
+@layer base {
+	html {
+		background: theme('colors.neutral.bg');
+	}
+
+	body {
+		margin: 0;
+		min-width: 320px;
+	}
+
+	button {
+		font: inherit;
+	}
+}
