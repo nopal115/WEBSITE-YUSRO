@@ -1,7 +1,11 @@
 import io
+import math
+import struct
 import wave
+import asyncio
 
 from fastapi.testclient import TestClient
+import pytest
 
 from app.main import app
 from app import main
@@ -17,40 +21,157 @@ def wav_bytes() -> bytes:
         wav_file.setnchannels(1)
         wav_file.setsampwidth(2)
         wav_file.setframerate(16000)
-        wav_file.writeframes(b'\x00\x00' * 16000)
+        wav_file.writeframes(b''.join(struct.pack('<h', int(8_000 * math.sin(2 * math.pi * 440 * index / 16_000))) for index in range(48_000)))
     return buffer.getvalue()
 
 
-def test_health() -> None:
+def test_health(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'model_loaded', lambda: True)
     response = client.get('/health')
     assert response.status_code == 200
-    assert response.json() == {'status': 'ok'}
+    assert response.json() == {
+        'status': 'ok',
+        'model_version': main.settings.model_version,
+        'model_loaded': True,
+    }
+
+
+def test_health_reports_loading_when_model_is_not_ready(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'model_loaded', lambda: False)
+    response = client.get('/health')
+    assert response.status_code == 503
+    assert response.json() == {
+        'status': 'loading',
+        'model_version': main.settings.model_version,
+        'model_loaded': False,
+    }
+
+
+def test_model_info_does_not_read_artifact_metrics_when_model_is_not_ready(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'model_loaded', lambda: False)
+    monkeypatch.setattr(main, 'artifact_summary', lambda: pytest.fail('artifact must not be read while model is unavailable'))
+    response = client.get('/model-info')
+    assert response.status_code == 200
+    assert response.json()['model_loaded'] is False
+    assert response.json()['trained_at'] is None
+    assert response.json()['metrics'] is None
+
+
+def test_model_info(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'model_loaded', lambda: True)
+    monkeypatch.setattr(main, 'artifact_summary', lambda: ('2026-09-22T00:00:00Z', {'mae': 1.0, 'pearson_correlation': 0.9, 'category_accuracy': 0.8}))
+    response = client.get('/model-info')
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['model_version'] == main.settings.model_version
+    assert payload['whisper_version'] == main.settings.whisper_model
+    assert payload['model_loaded'] is True
+    assert payload['trained_at'] == '2026-09-22T00:00:00Z'
 
 
 def test_evaluate_audio(monkeypatch) -> None:
-    monkeypatch.setattr(main, 'evaluate_audio', lambda samples, sample_rate, features: (85.0, 'good', 'test transcript'))
+    monkeypatch.setattr(main, 'encode_audio', lambda samples: __import__('numpy').ones(4))
+    monkeypatch.setattr(main, 'transcribe_audio', lambda samples: 'test transcript')
+    monkeypatch.setattr(main, 'evaluate_comparison', lambda features: 85.0)
     response = client.post(
         '/evaluate',
-        files={'audio': ('sample.wav', wav_bytes(), 'audio/wav')},
+        data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        headers={'X-Request-Id': 'test-evaluate-audio'},
+        files={
+            'reference': ('reference.wav', wav_bytes(), 'audio/wav'),
+            'recording': ('recording.wav', wav_bytes(), 'audio/wav'),
+        },
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload['filename'] == 'sample.wav'
-    assert payload['sample_rate'] == 16000
-    assert payload['model_ready'] is True
+    assert payload['submission_id'] == 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'
+    assert payload['model_version'] == main.settings.model_version
+    assert payload['whisper_version'] == main.settings.whisper_model
+    assert payload['processing_ms'] >= 0
     assert payload['score'] == 85
-    assert payload['transcript'] == 'test transcript'
+    assert payload['details']['duration_ratio'] == 1
+    assert payload['details']['embedding_similarity'] == 1
+    assert payload['details']['text_similarity'] == 1
 
 
 def test_invalid_score_is_rejected(monkeypatch) -> None:
-    monkeypatch.setattr(main, 'evaluate_audio', lambda samples, sample_rate, features: (_ for _ in ()).throw(ValueError('MLP returned an invalid score')))
-    response = client.post('/evaluate', files={'audio': ('sample.wav', wav_bytes(), 'audio/wav')})
+    monkeypatch.setattr(main, 'encode_audio', lambda samples: __import__('numpy').ones(4))
+    monkeypatch.setattr(main, 'transcribe_audio', lambda samples: 'test transcript')
+    monkeypatch.setattr(main, 'evaluate_comparison', lambda features: (_ for _ in ()).throw(ValueError('MLP returned an invalid score')))
+    response = client.post(
+        '/evaluate',
+        data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        headers={'X-Request-Id': 'test-invalid-score'},
+        files={'reference': ('reference.wav', wav_bytes(), 'audio/wav'), 'recording': ('recording.wav', wav_bytes(), 'audio/wav')},
+    )
     assert response.status_code == 422
-    assert 'invalid score' in response.json()['detail']
+    assert response.json()['error_code'] == 'ML_BAD_REQUEST'
+    assert 'invalid score' in response.json()['message']
 
 
 def test_evaluation_failure_is_reported(monkeypatch) -> None:
-    monkeypatch.setattr(main, 'evaluate_audio', lambda samples, sample_rate, features: (_ for _ in ()).throw(ModelNotReadyError('ML model unavailable')))
-    response = client.post('/evaluate', files={'audio': ('sample.wav', wav_bytes(), 'audio/wav')})
+    monkeypatch.setattr(main, 'encode_audio', lambda samples: (_ for _ in ()).throw(ModelNotReadyError('ML model unavailable')))
+    response = client.post(
+        '/evaluate',
+        data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        headers={'X-Request-Id': 'test-model-unavailable'},
+        files={'reference': ('reference.wav', wav_bytes(), 'audio/wav'), 'recording': ('recording.wav', wav_bytes(), 'audio/wav')},
+    )
     assert response.status_code == 503
-    assert response.json()['detail'] == 'ML model unavailable'
+    assert response.json()['error_code'] == 'ML_SERVICE_ERROR'
+    assert response.json()['message'] == 'ML model unavailable'
+
+
+def test_evaluate_accepts_approved_legacy_reference_header(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'encode_audio', lambda samples: __import__('numpy').ones(4))
+    monkeypatch.setattr(main, 'transcribe_audio', lambda samples: 'test transcript')
+    monkeypatch.setattr(main, 'evaluate_comparison', lambda features: 85.0)
+    response = client.post(
+        '/evaluate',
+        data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        headers={'X-Request-Id': 'test-legacy-reference', 'X-Reference-Legacy-Resample': 'true'},
+        files={
+            'reference': ('reference.wav', wav_bytes(), 'audio/wav'),
+            'recording': ('recording.wav', wav_bytes(), 'audio/wav'),
+        },
+    )
+    assert response.status_code == 200
+
+
+def test_evaluate_rejects_non_wav_before_model_inference() -> None:
+    response = client.post(
+        '/evaluate',
+        data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        headers={'X-Request-Id': 'test-invalid-wav'},
+        files={'reference': ('reference.wav', b'not-a-wav', 'audio/wav'), 'recording': ('recording.wav', wav_bytes(), 'audio/wav')},
+    )
+    assert response.status_code == 400
+    assert response.json()['error_code'] == 'AUDIO_DECODE_FAILED'
+    assert 'RIFF/WAVE' in response.json()['message']
+
+
+def test_evaluate_requires_request_id_with_stable_validation_error(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'encode_audio', lambda samples: pytest.fail('validation must happen before inference'))
+    response = client.post(
+        '/evaluate',
+        data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        files={'reference': ('reference.wav', wav_bytes(), 'audio/wav'), 'recording': ('recording.wav', wav_bytes(), 'audio/wav')},
+    )
+    assert response.status_code == 422
+    assert response.json() == {
+        'error_code': 'ML_BAD_REQUEST',
+        'message': 'Request is missing required or valid fields',
+    }
+
+
+def test_startup_fails_when_whisper_cannot_load(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'configure_deterministic_inference', lambda: None)
+    monkeypatch.setattr(main, 'validate_artifact', lambda: None)
+    monkeypatch.setattr(main, 'load_whisper_model', lambda: (_ for _ in ()).throw(ModelNotReadyError('Whisper unavailable')))
+
+    async def start() -> None:
+        async with main.lifespan(main.app):
+            pass
+
+    with pytest.raises(ModelNotReadyError, match='Whisper unavailable'):
+        asyncio.run(start())

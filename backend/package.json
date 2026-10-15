@@ -3,11 +3,21 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "scripts": {
     "build": "nest build",
     "start:dev": "nest start --watch",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "admin:create": "tsx src/cli/create-admin.ts",
+    "test:unit": "jest --config jest.config.js --runInBand src",
+    "test:db:migrate": "node --env-file=.env.test test/run-prisma.cjs migrate deploy",
+    "test:integration": "node --env-file=.env.test ./node_modules/jest/bin/jest.js --config jest.config.js --runInBand test/backend.integration.spec.ts",
+    "test:seed": "node --env-file=.env.test ./node_modules/tsx/dist/cli.mjs prisma/seed/test-seed.ts",
+    "test:ml:mock": "node --env-file=.env.test test/mock-ml-service.cjs",
+    "test:db:up": "docker compose -f docker-compose.test.yml up -d --wait",
+    "test:db:down": "docker compose -f docker-compose.test.yml down",
     "lint": "eslint --config eslint.config.mjs \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "jest --config jest.config.js"
@@ -17,6 +27,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.1133.0",
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
     "@nestjs/jwt": "^10.2.0",

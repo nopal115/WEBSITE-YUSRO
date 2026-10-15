@@ -8,7 +8,7 @@ import { MonitoringService } from './monitoring.service';
 
 @Controller('monitoring')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN_PENGAJAR)
+@Roles(UserRole.ADMIN)
 export class MonitoringController {
 	constructor(private readonly monitoringService: MonitoringService) {}
 

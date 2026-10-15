@@ -14,12 +14,12 @@ async function main(): Promise<void> {
 
 	await prisma.user.upsert({
 		where: { email },
-		update: { name, role: UserRole.ADMIN_PENGAJAR, status: AccountStatus.ACTIVE },
+		update: { name, role: UserRole.ADMIN, status: AccountStatus.ACTIVE },
 		create: {
 			email,
 			name,
 			password: await argon2.hash(password),
-			role: UserRole.ADMIN_PENGAJAR,
+			role: UserRole.ADMIN,
 			status: AccountStatus.ACTIVE,
 		},
 	});

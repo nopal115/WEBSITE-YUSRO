@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AudioModule } from './modules/audio/audio.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AppController } from './app.controller';
@@ -18,6 +19,7 @@ import { StatisticsModule } from './modules/statistics/statistics.module';
 import { StudentAdminModule } from './modules/student-admin/student-admin.module';
 import { TaskModule } from './modules/task/task.module';
 import { UserModule } from './modules/user/user.module';
+import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { AudioProcessingModule } from './shared/audio/audio-processing.module';
 import { BrowserModule } from './shared/browser/browser.module';
 import { DatabaseModule } from './shared/database/database.module';
@@ -48,6 +50,9 @@ import { StorageModule } from './shared/storage/storage.module';
     HealthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
 })
 export class AppModule {}

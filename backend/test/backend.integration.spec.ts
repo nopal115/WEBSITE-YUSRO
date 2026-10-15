@@ -23,8 +23,32 @@ import { PrismaService } from '../src/shared/database/prisma.service';
 import { UserService } from '../src/modules/user/user.service';
 import * as argon2 from 'argon2';
 
-describe('Backend business integration', () => {
-  const prisma = new PrismaService();
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+
+function isLocalTestDatabase(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const databaseName = parsed.pathname.replace(/^\/+/, '').toLowerCase();
+    const localHost = ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+    const testName = /(^|[_-])test($|[_-])/.test(databaseName);
+    return ['postgres:', 'postgresql:'].includes(parsed.protocol) && localHost && testName;
+  } catch {
+    return false;
+  }
+}
+
+if (testDatabaseUrl && !isLocalTestDatabase(testDatabaseUrl)) {
+  throw new Error('Refusing integration tests: TEST_DATABASE_URL must target a loopback database with a test-marked name');
+}
+
+const prisma = new PrismaService({
+  datasources: {
+    db: { url: testDatabaseUrl ?? 'postgresql://test:test@127.0.0.1:5433/yusro_test?schema=public' },
+  },
+});
+const integrationDescribe = testDatabaseUrl ? describe : describe.skip;
+
+integrationDescribe('Backend business integration', () => {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   let userId: string;
   let stageId: string;
@@ -47,8 +71,12 @@ describe('Backend business integration', () => {
       },
     });
     userId = user.id;
+    const earliestStage = await prisma.stage.aggregate({ _min: { order: true } });
+    const fixtureStageOrder = (earliestStage._min.order ?? 0) - 1;
     const stage = await prisma.stage.create({
-      data: { title: `Integration Stage ${suffix}`, order: -2000000000 + Math.floor(Math.random() * 1000), status: ContentStatus.ACTIVE },
+      // Keep this fixture before every existing stage without assuming a
+      // particular seed value or colliding with a prior interrupted run.
+      data: { title: `Integration Stage ${suffix}`, order: fixtureStageOrder, status: ContentStatus.ACTIVE },
     });
     stageId = stage.id;
     const materials = await prisma.$transaction([
@@ -74,7 +102,7 @@ describe('Backend business integration', () => {
         stageId,
         materialId: materialOneId,
         title: 'Repeat Task',
-        type: TaskType.LISTEN_REPEAT,
+        type: TaskType.IMITATION,
         status: ContentStatus.ACTIVE,
         order: 1,
         referenceAudioId,
@@ -86,7 +114,7 @@ describe('Backend business integration', () => {
         stageId,
         materialId: materialOneId,
         title: 'Select Task',
-        type: TaskType.LISTEN_SELECT,
+        type: TaskType.QUIZ,
         status: ContentStatus.ACTIVE,
         order: 2,
         questions: {
@@ -103,20 +131,34 @@ describe('Backend business integration', () => {
   });
 
   afterAll(async () => {
-    await prisma.evaluation.deleteMany({ where: { submission: { userId } } });
-    await prisma.submission.deleteMany({ where: { userId } });
-    await prisma.quizAnswer.deleteMany({ where: { attempt: { userId } } });
-    await prisma.quizAttempt.deleteMany({ where: { userId } });
-    await prisma.taskProgress.deleteMany({ where: { userId } });
-    await prisma.materialProgress.deleteMany({ where: { userId } });
-    await prisma.answerOption.deleteMany({ where: { question: { taskId: { in: [repeatTaskId, selectTaskId] } } } });
-    await prisma.question.deleteMany({ where: { taskId: { in: [repeatTaskId, selectTaskId] } } });
-    await prisma.task.deleteMany({ where: { id: { in: [repeatTaskId, selectTaskId] } } });
-    await prisma.material.deleteMany({ where: { stageId } });
-    await prisma.audioAsset.deleteMany({ where: { id: referenceAudioId } });
-    await prisma.stage.delete({ where: { id: stageId } });
-    await prisma.user.delete({ where: { id: userId } });
-    await prisma.$disconnect();
+    try {
+      if (userId) {
+        await prisma.evaluationJob.deleteMany({ where: { attempt: { userId } } });
+        await prisma.attemptAnswer.deleteMany({ where: { attempt: { userId } } });
+        await prisma.attempt.deleteMany({ where: { userId } });
+        await prisma.audioAsset.deleteMany({ where: { objectKey: { startsWith: `recordings/${userId}/` } } });
+        await prisma.evaluation.deleteMany({ where: { submission: { userId } } });
+        await prisma.submission.deleteMany({ where: { userId } });
+        await prisma.quizAnswer.deleteMany({ where: { attempt: { userId } } });
+        await prisma.quizAttempt.deleteMany({ where: { userId } });
+        await prisma.taskProgress.deleteMany({ where: { userId } });
+        await prisma.materialProgress.deleteMany({ where: { userId } });
+      }
+      const taskIds = [repeatTaskId, selectTaskId].filter((id): id is string => Boolean(id));
+      if (taskIds.length) {
+        await prisma.answerOption.deleteMany({ where: { question: { taskId: { in: taskIds } } } });
+        await prisma.question.deleteMany({ where: { taskId: { in: taskIds } } });
+        await prisma.task.deleteMany({ where: { id: { in: taskIds } } });
+      }
+      if (stageId) {
+        await prisma.material.deleteMany({ where: { stageId } });
+        await prisma.stage.deleteMany({ where: { id: stageId } });
+      }
+      if (referenceAudioId) await prisma.audioAsset.deleteMany({ where: { id: referenceAudioId } });
+      if (userId) await prisma.user.deleteMany({ where: { id: userId } });
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 
   it('authenticates a student and carries role/status claims', async () => {
@@ -132,7 +174,7 @@ describe('Backend business integration', () => {
 
   it('allows only the declared role through RolesGuard', () => {
     class AdminController {}
-    Roles(UserRole.ADMIN_PENGAJAR)(AdminController);
+    Roles(UserRole.ADMIN)(AdminController);
     const reflector = new Reflector();
     const guard = new RolesGuard(reflector);
     const context = { getHandler: () => () => undefined, getClass: () => AdminController, switchToHttp: () => ({ getRequest: () => ({ user: { role: UserRole.SANTRI } }) }) } as unknown as ExecutionContext;
@@ -149,35 +191,47 @@ describe('Backend business integration', () => {
     expect(stages.find(stage => stage.id === stageId)?.materials[1].isUnlocked).toBe(true);
   });
 
-  it('submits a quiz attempt and records task progress', async () => {
+	it('submits a quiz attempt and records task progress', async () => {
     const quiz = new QuizService(prisma);
     const task = await prisma.task.findUniqueOrThrow({ where: { id: selectTaskId }, include: { questions: { include: { options: true } } } });
     const result = await quiz.submitAttempt(userId, selectTaskId, { answers: [{ questionId: task.questions[0].id, optionId: task.questions[0].options.find(option => option.isCorrect)!.id }] });
     expect(result.score).toBe(100);
+    expect(await prisma.attempt.findFirst({ where: { id: result.attemptId, taskType: TaskType.QUIZ, userId }, include: { answers: true } })).toMatchObject({ correctCount: 1, questionCount: 1, answers: [{ questionId: task.questions[0].id }] });
+    expect(await prisma.quizAttempt.count({ where: { userId, taskId: selectTaskId } })).toBe(0);
     expect(await prisma.taskProgress.findUnique({ where: { userId_taskId: { userId, taskId: selectTaskId } } })).not.toBeNull();
   });
 
-  it('stores an audio submission and completes it asynchronously', async () => {
-    const fakeStorage = { putObject: jest.fn().mockResolvedValue(undefined), getObject: jest.fn() };
-    const fakeAudio = { getMetadata: jest.fn().mockResolvedValue({ format: { duration: 2 } }) };
-    const fakeMl = { evaluateAudio: jest.fn().mockResolvedValue({ score: 85, label: 'good', model_ready: true }) };
-    const imitation = new ImitationService(prisma, fakeStorage as never, fakeAudio as never, fakeMl as never);
-    const result = await imitation.submitRecording(userId, repeatTaskId, { buffer: Buffer.from('audio'), size: 5, mimetype: 'audio/webm', originalname: 'recording.webm' } as Express.Multer.File);
+	it('stores an audio submission and queues it for the evaluation worker', async () => {
+		const fakeStorage = { putObject: jest.fn().mockResolvedValue(undefined), getObject: jest.fn(), deleteObject: jest.fn() };
+		const fakeAudio = {
+			getMetadata: jest.fn().mockResolvedValue({
+				format: { duration: 2, format_name: 'wav' },
+				streams: [{ codec_type: 'audio', codec_name: 'pcm_s16le', sample_rate: 16000, channels: 1, bits_per_sample: 16 }],
+			}),
+			getVolumeStats: jest.fn().mockResolvedValue({ meanDbfs: -20, maxDbfs: -10 }),
+		};
+		const imitation = new ImitationService(prisma, fakeStorage as never, fakeAudio as never);
+		const wavHeader = Buffer.from('RIFF\x24\x00\x00\x00WAVEfmt ');
+		const result = await imitation.submitRecording(userId, repeatTaskId, { buffer: wavHeader, size: wavHeader.length, mimetype: 'audio/wav', originalname: 'recording.wav' } as Express.Multer.File);
     submissionId = result.submissionId;
     expect(result.status).toBe(EvaluationStatus.SUBMITTED);
-    await new Promise(resolve => setTimeout(resolve, 100));
     const status = await imitation.getSubmission(userId, submissionId);
-    expect(status.status).toBe(EvaluationStatus.EVALUATED);
-    expect(status.score).toBe(85);
-    expect(status.feedback).toBe('Baik');
+		expect(status.status).toBe(EvaluationStatus.SUBMITTED);
+		expect(status.score).toBeNull();
+		expect(await prisma.evaluationJob.findFirst({ where: { attemptId: submissionId, status: 'QUEUED' } })).not.toBeNull();
   });
 
-  it('calculates progress and statistics from completed activities and valid scores', async () => {
-    const progress = await new ProgressService(prisma).getProgress(userId);
-    const statistics = await new StatisticsService(prisma).getStudentStatistics(userId);
+	it('calculates progress and statistics from canonical evaluated attempts', async () => {
+		await prisma.attempt.update({
+			where: { id: submissionId },
+			data: { evaluationStatus: EvaluationStatus.EVALUATED, score: 93, feedbackCategory: 'SANGAT_BAIK', evaluatedAt: new Date() },
+		});
+		const progress = await new ProgressService(prisma).getProgress(userId);
+		const statistics = await new StatisticsService(prisma).getStudentStatistics(userId);
     expect(progress.tasks.completed).toBeGreaterThanOrEqual(1);
     expect(progress.materials.completed).toBeGreaterThanOrEqual(1);
-    expect(statistics.bestScore).toBe(85);
-    expect(statistics.averageScore).toBe(85);
-  });
+		expect(statistics.bestScore).toBe(93);
+		expect(statistics.averageScore).toBe(93);
+		expect(statistics.validEvaluationCount).toBe(1);
+	});
 });
