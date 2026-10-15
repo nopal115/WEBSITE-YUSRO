@@ -36,6 +36,8 @@ function lastRequestHeaders(): Record<string, string> {
 
 beforeEach(() => {
   vi.stubEnv('VITE_API_BASE_URL', BASE_URL);
+  // Tes ini menguji jalur HTTP asli, terlepas dari VITE_USE_MOCK di frontend/.env lokal.
+  vi.stubEnv('VITE_USE_MOCK', 'false');
   vi.stubGlobal('sessionStorage', createMemoryStorage());
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
