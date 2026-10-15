@@ -23,8 +23,32 @@ import { PrismaService } from '../src/shared/database/prisma.service';
 import { UserService } from '../src/modules/user/user.service';
 import * as argon2 from 'argon2';
 
-describe('Backend business integration', () => {
-  const prisma = new PrismaService();
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+
+function isLocalTestDatabase(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const databaseName = parsed.pathname.replace(/^\/+/, '').toLowerCase();
+    const localHost = ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+    const testName = /(^|[_-])test($|[_-])/.test(databaseName);
+    return ['postgres:', 'postgresql:'].includes(parsed.protocol) && localHost && testName;
+  } catch {
+    return false;
+  }
+}
+
+if (testDatabaseUrl && !isLocalTestDatabase(testDatabaseUrl)) {
+  throw new Error('Refusing integration tests: TEST_DATABASE_URL must target a loopback database with a test-marked name');
+}
+
+const prisma = new PrismaService({
+  datasources: {
+    db: { url: testDatabaseUrl ?? 'postgresql://test:test@127.0.0.1:5433/yusro_test?schema=public' },
+  },
+});
+const integrationDescribe = testDatabaseUrl ? describe : describe.skip;
+
+integrationDescribe('Backend business integration', () => {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   let userId: string;
   let stageId: string;
@@ -107,24 +131,34 @@ describe('Backend business integration', () => {
   });
 
   afterAll(async () => {
-		await prisma.evaluationJob.deleteMany({ where: { attempt: { userId } } });
-		await prisma.attemptAnswer.deleteMany({ where: { attempt: { userId } } });
-		await prisma.attempt.deleteMany({ where: { userId } });
-		await prisma.audioAsset.deleteMany({ where: { objectKey: { startsWith: `recordings/${userId}/` } } });
-    await prisma.evaluation.deleteMany({ where: { submission: { userId } } });
-    await prisma.submission.deleteMany({ where: { userId } });
-    await prisma.quizAnswer.deleteMany({ where: { attempt: { userId } } });
-    await prisma.quizAttempt.deleteMany({ where: { userId } });
-    await prisma.taskProgress.deleteMany({ where: { userId } });
-    await prisma.materialProgress.deleteMany({ where: { userId } });
-    await prisma.answerOption.deleteMany({ where: { question: { taskId: { in: [repeatTaskId, selectTaskId] } } } });
-    await prisma.question.deleteMany({ where: { taskId: { in: [repeatTaskId, selectTaskId] } } });
-    await prisma.task.deleteMany({ where: { id: { in: [repeatTaskId, selectTaskId] } } });
-    await prisma.material.deleteMany({ where: { stageId } });
-    await prisma.audioAsset.deleteMany({ where: { id: referenceAudioId } });
-    await prisma.stage.delete({ where: { id: stageId } });
-    await prisma.user.delete({ where: { id: userId } });
-    await prisma.$disconnect();
+    try {
+      if (userId) {
+        await prisma.evaluationJob.deleteMany({ where: { attempt: { userId } } });
+        await prisma.attemptAnswer.deleteMany({ where: { attempt: { userId } } });
+        await prisma.attempt.deleteMany({ where: { userId } });
+        await prisma.audioAsset.deleteMany({ where: { objectKey: { startsWith: `recordings/${userId}/` } } });
+        await prisma.evaluation.deleteMany({ where: { submission: { userId } } });
+        await prisma.submission.deleteMany({ where: { userId } });
+        await prisma.quizAnswer.deleteMany({ where: { attempt: { userId } } });
+        await prisma.quizAttempt.deleteMany({ where: { userId } });
+        await prisma.taskProgress.deleteMany({ where: { userId } });
+        await prisma.materialProgress.deleteMany({ where: { userId } });
+      }
+      const taskIds = [repeatTaskId, selectTaskId].filter((id): id is string => Boolean(id));
+      if (taskIds.length) {
+        await prisma.answerOption.deleteMany({ where: { question: { taskId: { in: taskIds } } } });
+        await prisma.question.deleteMany({ where: { taskId: { in: taskIds } } });
+        await prisma.task.deleteMany({ where: { id: { in: taskIds } } });
+      }
+      if (stageId) {
+        await prisma.material.deleteMany({ where: { stageId } });
+        await prisma.stage.deleteMany({ where: { id: stageId } });
+      }
+      if (referenceAudioId) await prisma.audioAsset.deleteMany({ where: { id: referenceAudioId } });
+      if (userId) await prisma.user.deleteMany({ where: { id: userId } });
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 
   it('authenticates a student and carries role/status claims', async () => {

@@ -3,6 +3,7 @@ import asyncio
 from time import perf_counter
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .config import settings
@@ -49,6 +50,15 @@ async def http_error_contract(_: object, error: HTTPException) -> JSONResponse:
     return JSONResponse(
         status_code=error.status_code,
         content={'error_code': error_code, 'message': str(error.detail)},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_contract(_: object, __: RequestValidationError) -> JSONResponse:
+    """Return a stable error shape without exposing submitted form contents."""
+    return JSONResponse(
+        status_code=422,
+        content={'error_code': 'ML_BAD_REQUEST', 'message': 'Request is missing required or valid fields'},
     )
 
 
@@ -104,6 +114,7 @@ async def evaluate(
     submission_id: str = Form(...),
     reference: UploadFile = File(...),
     recording: UploadFile = File(...),
+    x_request_id: str = Header(..., min_length=1, max_length=128),
     x_reference_legacy_resample: bool = Header(default=False),
 ) -> EvaluationResponse:
     async with evaluation_lock:

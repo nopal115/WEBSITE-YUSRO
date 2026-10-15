@@ -1,0 +1,16 @@
+services:
+  test-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: yusro_test
+      POSTGRES_USER: yusro_test
+      POSTGRES_PASSWORD: yusro_test_only
+    ports:
+      - "127.0.0.1:5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yusro_test -d yusro_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20

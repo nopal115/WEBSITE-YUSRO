@@ -15,7 +15,6 @@ export class AudioProcessingService {
     const resolvedFfmpeg =
       process.env.FFMPEG_PATH ||
       (typeof ffmpegPath === 'string' ? ffmpegPath : (ffmpegPath as any)?.default) ||
-      (typeof require !== 'undefined' ? require('ffmpeg-static') : null) ||
       'ffmpeg';
     ffmpeg.setFfmpegPath(resolvedFfmpeg);
     const resolvedFfprobe = process.env.FFPROBE_PATH || (ffprobePath as any)?.path || (ffprobePath as any)?.default?.path;

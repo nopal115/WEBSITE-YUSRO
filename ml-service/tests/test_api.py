@@ -36,6 +36,27 @@ def test_health(monkeypatch) -> None:
     }
 
 
+def test_health_reports_loading_when_model_is_not_ready(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'model_loaded', lambda: False)
+    response = client.get('/health')
+    assert response.status_code == 503
+    assert response.json() == {
+        'status': 'loading',
+        'model_version': main.settings.model_version,
+        'model_loaded': False,
+    }
+
+
+def test_model_info_does_not_read_artifact_metrics_when_model_is_not_ready(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'model_loaded', lambda: False)
+    monkeypatch.setattr(main, 'artifact_summary', lambda: pytest.fail('artifact must not be read while model is unavailable'))
+    response = client.get('/model-info')
+    assert response.status_code == 200
+    assert response.json()['model_loaded'] is False
+    assert response.json()['trained_at'] is None
+    assert response.json()['metrics'] is None
+
+
 def test_model_info(monkeypatch) -> None:
     monkeypatch.setattr(main, 'model_loaded', lambda: True)
     monkeypatch.setattr(main, 'artifact_summary', lambda: ('2026-09-22T00:00:00Z', {'mae': 1.0, 'pearson_correlation': 0.9, 'category_accuracy': 0.8}))
@@ -55,6 +76,7 @@ def test_evaluate_audio(monkeypatch) -> None:
     response = client.post(
         '/evaluate',
         data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        headers={'X-Request-Id': 'test-evaluate-audio'},
         files={
             'reference': ('reference.wav', wav_bytes(), 'audio/wav'),
             'recording': ('recording.wav', wav_bytes(), 'audio/wav'),
@@ -79,6 +101,7 @@ def test_invalid_score_is_rejected(monkeypatch) -> None:
     response = client.post(
         '/evaluate',
         data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        headers={'X-Request-Id': 'test-invalid-score'},
         files={'reference': ('reference.wav', wav_bytes(), 'audio/wav'), 'recording': ('recording.wav', wav_bytes(), 'audio/wav')},
     )
     assert response.status_code == 422
@@ -91,6 +114,7 @@ def test_evaluation_failure_is_reported(monkeypatch) -> None:
     response = client.post(
         '/evaluate',
         data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        headers={'X-Request-Id': 'test-model-unavailable'},
         files={'reference': ('reference.wav', wav_bytes(), 'audio/wav'), 'recording': ('recording.wav', wav_bytes(), 'audio/wav')},
     )
     assert response.status_code == 503
@@ -105,7 +129,7 @@ def test_evaluate_accepts_approved_legacy_reference_header(monkeypatch) -> None:
     response = client.post(
         '/evaluate',
         data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
-        headers={'X-Reference-Legacy-Resample': 'true'},
+        headers={'X-Request-Id': 'test-legacy-reference', 'X-Reference-Legacy-Resample': 'true'},
         files={
             'reference': ('reference.wav', wav_bytes(), 'audio/wav'),
             'recording': ('recording.wav', wav_bytes(), 'audio/wav'),
@@ -118,11 +142,26 @@ def test_evaluate_rejects_non_wav_before_model_inference() -> None:
     response = client.post(
         '/evaluate',
         data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        headers={'X-Request-Id': 'test-invalid-wav'},
         files={'reference': ('reference.wav', b'not-a-wav', 'audio/wav'), 'recording': ('recording.wav', wav_bytes(), 'audio/wav')},
     )
     assert response.status_code == 400
     assert response.json()['error_code'] == 'AUDIO_DECODE_FAILED'
     assert 'RIFF/WAVE' in response.json()['message']
+
+
+def test_evaluate_requires_request_id_with_stable_validation_error(monkeypatch) -> None:
+    monkeypatch.setattr(main, 'encode_audio', lambda samples: pytest.fail('validation must happen before inference'))
+    response = client.post(
+        '/evaluate',
+        data={'submission_id': 'b8c5b1ec-25e8-4d25-9f97-93c5b7e56b67'},
+        files={'reference': ('reference.wav', wav_bytes(), 'audio/wav'), 'recording': ('recording.wav', wav_bytes(), 'audio/wav')},
+    )
+    assert response.status_code == 422
+    assert response.json() == {
+        'error_code': 'ML_BAD_REQUEST',
+        'message': 'Request is missing required or valid fields',
+    }
 
 
 def test_startup_fails_when_whisper_cannot_load(monkeypatch) -> None:

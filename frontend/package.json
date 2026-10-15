@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": "20.x" },
+  "engines": { "node": "22.x" },
   "scripts": { "dev": "vite", "build": "tsc && vite build", "lint": "eslint src", "test": "vitest" },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
