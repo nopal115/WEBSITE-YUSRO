@@ -141,7 +141,7 @@ function ReportSection({ studentCode }: { studentCode: string }): JSX.Element {
 }
 
 // SDD 7.7.15 (UI-PROFILE-01/02). [REKOMENDASI] Tampilan disusun dari SDD dan UI kit; Figma 20 belum dicocokkan.
-// Tombol logout belum ditambahkan (menunggu desain).
+// Tombol logout ada di sidebar dan laci (AppLayout), bukan di halaman ini.
 export function ProfilePage(): JSX.Element {
   const { data, isPending, isError, error, refetch } = useQuery({ queryKey: PROFILE_KEY, queryFn: ({ signal }) => profileApi.get(signal) });
 
