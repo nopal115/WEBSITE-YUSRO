@@ -339,13 +339,28 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | PATCH `admin/materials/reorder` | Admin | body `{ orderedIds }` berisi seluruh materi **satu tahapan** [ASUMSI AS36] | `AdminMaterial[]` dalam urutan baru | 422 `CONTENT_REORDER_INCOMPLETE` → pesan + muat ulang | SDD 5.15 | **belum ada** |
 | GET `admin/materials/:id/blocks` | Admin | — | `AdminBlock[] { id, type (TEXT\|AUDIO\|IMAGE), orderIndex, textContent, arabicContent, transliteration, imageUrl, audioId, audio { id, originalName, durationMs } \| null }` [ASUMSI AS37] | umum | SDD 5.15, 4.5.7 | **belum ada** |
 | PUT `admin/materials/:id/blocks` | Admin | body `{ blocks: BlockInput[] }`, urutan = urutan larik; blok lama membawa `id`; IMAGE lama dikirim apa adanya `{ id, type, imageUrl }` [ASUMSI AS37] | `AdminBlock[]` tersimpan | 422 `VALIDATION_ERROR` dengan field `blocks.N.<kolom>` → ditandai di blok ke-N | SDD 5.15, 4.5.7 (`chk_material_blocks_payload`) | **belum ada** |
-| GET `admin/audio?kind=LEARNING` | Admin | query `kind` | `AudioAsset[] { id, kind, originalName, durationMs, status }` tanpa pagination; versi minimal, dilengkapi di A5 [ASUMSI AS38] | gagal → pilihan audio tidak tersedia | SDD 5.16 (isi [ASUMSI]) | **belum ada** (K2) |
+| GET `admin/audio?kind=LEARNING` | Admin | query `kind` | `AudioAsset[] { id, kind, originalName, durationMs, status }` tanpa pagination; versi minimal [ASUMSI AS38]; bentuk lengkap di 2.15 | gagal → pilihan audio tidak tersedia | SDD 5.16 (isi [ASUMSI]) | **belum ada** (K2) |
 | GET `admin/audio/:id/url` | Admin | — (diminta saat pratinjau diputar) | `{ url, expiresInSeconds }` [ASUMSI AS38] | pesan di bawah tombol; URL kedaluwarsa → minta ulang sekali | SDD 5.16, NFR-PRIV-02 | **belum ada** (K2) |
 
 - **K1:** `backend/src/modules/content/content.controller.ts` hanya stub `GET content` → 501. Tidak ada route `admin/stages`, `admin/materials`, maupun blok. Padanan baca terdekat tetap `GET learning/stages` (S2-2, L1).
 - **K2:** `backend/src/modules/audio/audio.controller.ts` hanya stub `GET audio` → 501.
 - Baris `GET admin/stages` di 2.12 kini menjadi bagian dari kontrak lengkap di atas; field yang dipakai filter Daftar Santri tidak berubah.
 - Aturan sisi Santri yang ditiru mock [ASUMSI AS39]: tahapan/materi DRAFT tidak tampil; materi INACTIVE tidak tampil di daftar, bila dibuka langsung ditolak (`LEARNING_MATERIAL_INACTIVE`) dan tugasnya ditolak (`TASK_INACTIVE`), tetapi riwayat dan percobaan lamanya tetap tersimpan; urutan baru langsung berlaku di daftar Santri.
+
+### 2.15 Admin — Audio (`src/features/admin/audio/api.ts`, `types.ts`; ditambahkan di A5)
+
+| Method + path | Peran | Request | Respons yang diharapkan | Galat yang ditangani frontend | Sumber | Backend |
+| --- | --- | --- | --- | --- | --- | --- |
+| GET `admin/audio` | Admin | query `kind` (LEARNING\|REFERENCE), `status` (ACTIVE\|ARCHIVED), keduanya opsional | `AdminAudio[] { id, kind, originalName, mimeType, sizeBytes, durationMs, version, status, replacesId \| null, createdAt, usedBySubmission, usage { taskId, taskTitle, materialId, materialTitle } \| null }` tanpa pagination [ASUMSI AS40]; menggantikan bentuk minimal AS38 (field lama tetap ada, penyunting materi A4 tidak berubah) | umum (layar galat + coba lagi) | SDD 5.16, 4.5.8, 7.7.19 | **beda** (K3) |
+| GET `admin/audio/:id` | Admin | — | `AdminAudio` + `versions: AdminAudio[]` (seluruh rantai `replacesId`, terbaru dulu) [ASUMSI AS41] | galat di dalam dialog riwayat | SDD 5.16, 3.6.4 | **belum ada** |
+| POST `admin/audio` | Admin | multipart `file` + `kind` | `AdminAudio` (201), versi 1, AKTIF | 422 `errors[]` field `file`/`kind` di bawah kolom; 413 → pesan umum di dialog | SDD 5.16, 5.20 (batas 12 MB) | **beda** (K3) |
+| POST `admin/audio/:id/replace` | Admin | multipart `file` | `AdminAudio` baru (201): `version` +1, `replacesId` = audio lama; audio lama menjadi ARCHIVED [ASUMSI AS42] | 409 `AUDIO_ARCHIVED`; 422 bukan referensi; pesan di dialog | SDD 5.16, 3.6.4, FR-AUDIO-03 | **belum ada** |
+| POST `admin/audio/:id/archive` | Admin | — | `AdminAudio` berstatus ARCHIVED | 409 `AUDIO_IN_USE_BY_SUBMISSION` (referensi sudah dipakai) [ASUMSI AS43], 409 `AUDIO_ARCHIVED`; pesan di dialog konfirmasi | SDD 5.16, 7.7.19 | **belum ada** |
+| GET `admin/audio/:id/url` | Admin | — | `{ url, expiresInSeconds }` (AS38) | pesan di bawah tombol Putar | SDD 5.16, NFR-PRIV-02 | **beda** (K3) |
+
+- **K3:** backend `main` (`5014087`) punya `audio/audio.controller.ts` dengan path tanpa `admin/`: `GET audio?type=`, `GET audio/:audioId/url`, dan `POST audio` (multipart field `audio` + `type`, batas 25 MB). Nama query dan field berbeda dari SDD 5.16 (`kind`, `file`), dan batasnya berbeda dari SDD 5.20 (12 MB). Detail, `replace`, dan `archive` belum ada.
+- Aturan aksi di UI (SDD 7.7.19): tidak ada tombol hapus; Ganti Versi hanya untuk referensi AKTIF; Arsipkan untuk audio AKTIF yang belum dipakai submission (`src/features/admin/audio/view.ts`).
+- [TBD] Daftar tanpa pagination; bila jumlah audio di backend besar, perlu pagination SDD 1.4.
 
 **Ringkasan status (27 endpoint yang dipanggil frontend):** sesuai 0 · beda 12 · belum ada 15 · tidak dapat dipastikan 0. Ditambah 2 endpoint admin di 2.11 (A1) dan 8 di 2.12 (A2): semuanya belum ada. Ditambah 7 endpoint di 2.13 (A3): 2 beda (retry, queue) dan 5 belum ada. Ada satu detail yang tidak dapat dipastikan di dalam baris "beda": serialisasi `score`, lihat I3. Ditambah 15 endpoint baru di 2.14 (A4; `GET admin/stages` sudah dihitung di 2.12): semuanya belum ada.
 
@@ -394,6 +409,10 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | AS37 | Bentuk blok `GET/PUT admin/materials/:id/blocks` (lihat 2.14): PUT mengganti seluruh blok, urutan = urutan larik, galat validasi ber-field `blocks.N.<kolom>`; blok IMAGE lama dikirim kembali apa adanya agar tidak terhapus (menambah gambar [TBD]). | SDD 5.15 dan 4.5.7 hanya merinci kolom tabel. | `blocks.ts`, `MaterialEditorPage.tsx` |
 | AS38 | `GET admin/audio?kind=LEARNING` versi minimal `[{ id, kind, originalName, durationMs, status }]` dan `GET admin/audio/:id/url` → `{ url, expiresInSeconds }`, diminta saat pratinjau diputar. | SDD 5.16 tidak merinci respons; dilengkapi di A5. | `api.ts`, `src/components/audio/OnDemandAudioPlayer.tsx` |
 | AS39 | Visibilitas Santri: DRAFT tidak tampil; INACTIVE tidak tampil dan ditolak `LEARNING_MATERIAL_INACTIVE`/`TASK_INACTIVE` bila dibuka langsung, data historis tetap; urutan baru langsung berlaku. | Ditafsirkan dari SDD 3.8 dan 3.13 (keputusan Q2 A4). | mock `db.ts`, `handlers/learning.ts` |
+| AS40 | `GET admin/audio` lengkap: butir `AdminAudio` (lihat 2.15) dengan `usedBySubmission` dan `usage` (tugas Dengar-Tirukan pemakai referensi); penyaring `kind` dan `status`; tanpa pagination. | SDD 5.16 tidak merinci respons; penanda pemakaian dibutuhkan SDD 7.7.19. | `types.ts`, `AudioManagementPage.tsx` |
+| AS41 | `GET admin/audio/:id` memuat `versions` (seluruh rantai `replacesId`, terbaru dulu); masa berlaku versi = sejak diunggah sampai versi berikutnya diunggah. | SDD 7.7.19 meminta riwayat versi, SDD 5.16 tidak merinci respons. | `AudioVersionsDialog.tsx` |
+| AS42 | `POST admin/audio/:id/replace` hanya untuk audio referensi AKTIF; respons audio baru (201). | SDD 7.7.19 menyebut Ganti Versi untuk referensi; SDD 5.16 tidak membatasi jenis. | `view.ts`, `hooks.ts` |
+| AS43 | `POST admin/audio/:id/archive` menolak referensi yang sudah dipakai submission (409 `AUDIO_IN_USE_BY_SUBMISSION`). | SDD 5.16 memakai kode ini untuk penghapusan; SDD 7.7.19 hanya menyediakan Ganti Versi untuk referensi yang dipakai. | `view.ts`, mock `handlers/audio.ts` |
 
 Asumsi yang hanya ada di mock (`src/lib/api/mock/`) tidak membentuk kontrak dan tidak dicantumkan, kecuali AS15 yang sudah menjadi keputusan. Contohnya: waktu tiruan evaluasi, rumus `pct` per tahapan, label riwayat SUBMITTED/PROCESSING, dan cara menghitung tren.
 
@@ -418,7 +437,8 @@ Asumsi yang hanya ada di mock (`src/lib/api/mock/`) tidak membentuk kontrak dan 
 | `/progress`, `/riwayat`, `/statistik`, `/profil` | Progress, Riwayat, Statistik, Profil | Santri |
 | `/riwayat/:attemptId` (`?jenis=tirukan` untuk Dengar-Tirukan) | Detail percobaan | Santri; **penyimpangan sitemap yang disetujui, [TBD]** |
 | `/tugas` | Placeholder menu Tugas | Santri; **penyimpangan sitemap yang disetujui, [TBD]** |
-| `/admin` | Placeholder Admin | Admin; halaman `/admin/*` lain belum dibangun |
+| `/admin`, `/admin/santri`, `/admin/santri/:studentId`, `/admin/tahapan`, `/admin/materi`, `/admin/materi/:materialId`, `/admin/audio`, `/admin/monitoring` | Dashboard, Santri, Konten, Audio, Monitoring (A1–A5) | Admin |
+| `/admin/tugas`, `/admin/tugas/:taskId` | Placeholder Tugas & Soal (A6) | Admin; **[TBD]** |
 
 Id di route diteruskan apa adanya ke path API (`encodeURIComponent`). Backend-noval mewajibkan UUID (`ParseUUIDPipe`).
 

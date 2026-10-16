@@ -45,13 +45,28 @@ export interface MockMaterial {
   practice: string[];
 }
 
-/** [DATA CONTOH] Audio pembelajaran (SDD 4.5.8 audio_assets, kind LEARNING). Suaranya sintetis. */
+/** [DATA CONTOH] Audio pembelajaran dan referensi (SDD 4.5.8 audio_assets). Suaranya sintetis. */
 export interface MockAudio {
   id: string;
   kind: 'LEARNING' | 'REFERENCE';
   originalName: string;
+  mimeType: string;
+  sizeBytes: number;
   durationMs: number;
+  version: number;
   status: 'ACTIVE' | 'ARCHIVED';
+  /** Rantai versi audio referensi (SDD 3.6.4). */
+  replacesId: string | null;
+  /** [ASUMSI] Tugas Dengar-Tirukan pemakai audio referensi; di backend lewat tasks.reference_audio_id. */
+  taskId: string | null;
+  createdAt: string;
+}
+
+/** [DATA CONTOH] Audio bawaan dianggap diunggah sebelum seluruh submission contoh. */
+const SEED_AUDIO_AT = '2026-01-05T08:00:00.000Z';
+
+function seedAudio(id: string, kind: MockAudio['kind'], originalName: string, durationMs: number, extra: Partial<MockAudio> = {}): MockAudio {
+  return { id, kind, originalName, mimeType: 'audio/wav', sizeBytes: Math.round(durationMs * 32), durationMs, version: 1, status: 'ACTIVE', replacesId: null, taskId: null, createdAt: SEED_AUDIO_AT, ...extra };
 }
 
 export interface MockQuestion {
@@ -200,7 +215,10 @@ function buildContent() {
         practice,
       };
       materials.push(material);
-      audio.push({ id: `aud-${code}`, kind: 'LEARNING', originalName: `audio-materi-${code}.wav`, durationMs: 2000, status: 'ACTIVE' });
+      audio.push(
+        seedAudio(`aud-${code}`, 'LEARNING', `audio-materi-${code}.wav`, 2000),
+        seedAudio(`ref-${code}`, 'REFERENCE', `referensi-${code}.wav`, 2000, { taskId: `tsk-${code}-imitation` }),
+      );
       tasks.push(
         {
           id: `tsk-${code}-quiz`,
@@ -245,10 +263,17 @@ function buildContent() {
   });
 
   audio.push(
-    { id: 'aud-contoh-1', kind: 'LEARNING', originalName: 'contoh-bacaan-fathah.wav', durationMs: 3200, status: 'ACTIVE' },
-    { id: 'aud-contoh-2', kind: 'LEARNING', originalName: 'contoh-bacaan-kasrah.wav', durationMs: 2800, status: 'ACTIVE' },
-    { id: 'aud-contoh-3', kind: 'LEARNING', originalName: 'contoh-bacaan-dammah.wav', durationMs: 3000, status: 'ACTIVE' },
+    seedAudio('aud-contoh-1', 'LEARNING', 'contoh-bacaan-fathah.wav', 3200),
+    seedAudio('aud-contoh-2', 'LEARNING', 'contoh-bacaan-kasrah.wav', 2800),
+    seedAudio('aud-contoh-3', 'LEARNING', 'contoh-bacaan-dammah.wav', 3000),
+    seedAudio('aud-contoh-arsip', 'LEARNING', 'contoh-bacaan-lama.wav', 2600, { status: 'ARCHIVED' }),
   );
+  // [DATA CONTOH] Satu rantai versi referensi: v1 diarsipkan, v2 aktif (SDD 3.6.4, 7.7.19).
+  const firstReference = audio.find((item) => item.id === 'ref-l001m001');
+  if (firstReference) {
+    audio.push(seedAudio('ref-l001m001-v1', 'REFERENCE', 'referensi-l001m001-awal.wav', 2400, { status: 'ARCHIVED', taskId: firstReference.taskId, createdAt: '2026-01-02T08:00:00.000Z' }));
+    Object.assign(firstReference, { version: 2, replacesId: 'ref-l001m001-v1' });
+  }
 
   return { stages, materials, tasks, audio };
 }

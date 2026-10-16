@@ -514,3 +514,62 @@ describe('admin konten (SDD 5.15, 3.5) dan dampaknya ke Santri', () => {
     expect(detail.blocks[2]).toMatchObject({ audioUrl: expect.any(String), durationMs: 3200 });
   });
 });
+
+describe('admin audio (SDD 5.16, 3.6.4, 7.7.19)', () => {
+  type Audio = { id: string; kind: string; status: string; version: number; usedBySubmission: boolean; replacesId: string | null; usage: { taskId: string } | null };
+  const audioFile = (name = 'baru.wav', type = 'audio/wav', bytes = 2000, kind?: string) => {
+    const form = new FormData();
+    form.append('file', new File([new Uint8Array(bytes)], name, { type }));
+    if (kind) form.append('kind', kind);
+    return form;
+  };
+  const list = async (query = '') => (await call('GET', `admin/audio${query}`)).body.data as Audio[];
+
+  beforeEach(async () => {
+    await login('admin@yusro.mock', 'admin1234');
+  });
+
+  it('Santri ditolak 403', async () => {
+    await login('santri@yusro.mock', 'santri123');
+    expect((await call('GET', 'admin/audio')).status).toBe(403);
+  });
+
+  it('menyaring jenis dan status; referensi membawa pemakaian tugas', async () => {
+    const references = await list('?kind=REFERENCE&status=ACTIVE');
+    expect(references.length).toBeGreaterThan(0);
+    expect(references.every((audio) => audio.kind === 'REFERENCE' && audio.status === 'ACTIVE' && audio.usage)).toBe(true);
+    expect((await list('?status=ARCHIVED')).map((audio) => audio.id)).toEqual(expect.arrayContaining(['aud-contoh-arsip', 'ref-l001m001-v1']));
+  });
+
+  it('detail memuat rantai versi terbaru dulu', async () => {
+    const detail = (await call('GET', 'admin/audio/ref-l001m001')).body.data as Audio & { versions: Audio[] };
+    expect(detail.versions.map((version) => `${version.version}:${version.status}`)).toEqual(['2:ACTIVE', '1:ARCHIVED']);
+  });
+
+  it('unggah memvalidasi berkas dan jenis', async () => {
+    expect((await call('POST', 'admin/audio', audioFile('a.png', 'image/png', 10, 'LEARNING'))).body.errors[0].field).toBe('file');
+    expect((await call('POST', 'admin/audio', audioFile('a.wav', 'audio/wav', 10))).body.errors[0].field).toBe('kind');
+    expect((await call('POST', 'admin/audio', audioFile('a.wav', 'audio/wav', 12 * 1024 * 1024 + 1, 'LEARNING'))).status).toBe(413);
+    const created = await call('POST', 'admin/audio', audioFile('bacaan-baru.wav', 'audio/wav', 2000, 'LEARNING'));
+    expect(created).toMatchObject({ status: 201, body: { data: { originalName: 'bacaan-baru.wav', kind: 'LEARNING', status: 'ACTIVE', version: 1 } } });
+  });
+
+  it('referensi yang dipakai submission tidak dapat diarsipkan, tetapi dapat diganti versinya', async () => {
+    const used = (await list('?kind=REFERENCE&status=ACTIVE')).find((audio) => audio.usedBySubmission);
+    expect(used).toBeDefined();
+    if (!used) return;
+    expect(await call('POST', `admin/audio/${used.id}/archive`)).toMatchObject({ status: 409, body: { errorCode: 'AUDIO_IN_USE_BY_SUBMISSION' } });
+    const replaced = await call('POST', `admin/audio/${used.id}/replace`, audioFile('pengganti.wav'));
+    expect(replaced.status).toBe(201);
+    expect(replaced.body.data).toMatchObject({ version: used.version + 1, replacesId: used.id, usedBySubmission: false, usage: { taskId: used.usage?.taskId } });
+    const old = (await call('GET', `admin/audio/${used.id}`)).body.data as Audio;
+    expect(old).toMatchObject({ status: 'ARCHIVED', usedBySubmission: true });
+    expect(await call('POST', `admin/audio/${used.id}/replace`, audioFile())).toMatchObject({ status: 409, body: { errorCode: 'AUDIO_ARCHIVED' } });
+  });
+
+  it('audio pembelajaran dapat diarsipkan dan tidak dapat diganti versinya', async () => {
+    expect((await call('POST', 'admin/audio/aud-contoh-1/replace', audioFile())).status).toBe(422);
+    expect((await call('POST', 'admin/audio/aud-contoh-1/archive')).body.data.status).toBe('ARCHIVED');
+    expect((await call('PUT', 'admin/materials/mat-l001m001/blocks', { blocks: [{ type: 'AUDIO', audioId: 'aud-contoh-1' }] })).status).toBe(422);
+  });
+});
