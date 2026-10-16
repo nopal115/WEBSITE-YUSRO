@@ -573,3 +573,95 @@ describe('admin audio (SDD 5.16, 3.6.4, 7.7.19)', () => {
     expect((await call('PUT', 'admin/materials/mat-l001m001/blocks', { blocks: [{ type: 'AUDIO', audioId: 'aud-contoh-1' }] })).status).toBe(422);
   });
 });
+
+describe('admin tugas dan soal (SDD 5.17, 3.7) dan dampaknya ke Santri', () => {
+  type Task = { id: string; type: string; status: string; orderIndex: number; questionCount: number | null; isReferenced: boolean; isComplete: boolean; referenceAudio: { id: string } | null };
+  type Question = { id: string; options: { id: string; label: string; isCorrect: boolean }[] };
+  const material = 'mat-l001m001';
+  const quizBody = (correct = 0) => ({ prompt: 'Huruf apakah ini?', audioId: 'aud-huruf-002', options: [0, 1, 2].map((i) => ({ label: `Pilihan ${i}`, arabicLabel: '', isCorrect: i === correct })) });
+  let santri = '';
+
+  beforeEach(async () => {
+    santri = token;
+    await login('admin@yusro.mock', 'admin1234');
+  });
+
+  it('Santri ditolak 403', async () => {
+    token = santri;
+    expect((await call('GET', 'admin/tasks')).status).toBe(403);
+  });
+
+  it('daftar per materi memuat kelengkapan dan tetap memuat field filter Monitoring (AS30)', async () => {
+    const tasks = (await call('GET', `admin/tasks?materialId=${material}`)).body.data as (Task & { title: string; materialTitle: string })[];
+    expect(tasks.map((task) => `${task.orderIndex}:${task.type}`)).toEqual(['1:QUIZ', '2:IMITATION']);
+    expect(tasks[0]).toMatchObject({ questionCount: 5, isComplete: true, status: 'ACTIVE', materialTitle: expect.any(String) });
+    expect(tasks[1]).toMatchObject({ referenceAudio: { id: 'ref-l001m001' }, isComplete: true });
+    expect(((await call('GET', 'admin/tasks?type=IMITATION')).body.data as Task[]).every((task) => task.type === 'IMITATION')).toBe(true);
+  });
+
+  it('tugas baru DRAFT tidak terlihat Santri; publish menolak bila belum lengkap', async () => {
+    const created = await call('POST', 'admin/tasks', { materialId: material, type: 'QUIZ', title: 'Latihan tambahan' });
+    expect(created).toMatchObject({ status: 201, body: { data: { status: 'DRAFT', orderIndex: 3, isComplete: false } } });
+    const id = created.body.data.id as string;
+    const incomplete = await call('POST', `admin/tasks/${id}/publish`);
+    expect(incomplete).toMatchObject({ status: 422, body: { errorCode: 'TASK_INCOMPLETE' } });
+    expect(incomplete.body.errors[0].field).toBe('questions');
+
+    token = santri;
+    expect((await call('GET', `quiz/tasks/${id}`)).status).toBe(404);
+    expect(((await call('GET', `learning/materials/${material}`)).body.data.tasks as { id: string }[]).map((task) => task.id)).not.toContain(id);
+    token = '';
+    await login('admin@yusro.mock', 'admin1234');
+
+    expect(await call('POST', `admin/tasks/${id}/questions`, { ...quizBody(), options: quizBody().options.map((o) => ({ ...o, isCorrect: true })) })).toMatchObject({ status: 422, body: { errorCode: 'TASK_ANSWER_KEY_INVALID' } });
+    expect((await call('POST', `admin/tasks/${id}/questions`, { ...quizBody(), options: [quizBody().options[0]] })).body.errors[0].field).toBe('options');
+    expect((await call('POST', `admin/tasks/${id}/questions`, quizBody(1))).status).toBe(201);
+    expect((await call('POST', `admin/tasks/${id}/publish`)).body.data.status).toBe('ACTIVE');
+
+    token = santri;
+    const quiz = (await call('GET', `quiz/tasks/${id}`)).body.data;
+    expect(quiz.questions).toHaveLength(1);
+    expect(JSON.stringify(quiz)).not.toContain('isCorrect');
+  });
+
+  it('mengubah soal tidak mengubah riwayat percobaan (SDD 3.7.5)', async () => {
+    const taskId = 'tsk-l001m001-quiz';
+    token = santri;
+    const quiz = (await call('GET', `quiz/tasks/${taskId}`)).body.data as { questions: { id: string; options: { id: string }[] }[] };
+    const submitted = await call('POST', `quiz/tasks/${taskId}/submit`, { answers: quiz.questions.map((q) => ({ questionId: q.id, optionId: q.options[0].id })) });
+    const attemptId = submitted.body.data.attemptId ?? submitted.body.data.id;
+    const before = (await call('GET', `quiz/attempts/${attemptId}`)).body.data.questions;
+    await login('admin@yusro.mock', 'admin1234');
+    const questions = (await call('GET', `admin/tasks/${taskId}/questions`)).body.data as Question[];
+    expect(questions[0].options.filter((o) => o.isCorrect)).toHaveLength(1);
+    expect((await call('PATCH', `admin/questions/${questions[0].id}`, { ...quizBody(2), prompt: 'Soal yang diubah' })).status).toBe(200);
+    expect((await call('DELETE', `admin/tasks/${taskId}`)).body.errorCode).toBe('TASK_IN_USE');
+    token = santri;
+    expect((await call('GET', `quiz/attempts/${attemptId}`)).body.data.questions).toEqual(before);
+  });
+
+  it('referensi tugas Dengar-Tirukan harus AKTIF; nonaktif menolak pengerjaan baru', async () => {
+    const taskId = 'tsk-l001m001-imitation';
+    expect(await call('PATCH', `admin/tasks/${taskId}`, { referenceAudioId: 'ref-l001m001-v1' })).toMatchObject({ status: 422, body: { errorCode: 'TASK_REFERENCE_NOT_ACTIVE' } });
+    expect(await call('PATCH', `admin/tasks/${taskId}`, { referenceAudioId: 'aud-contoh-1' })).toMatchObject({ status: 422, body: { errorCode: 'TASK_REFERENCE_NOT_ACTIVE' } });
+    expect((await call('PATCH', `admin/tasks/${taskId}`, { status: 'INACTIVE' })).body.data.status).toBe('INACTIVE');
+    token = santri;
+    expect(await call('GET', `imitation/tasks/${taskId}`)).toMatchObject({ status: 409, body: { errorCode: 'TASK_INACTIVE' } });
+  });
+
+  it('urutan tugas per materi; daftar tidak lengkap ditolak', async () => {
+    expect(await call('PATCH', 'admin/tasks/reorder', { orderedIds: ['tsk-l001m001-imitation'] })).toMatchObject({ status: 422, body: { errorCode: 'TASK_REORDER_INCOMPLETE' } });
+    const reordered = (await call('PATCH', 'admin/tasks/reorder', { orderedIds: ['tsk-l001m001-imitation', 'tsk-l001m001-quiz'] })).body.data as Task[];
+    expect(reordered.map((task) => task.id)).toEqual(['tsk-l001m001-imitation', 'tsk-l001m001-quiz']);
+    token = santri;
+    expect(((await call('GET', `learning/materials/${material}`)).body.data.tasks as { type: string }[]).map((task) => task.type)).toEqual(['IMITATION', 'QUIZ']);
+  });
+
+  it('Ganti Versi audio referensi memindahkan referensi tugas ke versi baru', async () => {
+    const form = new FormData();
+    form.append('file', new File([new Uint8Array(100)], 'baru.wav', { type: 'audio/wav' }));
+    const created = (await call('POST', 'admin/audio/ref-l001m002/replace', form)).body.data as { id: string };
+    const task = (await call('GET', 'admin/tasks/tsk-l001m002-imitation')).body.data as Task & { referenceAudioId: string };
+    expect(task.referenceAudioId).toBe(created.id);
+  });
+});

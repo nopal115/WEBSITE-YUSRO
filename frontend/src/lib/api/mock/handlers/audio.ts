@@ -139,6 +139,8 @@ export const audioRoutes: MockRoute[] = [
       if ('error' in read) return read.error;
       const created = createAudio(read.file, old.kind, { version: old.version + 1, replacesId: old.id, taskId: old.taskId });
       old.status = 'ARCHIVED';
+      // SDD 4.5.9: tasks.reference_audio_id selalu menunjuk versi yang berlaku.
+      for (const task of CONTENT.tasks) if (task.type === 'IMITATION' && task.referenceAudioId === old.id) task.referenceAudioId = created.id;
       return ok(audioView(created), { status: 201, message: `Versi ${created.version} aktif. Versi lama diarsipkan.` });
     },
   },
@@ -151,6 +153,8 @@ export const audioRoutes: MockRoute[] = [
       if (audio.status === 'ARCHIVED') throw ARCHIVED();
       // [ASUMSI] SDD 7.7.19: referensi yang sudah dipakai submission hanya dapat diganti versinya.
       if (usedBySubmission(audio)) return fail(409, 'AUDIO_IN_USE_BY_SUBMISSION', 'Audio referensi ini sudah dipakai submission. Gunakan Ganti Versi.');
+      // [ASUMSI] Referensi yang berlaku pada tugas AKTIF tidak diarsipkan agar tugas tetap lengkap (SDD 3.7.3).
+      if (CONTENT.tasks.some((task) => task.type === 'IMITATION' && task.status === 'ACTIVE' && task.referenceAudioId === audio.id)) return fail(409, 'AUDIO_IN_USE_BY_TASK', 'Audio ini menjadi referensi tugas aktif. Ganti audio referensi tugasnya atau gunakan Ganti Versi.');
       audio.status = 'ARCHIVED';
       return ok(audioView(audio), { message: 'Audio diarsipkan.' });
     },

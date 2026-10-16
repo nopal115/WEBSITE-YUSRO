@@ -73,7 +73,10 @@ export interface MockQuestion {
   id: string;
   orderIndex: number;
   prompt: string;
+  /** Kunci suara sintetis untuk Santri (src/lib/api/mock/media.ts). */
   audioKey: string;
+  /** Audio soal (SDD 4.5.10 questions.audio_id). */
+  audioId: string;
   options: { id: string; label: string; arabicLabel: string; orderIndex: number }[];
   correctOptionId: string;
 }
@@ -82,6 +85,8 @@ export interface MockQuizTask {
   id: string;
   materialId: string;
   type: 'QUIZ';
+  orderIndex: number;
+  status: ContentStatus;
   title: string;
   instruction: string;
   questions: MockQuestion[];
@@ -91,6 +96,10 @@ export interface MockImitationTask {
   id: string;
   materialId: string;
   type: 'IMITATION';
+  orderIndex: number;
+  status: ContentStatus;
+  /** SDD 4.5.9 tasks.reference_audio_id: audio referensi yang berlaku saat ini. */
+  referenceAudioId: string;
   title: string;
   instruction: string;
   arabicText: string;
@@ -122,6 +131,9 @@ const LETTER_POOL: Letter[] = [
   ['غَ', 'Gho'], ['فَ', 'Fa'], ['قَ', 'Qo'], ['كَ', 'Ka'], ['لَ', 'La'], ['مَ', 'Ma'], ['نَ', 'Na'],
   ['وَ', 'Wa'], ['هَ', 'Ha'], ['ءَ', 'A (hamzah)'], ['يَ', 'Ya'],
 ].map(([arabic, label]) => ({ arabic, label }));
+
+/** [DATA CONTOH] Audio soal per huruf (aset LEARNING). */
+const letterAudioId = (item: Letter) => `aud-huruf-${pad(LETTER_POOL.indexOf(item) + 1)}`;
 
 const letter = (arabic: string): Letter => LETTER_POOL.find((item) => item.arabic === arabic) as Letter;
 
@@ -156,6 +168,7 @@ function buildQuestions(material: MockMaterial, seed: number): MockQuestion[] {
       orderIndex: index + 1,
       prompt: 'Huruf apakah yang dibaca?',
       audioKey: `letter:${correct.arabic}`,
+      audioId: letterAudioId(correct),
       options,
       correctOptionId: options[rotated.indexOf(correct)].id,
     };
@@ -224,6 +237,8 @@ function buildContent() {
           id: `tsk-${code}-quiz`,
           materialId: material.id,
           type: 'QUIZ',
+          orderIndex: 1,
+          status: 'ACTIVE',
           title: 'Latihan Dengar-Pilih',
           instruction: 'Dengarkan audio berikut, lalu pilih jawaban yang benar.',
           questions: buildQuestions(material, globalIndex),
@@ -232,6 +247,9 @@ function buildContent() {
           id: `tsk-${code}-imitation`,
           materialId: material.id,
           type: 'IMITATION',
+          orderIndex: 2,
+          status: 'ACTIVE',
+          referenceAudioId: `ref-${code}`,
           title: 'Latihan Dengar-Tirukan',
           instruction: 'Dengarkan contoh bacaan, lalu tirukan dan rekam suara Anda.',
           arabicText: material.practice[0],
@@ -266,6 +284,7 @@ function buildContent() {
     seedAudio('aud-contoh-1', 'LEARNING', 'contoh-bacaan-fathah.wav', 3200),
     seedAudio('aud-contoh-2', 'LEARNING', 'contoh-bacaan-kasrah.wav', 2800),
     seedAudio('aud-contoh-3', 'LEARNING', 'contoh-bacaan-dammah.wav', 3000),
+    ...LETTER_POOL.map((item, index) => seedAudio(letterAudioId(item), 'LEARNING', `huruf-${pad(index + 1)}.wav`, 1200)),
     seedAudio('aud-contoh-arsip', 'LEARNING', 'contoh-bacaan-lama.wav', 2600, { status: 'ARCHIVED' }),
   );
   // [DATA CONTOH] Satu rantai versi referensi: v1 diarsipkan, v2 aktif (SDD 3.6.4, 7.7.19).

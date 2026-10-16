@@ -9,8 +9,9 @@ import { learningRoutes } from './learning';
 import { profileRoutes } from './profile';
 import { progressRoutes } from './progress';
 import { quizRoutes } from './quiz';
+import { taskRoutes } from './tasks';
 
 export { resolveIdentity } from './auth';
 
-// Endpoint sisi Santri SDD 5.6–5.13 dan endpoint Admin yang sudah ditiru (handlers/admin.ts, monitoring.ts, content.ts, audio.ts).
-export const routes: MockRoute[] = [...authRoutes, ...profileRoutes, ...learningRoutes, ...quizRoutes, ...imitationRoutes, ...progressRoutes, ...adminRoutes, ...monitoringRoutes, ...contentRoutes, ...audioRoutes];
+// Endpoint sisi Santri SDD 5.6–5.13 dan endpoint Admin yang sudah ditiru (handlers/admin.ts, monitoring.ts, content.ts, audio.ts, tasks.ts).
+export const routes: MockRoute[] = [...authRoutes, ...profileRoutes, ...learningRoutes, ...quizRoutes, ...imitationRoutes, ...progressRoutes, ...adminRoutes, ...monitoringRoutes, ...contentRoutes, ...audioRoutes, ...taskRoutes];

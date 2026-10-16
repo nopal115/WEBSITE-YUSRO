@@ -309,7 +309,7 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | POST `admin/submissions/:id/retry` | Admin | tanpa body | 202 `{ submissionId, evaluationStatus: SUBMITTED, attemptNo, jobId, isRetry }` (contoh SDD 5.18) | 409 `EVAL_RETRY_NOT_ALLOWED` → pesan server + muat ulang daftar | SDD 5.18, 3.11.7, BR-ML-07 | **beda** (M4) |
 | GET `admin/evaluation/queue` | Admin | — | `{ counts: { SUBMITTED, PROCESSING, EVALUATED, FAILED }, oldestWaitingSince \| null }`; EVALUATED/FAILED 24 jam terakhir [ASUMSI] | galat panel terpisah dari tabel | SDD 5.18 (bentuk [ASUMSI]), UI-ADMIN-MONITOR-02 | **beda** (M5) |
 | GET `admin/evaluation/health` | Admin | — | `{ serviceStatus, modelVersion \| null, modelLoaded, checkedAt }` [ASUMSI]; status dipetakan AS16 | galat bagian layanan terpisah | SDD 5.18, NFR-AVAIL-02 (bentuk [ASUMSI]) | **belum ada** (M6) |
-| GET `admin/tasks?type=IMITATION` | Admin | query `type` | `TaskOption[] { id, title, type, materialTitle, status }` tanpa pagination [ASUMSI]; filter tugas (akan dipakai lagi di A6) | gagal → filter tugas tidak tersedia, daftar tetap tampil | SDD 5.17 (bentuk [ASUMSI]) | **belum ada** (M7) |
+| GET `admin/tasks?type=IMITATION` | Admin | query `type` | `TaskOption[] { id, title, type, materialTitle, status }` tanpa pagination [ASUMSI]; filter tugas; bentuk lengkap di 2.16 | gagal → filter tugas tidak tersedia, daftar tetap tampil | SDD 5.17 (bentuk [ASUMSI]) | **belum ada** (M7) |
 
 - **M4:** route ada (`evaluation.controller.ts`, `@Roles(ADMIN)`), tetapi berbeda:
   - respons `{ submissionId, jobId, status: SUBMITTED }`: tanpa `attemptNo` dan `isRetry`, dan memakai `status`, bukan `evaluationStatus`;
@@ -355,12 +355,32 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `admin/audio/:id` | Admin | — | `AdminAudio` + `versions: AdminAudio[]` (seluruh rantai `replacesId`, terbaru dulu) [ASUMSI AS41] | galat di dalam dialog riwayat | SDD 5.16, 3.6.4 | **belum ada** |
 | POST `admin/audio` | Admin | multipart `file` + `kind` | `AdminAudio` (201), versi 1, AKTIF | 422 `errors[]` field `file`/`kind` di bawah kolom; 413 → pesan umum di dialog | SDD 5.16, 5.20 (batas 12 MB) | **beda** (K3) |
 | POST `admin/audio/:id/replace` | Admin | multipart `file` | `AdminAudio` baru (201): `version` +1, `replacesId` = audio lama; audio lama menjadi ARCHIVED [ASUMSI AS42] | 409 `AUDIO_ARCHIVED`; 422 bukan referensi; pesan di dialog | SDD 5.16, 3.6.4, FR-AUDIO-03 | **belum ada** |
-| POST `admin/audio/:id/archive` | Admin | — | `AdminAudio` berstatus ARCHIVED | 409 `AUDIO_IN_USE_BY_SUBMISSION` (referensi sudah dipakai) [ASUMSI AS43], 409 `AUDIO_ARCHIVED`; pesan di dialog konfirmasi | SDD 5.16, 7.7.19 | **belum ada** |
+| POST `admin/audio/:id/archive` | Admin | — | `AdminAudio` berstatus ARCHIVED | 409 `AUDIO_IN_USE_BY_SUBMISSION` (referensi sudah dipakai), 409 `AUDIO_IN_USE_BY_TASK` (referensi berlaku pada tugas AKTIF) [ASUMSI AS43], 409 `AUDIO_ARCHIVED`; pesan di dialog konfirmasi | SDD 5.16, 7.7.19 | **belum ada** |
 | GET `admin/audio/:id/url` | Admin | — | `{ url, expiresInSeconds }` (AS38) | pesan di bawah tombol Putar | SDD 5.16, NFR-PRIV-02 | **beda** (K3) |
 
 - **K3:** backend `main` (`5014087`) punya `audio/audio.controller.ts` dengan path tanpa `admin/`: `GET audio?type=`, `GET audio/:audioId/url`, dan `POST audio` (multipart field `audio` + `type`, batas 25 MB). Nama query dan field berbeda dari SDD 5.16 (`kind`, `file`), dan batasnya berbeda dari SDD 5.20 (12 MB). Detail, `replace`, dan `archive` belum ada.
 - Aturan aksi di UI (SDD 7.7.19): tidak ada tombol hapus; Ganti Versi hanya untuk referensi AKTIF; Arsipkan untuk audio AKTIF yang belum dipakai submission (`src/features/admin/audio/view.ts`).
 - [TBD] Daftar tanpa pagination; bila jumlah audio di backend besar, perlu pagination SDD 1.4.
+
+### 2.16 Admin — Tugas & Soal (`src/features/admin/tasks/api.ts`, `types.ts`; ditambahkan di A6)
+
+| Method + path | Peran | Request | Respons yang diharapkan | Galat yang ditangani frontend | Sumber | Backend |
+| --- | --- | --- | --- | --- | --- | --- |
+| GET `admin/tasks` | Admin | query `materialId`, `type` (opsional) | `AdminTask[] { id, title, type, materialId, materialTitle, stageId, stageTitle, orderIndex, status, questionCount \| null, referenceAudio { id, originalName, durationMs, status } \| null, isReferenced, isComplete }` tanpa pagination [ASUMSI AS44]; field AS30 tetap ada untuk filter Monitoring (2.13) | umum (layar galat + coba lagi) | SDD 5.17, 3.7.3 | **beda** (K4) |
+| POST `admin/tasks` | Admin | body `{ materialId, type (QUIZ\|IMITATION), title (maks 200) }` | `AdminTaskDetail` (201), DRAFT, urutan terakhir materinya | 422 `errors[]` field `title` | SDD 5.17, FR-TASK-03 | **beda** (K4) |
+| GET `admin/tasks/:id` | Admin | — | `AdminTask` + `instruction \| null`, `referenceAudioId \| null`, `arabicText \| null` [ASUMSI AS45] | layar galat + kembali ke daftar | SDD 5.17 | **belum ada** |
+| PATCH `admin/tasks/:id` | Admin | body sebagian `{ title?, instruction?, arabicText?, referenceAudioId?, status? (INACTIVE\|DRAFT) }`; AKTIF hanya lewat publish [ASUMSI AS46] | `AdminTaskDetail` | 422 `TASK_REFERENCE_NOT_ACTIVE` di bawah pilihan audio; 409 `CONTENT_INVALID_TRANSITION`; 422 `errors[]` per field | SDD 5.17, 3.7.8, FR-TASK-04/05 | **beda** (K4) |
+| DELETE `admin/tasks/:id` | Admin | — | sukses tanpa data; hanya DRAFT yang belum dikerjakan | 409 `TASK_IN_USE`, 409 `CONTENT_INVALID_TRANSITION`; pesan di dialog | SDD 5.17, 3.7.8, BR-DELETE-02 | **belum ada** |
+| POST `admin/tasks/:id/publish` | Admin | — | `AdminTaskDetail` berstatus ACTIVE | 422 `TASK_INCOMPLETE` + `errors[]` komponen yang kurang → daftar di penyunting [ASUMSI AS47] | SDD 5.17, 3.7.3 | **belum ada** |
+| PATCH `admin/tasks/reorder` | Admin | body `{ orderedIds }` seluruh tugas satu materi | `AdminTask[]` dalam urutan baru | 422 `TASK_REORDER_INCOMPLETE` → pesan lalu muat ulang [ASUMSI AS48] | SDD 5.17, FR-TASK-06 | **belum ada** |
+| GET `admin/tasks/:id/questions` | Admin | — | `AdminQuestion[] { id, orderIndex, prompt, audioId, audio \| null, options [{ id, label, arabicLabel, orderIndex, isCorrect }] }` [ASUMSI AS49] | layar galat + coba lagi | SDD 5.17, 4.5.10 | **belum ada** |
+| POST `admin/tasks/:id/questions` | Admin | body `{ prompt, audioId, options [{ label, arabicLabel, isCorrect }] }` (contoh SDD 5.17) | `AdminQuestion` (201) | 422 `TASK_ANSWER_KEY_INVALID`, 422 `errors[]` (`prompt`, `audioId`, `options`, `options.N.label`) di kolomnya | SDD 5.17 | **belum ada** |
+| PATCH `admin/questions/:id` | Admin | body sama dengan POST (mengganti seluruh pilihan) [ASUMSI AS49] | `AdminQuestion` | sama dengan POST | SDD 5.17, 3.7.5 | **belum ada** |
+| DELETE `admin/questions/:id` | Admin | — | sukses tanpa data | 422 `TASK_INCOMPLETE` bila soal terakhir pada tugas AKTIF [ASUMSI AS49]; pesan di dialog | SDD 5.17, BR-DELETE-02 | **belum ada** |
+
+- **K4:** backend `main` (`5014087`) punya `task/task.controller.ts` dengan path tanpa `admin/`: `GET task`, `GET task/admin`, `POST task`, `PATCH task/:taskId`. Tidak ada detail, hapus, publish, reorder, maupun endpoint soal. Bentuk respons belum dicocokkan.
+- Aksi status memakai aturan konten SDD 3.5.3 (`availableActions` di `content/view.ts`): mengaktifkan dan mengaktifkan kembali selalu lewat publish agar kelengkapan diperiksa (`src/features/admin/tasks/view.ts`).
+- Sisi Santri yang ditiru mock: tugas DRAFT tidak tampil (404 bila dibuka langsung), tugas NONAKTIF tidak tampil dan ditolak 409 `TASK_INACTIVE`, urutan tugas mengikuti `orderIndex`; detail percobaan Dengar-Pilih memakai snapshot soal saat dikerjakan (SDD 3.7.5).
 
 **Ringkasan status (27 endpoint yang dipanggil frontend):** sesuai 0 · beda 12 · belum ada 15 · tidak dapat dipastikan 0. Ditambah 2 endpoint admin di 2.11 (A1) dan 8 di 2.12 (A2): semuanya belum ada. Ditambah 7 endpoint di 2.13 (A3): 2 beda (retry, queue) dan 5 belum ada. Ada satu detail yang tidak dapat dipastikan di dalam baris "beda": serialisasi `score`, lihat I3. Ditambah 15 endpoint baru di 2.14 (A4; `GET admin/stages` sudah dihitung di 2.12): semuanya belum ada.
 
@@ -412,7 +432,13 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | AS40 | `GET admin/audio` lengkap: butir `AdminAudio` (lihat 2.15) dengan `usedBySubmission` dan `usage` (tugas Dengar-Tirukan pemakai referensi); penyaring `kind` dan `status`; tanpa pagination. | SDD 5.16 tidak merinci respons; penanda pemakaian dibutuhkan SDD 7.7.19. | `types.ts`, `AudioManagementPage.tsx` |
 | AS41 | `GET admin/audio/:id` memuat `versions` (seluruh rantai `replacesId`, terbaru dulu); masa berlaku versi = sejak diunggah sampai versi berikutnya diunggah. | SDD 7.7.19 meminta riwayat versi, SDD 5.16 tidak merinci respons. | `AudioVersionsDialog.tsx` |
 | AS42 | `POST admin/audio/:id/replace` hanya untuk audio referensi AKTIF; respons audio baru (201). | SDD 7.7.19 menyebut Ganti Versi untuk referensi; SDD 5.16 tidak membatasi jenis. | `view.ts`, `hooks.ts` |
-| AS43 | `POST admin/audio/:id/archive` menolak referensi yang sudah dipakai submission (409 `AUDIO_IN_USE_BY_SUBMISSION`). | SDD 5.16 memakai kode ini untuk penghapusan; SDD 7.7.19 hanya menyediakan Ganti Versi untuk referensi yang dipakai. | `view.ts`, mock `handlers/audio.ts` |
+| AS43 | `POST admin/audio/:id/archive` menolak referensi yang sudah dipakai submission (409 `AUDIO_IN_USE_BY_SUBMISSION`) dan referensi yang berlaku pada tugas AKTIF (409 `AUDIO_IN_USE_BY_TASK`, agar tugas tetap lengkap). `replace` memindahkan `tasks.reference_audio_id` ke versi baru (SDD 4.5.9). | SDD 5.16 memakai kode ini untuk penghapusan; SDD 7.7.19 hanya menyediakan Ganti Versi untuk referensi yang dipakai. | `view.ts`, mock `handlers/audio.ts` |
+| AS44 | `GET admin/tasks` lengkap (lihat 2.16) dengan penyaring `materialId` dan `type`, tanpa pagination; `isReferenced` = pernah dikerjakan; `isComplete` = komponen SDD 3.7.3 lengkap. | SDD 5.17 tidak merinci respons maupun parameter. | `types.ts`, `TaskManagementPage.tsx` |
+| AS45 | `GET admin/tasks/:id` memuat `instruction`, `referenceAudioId`, dan `arabicText` (teks yang ditirukan Santri; tidak ada di SDD 4.5.9, tetapi dipakai halaman Dengar-Tirukan 2.6). | SDD 5.17 tidak merinci respons. | `TaskEditorPage.tsx` |
+| AS46 | `PATCH admin/tasks/:id` menerima sebagian kolom; status AKTIF hanya lewat `publish`; DRAFT hanya dari AKTIF yang belum dikerjakan; NONAKTIF dari AKTIF. | Ditafsirkan dari SDD 3.5.3 dan 5.17 (publish = mengaktifkan). | `view.ts` |
+| AS47 | `TASK_INCOMPLETE` membawa `errors[]` per komponen yang kurang (`title`, `questions`, `referenceAudioId`). | SDD 3.7.8 hanya menyebut kode galat. | `TaskEditorPage.tsx` |
+| AS48 | Body reorder `{ orderedIds }` berisi seluruh tugas satu materi; tidak lengkap → 422 `TASK_REORDER_INCOMPLETE` (kode menyerupai `CONTENT_REORDER_INCOMPLETE`, AS36). | SDD 5.17 tidak merinci body maupun kode galat reorder tugas. | `hooks.ts`, `TaskManagementPage.tsx` |
+| AS49 | Soal admin memuat `isCorrect` per pilihan; PATCH soal mengganti seluruh pilihan; soal terakhir pada tugas AKTIF tidak dapat dihapus (422 `TASK_INCOMPLETE`); maksimal 6 pilihan per soal. | SDD 5.17 hanya memberi contoh body POST; batas atas pilihan tidak diatur. | `QuestionFormDialog.tsx`, `view.ts` |
 
 Asumsi yang hanya ada di mock (`src/lib/api/mock/`) tidak membentuk kontrak dan tidak dicantumkan, kecuali AS15 yang sudah menjadi keputusan. Contohnya: waktu tiruan evaluasi, rumus `pct` per tahapan, label riwayat SUBMITTED/PROCESSING, dan cara menghitung tren.
 
@@ -438,7 +464,7 @@ Asumsi yang hanya ada di mock (`src/lib/api/mock/`) tidak membentuk kontrak dan 
 | `/riwayat/:attemptId` (`?jenis=tirukan` untuk Dengar-Tirukan) | Detail percobaan | Santri; **penyimpangan sitemap yang disetujui, [TBD]** |
 | `/tugas` | Placeholder menu Tugas | Santri; **penyimpangan sitemap yang disetujui, [TBD]** |
 | `/admin`, `/admin/santri`, `/admin/santri/:studentId`, `/admin/tahapan`, `/admin/materi`, `/admin/materi/:materialId`, `/admin/audio`, `/admin/monitoring` | Dashboard, Santri, Konten, Audio, Monitoring (A1–A5) | Admin |
-| `/admin/tugas`, `/admin/tugas/:taskId` | Placeholder Tugas & Soal (A6) | Admin; **[TBD]** |
+| `/admin/tugas`, `/admin/tugas/:taskId` | Tugas & Soal (A6) | Admin |
 
 Id di route diteruskan apa adanya ke path API (`encodeURIComponent`). Backend-noval mewajibkan UUID (`ParseUUIDPipe`).
 
