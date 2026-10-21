@@ -1,7 +1,7 @@
 # Cara menyalakan backend Noval lagi (lokal)
 
 Yang sudah siap dan tidak perlu diulang:
-- Worktree backend: `C:\dev\yusro-backend` (detached di `origin/main`, terakhir `173c15a`; backend-nya identik dengan `423918c`).
+- Worktree backend: `C:\Users\pc\OneDrive\Desktop\alquran\yusro-backend` (detached di `origin/main`, terakhir `173c15a`; backend-nya identik dengan `423918c`).
 - `backend\.env` sudah terisi, termasuk `STORAGE_DRIVER=local` sehingga MinIO tidak diperlukan.
 - Database `yusro` di PostgreSQL 16 sudah dimigrasi dan diisi seed backend: kurikulum 10 tahapan, 69 materi, 79 tugas, 138 audio, dan akun `admin@yusro.local`. Untuk uji ada juga akun santri `santri.uji@yusro.local`.
 
@@ -10,14 +10,14 @@ Layanan `postgresql-x64-16` biasanya menyala otomatis saat Windows start. Untuk 
 
 ## 2. Nyalakan backend (terminal 1)
 ```
-cd C:\dev\yusro-backend\backend
+cd C:\Users\pc\OneDrive\Desktop\alquran\yusro-backend\backend
 npm run start:dev
 ```
 Backend siap kalau muncul tulisan `Nest application successfully started`. Membuka http://localhost:3000/api/v1 akan menampilkan `Unauthorized`; itu normal dan artinya server hidup.
 
 Kalau Noval sudah mengirim update ke `main`, ambil dulu kodenya sebelum menyalakan backend:
 ```
-cd C:\dev\yusro-backend
+cd C:\Users\pc\OneDrive\Desktop\alquran\yusro-backend
 git fetch origin
 git checkout --detach origin/main
 cd backend
@@ -46,6 +46,7 @@ Ubah `VITE_USE_MOCK=true` di `frontend\.env`. Server dev akan restart sendiri. L
 
 ## Catatan
 - Untuk mematikan backend atau frontend, tekan Ctrl+C di terminalnya. Pastikan hanya ada satu server dev frontend; server kedua akan pindah ke port 5174.
+- Worktree backend berada di dalam OneDrive, bersebelahan dengan `WEBSITE-YUSRO` dan folder `catatan`. Kalau `npm ci` gagal dengan EPERM saat menghapus berkas di `node_modules`, jeda sinkronisasi OneDrive dulu lalu ulangi.
 - Jangan jalankan `npm ci` di folder frontend selagi server dev menyala: Vite mengunci `esbuild.exe` dan instalasi gagal setengah jalan.
 - Endpoint yang masih belum ada atau berbeda bentuk dicatat di `api-contract.md` (bagian 1.9) dan SDD v1.1 Bab 5.25.
-- Password database dan admin tersimpan di `C:\dev\yusro-backend\backend\.env`. File ini tidak ter-commit dan jangan dibagikan.
+- Password database dan admin tersimpan di `C:\Users\pc\OneDrive\Desktop\alquran\yusro-backend\backend\.env`. File ini tidak ter-commit dan jangan dibagikan.
