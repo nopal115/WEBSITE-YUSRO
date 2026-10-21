@@ -1,9 +1,8 @@
-// Endpoint Admin konten SDD 5.15 (tahapan, materi, blok) dan audio minimal SDD 5.16. Bentuk respons yang
+// Endpoint Admin konten SDD 5.15 (tahapan, materi, blok). Audio ada di handlers/audio.ts. Bentuk respons yang
 // tidak dirinci SDD ditandai [ASUMSI] dan dicatat di docs/api-contract.md.
 import { CONTENT, type ContentStatus, type MockBlock, type MockMaterial, type MockStage } from '../data/content';
 import { db, findMaterial, findStage, newId } from '../db';
 import { fail, httpError, ok, type MockRequest } from '../http';
-import { mockAudioUrl } from '../media';
 import type { MockRoute } from '../router';
 import { referencedTaskIds } from '../students';
 
@@ -11,8 +10,6 @@ const pad = (value: number) => String(value).padStart(3, '0');
 const byOrder = <T extends { orderIndex: number }>(a: T, b: T) => a.orderIndex - b.orderIndex;
 const TITLE_MAX = { stage: 150, material: 200 };
 const TRANSLITERATION_MAX = 255;
-/** SDD 3.6.5: URL audio berbatas waktu 15 menit. */
-const AUDIO_URL_SECONDS = 900;
 
 const NOT_FOUND = () => httpError(404, 'CONTENT_NOT_FOUND', 'Konten tidak ditemukan.');
 const field = (name: string, message: string) => ({ field: name, message });
@@ -202,7 +199,7 @@ function parseBlocks(material: MockMaterial, body: unknown) {
     }
     if (item.type === 'AUDIO') {
       const audioId = text('audioId');
-      if (!audioId || !CONTENT.audio.some((audio) => audio.id === audioId && audio.status === 'ACTIVE')) errors.push(field(`blocks.${index}.audioId`, 'Pilih audio pembelajaran.'));
+      if (!audioId || !CONTENT.audio.some((audio) => audio.id === audioId && audio.kind === 'LEARNING' && audio.status === 'ACTIVE')) errors.push(field(`blocks.${index}.audioId`, 'Pilih audio pembelajaran.'));
       return { ...base, type: 'AUDIO', audioId };
     }
     if (item.type === 'IMAGE') {
@@ -372,66 +369,6 @@ export const contentRoutes: MockRoute[] = [
       if (parsed.errors) return fail(422, 'VALIDATION_ERROR', 'Konten belum lengkap. Periksa blok yang ditandai.', parsed.errors);
       material.blocks = parsed.blocks;
       return ok(material.blocks.map(blockView), { message: 'Konten materi tersimpan.' });
-    },
-  },
-  // Audio (minimal, SDD 5.16; dipakai lagi di A5).
-  {
-    // [ASUMSI] ?kind= menyaring jenis audio; tanpa pagination.
-    method: 'GET',
-    pattern: '/admin/audio',
-    access: 'ADMIN',
-    handler: (req) => {
-      const kind = req.query.get('kind');
-      return ok(CONTENT.audio.filter((audio) => !kind || audio.kind === kind).map((audio) => ({ ...audio })));
-    },
-  },
-  {
-    // [ASUMSI] { url, expiresInSeconds }; diminta saat pratinjau diputar (SDD 5.16, NFR-PRIV-02).
-    method: 'GET',
-    pattern: '/admin/audio/:id/url',
-    access: 'ADMIN',
-    handler: (req) => {
-      const audio = CONTENT.audio.find((item) => item.id === req.params.id);
-      if (!audio) throw httpError(404, 'NOT_FOUND', 'Data tidak ditemukan.');
-      return ok({ url: mockAudioUrl(`audio:${audio.id}`, audio.durationMs), expiresInSeconds: AUDIO_URL_SECONDS });
-    },
-  },
-  {
-    method: 'POST',
-    pattern: '/admin/audio',
-    access: 'ADMIN',
-    handler: () => {
-      const newAudio = {
-        id: `aud-${Date.now()}`,
-        kind: 'LEARNING' as const,
-        originalName: 'audio-unggah.mp3',
-        durationMs: 3000,
-        status: 'ACTIVE' as const,
-      };
-      CONTENT.audio.push(newAudio);
-      return ok(newAudio, { status: 201, message: 'Audio berhasil diunggah.' });
-    },
-  },
-  {
-    method: 'POST',
-    pattern: '/admin/audio/:id/archive',
-    access: 'ADMIN',
-    handler: (req) => {
-      const audio = CONTENT.audio.find((item) => item.id === req.params.id);
-      if (!audio) throw httpError(404, 'NOT_FOUND', 'Data tidak ditemukan.');
-      audio.status = 'ARCHIVED';
-      return ok(audio, { message: 'Audio berhasil diarsipkan.' });
-    },
-  },
-  {
-    method: 'POST',
-    pattern: '/admin/audio/:id/replace',
-    access: 'ADMIN',
-    handler: (req) => {
-      const audio = CONTENT.audio.find((item) => item.id === req.params.id);
-      if (!audio) throw httpError(404, 'NOT_FOUND', 'Data tidak ditemukan.');
-      audio.originalName = 'audio-pengganti.mp3';
-      return ok(audio, { message: 'Audio berhasil diganti.' });
     },
   },
 ];

@@ -1,388 +1,231 @@
-import { CheckCircle2, Edit2, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useCallback, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../../components/ui/Button';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
-import { Pill } from '../../../components/ui/Pill';
+import { ReorderableList, ReorderBar } from '../../../components/ui/ReorderableList';
 import { SelectField } from '../../../components/ui/SelectField';
-import { TextField } from '../../../components/ui/TextField';
 import { ApiError } from '../../../lib/api/ApiError';
+import { useReorder } from '../../../lib/hooks/useReorder';
 import { EmptyState, ErrorState, ListSkeleton } from '../../learning/QueryStates';
-import { useAdminAudioList } from '../audio/hooks';
+import { ContentStatusActions, ContentStatusPill } from '../content/ContentStatusActions';
 import { useAdminMaterials, useAdminStages } from '../content/hooks';
+import type { AdminMaterial } from '../content/types';
 import { useContentNotice } from '../content/useContentNotice';
-import { useAdminTasksList, useTaskMutations } from './hooks';
-import type { AdminTaskListItem, TaskType } from './types';
+import { STATUS_LABEL, type ContentAction } from '../content/view';
+import { useAdminTasks, useTaskMutations } from './hooks';
+import { TaskCreateDialog } from './TaskCreateDialog';
+import type { AdminTask } from './types';
+import { completenessText, statusRequest, TYPE_LABEL } from './view';
 
-export function TaskManagementPage(): JSX.Element {
-  const navigate = useNavigate();
-  const [selectedType, setSelectedType] = useState('ALL');
-  const notice = useContentNotice();
+const textLink = 'flex min-h-11 items-center text-brand-primary hover:underline';
 
-  // Dialog Tambah Tugas
-  const [createOpen, setCreateOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [taskType, setTaskType] = useState<TaskType>('QUIZ');
-  const [stageId, setStageId] = useState('');
-  const [materialId, setMaterialId] = useState('');
-  const [order, setOrder] = useState('1');
-  const [referenceAudioId, setReferenceAudioId] = useState('');
-  const [createError, setCreateError] = useState<string | null>(null);
-
-  // Dialog Hapus Tugas
-  const [deletingTask, setDeletingTask] = useState<AdminTaskListItem | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const tasksQuery = useAdminTasksList(selectedType);
-  const stagesQuery = useAdminStages();
-  const materialsQuery = useAdminMaterials(stageId);
-  const audioQuery = useAdminAudioList('REFERENCE');
+/** Daftar tugas satu materi; di-key dengan id materi agar urutan lokal tidak terbawa. */
+function TaskList({ material }: { material: AdminMaterial }): JSX.Element {
+  const tasks = useAdminTasks(material.id);
   const mutations = useTaskMutations();
+  const reorder = useReorder(tasks.data ?? [], (task) => task.id);
+  const notice = useContentNotice();
+  const navigate = useNavigate();
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<AdminTask | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) {
-      setCreateError('Judul tugas wajib diisi.');
-      return;
-    }
-    if (!stageId) {
-      setCreateError('Pilih tahapan untuk tugas ini.');
-      return;
-    }
-    if (taskType === 'IMITATION' && !referenceAudioId) {
-      setCreateError('Tugas imitasi wajib memilih audio referensi makhraj.');
-      return;
-    }
-    setCreateError(null);
-
-    mutations.create.mutate(
-      {
-        title: title.trim(),
-        type: taskType,
-        stageId,
-        materialId: materialId || null,
-        order: Number(order) || 1,
-        referenceAudioId: taskType === 'IMITATION' ? referenceAudioId : null,
-      },
-      {
-        onSuccess: (created) => {
-          setCreateOpen(false);
-          notice.success('Tugas berhasil dibuat.');
-          navigate(`/admin/tugas/${created.id}`);
-        },
-        onError: (err) => {
-          setCreateError(err instanceof ApiError ? err.message : 'Gagal membuat tugas.');
-        },
-      },
-    );
-  };
-
-  const handlePublish = (task: AdminTaskListItem) => {
-    notice.clear();
-    mutations.publish.mutate(task.id, {
-      onSuccess: () => {
-        notice.success(`Tugas "${task.title}" berhasil diterbitkan dan aktif.`);
-      },
-      onError: (err) => {
-        const msg =
-          err instanceof ApiError
-            ? err.message === 'TASK_INCOMPLETE'
-              ? 'Tugas belum lengkap: Kuis harus memiliki minimal 1 soal dan 2 pilihan, atau audio referensi imitasi belum terpasang.'
-              : err.message === 'TASK_ANSWER_KEY_INVALID'
-                ? 'Kunci jawaban belum valid: Setiap soal harus memiliki tepat satu jawaban benar.'
-                : err.message === 'TASK_REFERENCE_NOT_ACTIVE'
-                  ? 'Audio referensi imitasi tidak aktif atau telah diarsipkan.'
-                  : err.message
-            : 'Gagal menerbitkan tugas.';
-        notice.failureText(msg);
-      },
-    });
-  };
-
-  const handleDeleteConfirm = () => {
-    if (!deletingTask) return;
+  const restoreFocus = () => triggerRef.current?.focus();
+  const closeCreate = useCallback((saved: boolean) => {
+    setCreating(false);
+    if (!saved) triggerRef.current?.focus();
+  }, []);
+  const closeDelete = useCallback(() => {
+    setDeleting(null);
     setDeleteError(null);
-    mutations.remove.mutate(deletingTask.id, {
+    triggerRef.current?.focus();
+  }, []);
+
+  const onAction = (task: AdminTask, action: ContentAction, trigger: HTMLElement) => {
+    triggerRef.current = trigger;
+    notice.clear();
+    const request = statusRequest(action);
+    if (request.kind === 'delete') {
+      setDeleting(task);
+      return;
+    }
+    const done = { onError: notice.failure, onSettled: restoreFocus };
+    if (request.kind === 'publish') mutations.publish.mutate(task.id, { ...done, onSuccess: () => notice.success(`"${task.title}" diaktifkan.`) });
+    else mutations.update.mutate({ id: task.id, input: request.input }, { ...done, onSuccess: (saved) => notice.success(`Status "${task.title}" menjadi ${STATUS_LABEL[saved.status]}.`) });
+  };
+
+  const saveOrder = () => {
+    notice.clear();
+    mutations.reorder.mutate(reorder.orderedIds, {
       onSuccess: () => {
-        setDeletingTask(null);
-        notice.success(`Tugas "${deletingTask.title}" berhasil dihapus.`);
+        reorder.reset();
+        notice.success('Urutan tugas tersimpan.');
       },
-      onError: (err) => {
-        const msg =
-          err instanceof ApiError && err.message === 'TASK_IN_USE'
-            ? 'Tugas ini sudah dikerjakan santri dan tidak dapat dihapus.'
-            : 'Gagal menghapus tugas.';
-        setDeleteError(msg);
+      onError: (error) => {
+        notice.failure(error);
+        reorder.reset();
       },
     });
   };
 
-  let listContent: JSX.Element;
-  if (tasksQuery.isPending) {
-    listContent = <ListSkeleton rows={5} />;
-  } else if (tasksQuery.isError) {
-    listContent = (
-      <ErrorState
-        error={tasksQuery.error}
-        onRetry={() => void tasksQuery.refetch()}
-        backTo="/admin"
-        backLabel="Kembali ke dashboard"
-      />
-    );
-  } else if (!tasksQuery.data || tasksQuery.data.length === 0) {
-    listContent = <EmptyState>Belum ada tugas. Klik "+ Tambah Tugas" untuk membuat tugas baru.</EmptyState>;
+  const confirmDelete = () => {
+    if (!deleting) return;
+    const target = deleting;
+    mutations.remove.mutate(target.id, {
+      onSuccess: () => {
+        notice.success(`Tugas "${target.title}" dihapus.`);
+        setDeleting(null);
+      },
+      onError: (error) => setDeleteError(error instanceof ApiError ? error.message : 'Data gagal dihapus. Silakan coba lagi.'),
+    });
+  };
+
+  const busy = reorder.dirty || mutations.update.isPending || mutations.publish.isPending;
+
+  let content: JSX.Element;
+  if (tasks.isPending) {
+    content = <ListSkeleton rows={2} />;
+  } else if (tasks.isError) {
+    content = <ErrorState error={tasks.error} onRetry={() => void tasks.refetch()} backTo="/admin/materi" backLabel="Kembali ke daftar materi" />;
+  } else if (reorder.items.length === 0) {
+    content = <EmptyState>Belum ada tugas pada materi ini. Tambahkan tugas pertama.</EmptyState>;
   } else {
-    listContent = (
-      <div className="overflow-x-auto rounded-lg border border-neutral-border bg-neutral-surface">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-neutral-border bg-neutral-surface-alt text-body-s font-semibold text-text-secondary">
-              <th className="py-3 px-4">Judul Tugas</th>
-              <th className="py-3 px-4">Jenis</th>
-              <th className="py-3 px-4">Tahapan & Materi</th>
-              <th className="py-3 px-4">Urutan</th>
-              <th className="py-3 px-4">Konten</th>
-              <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4 text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-border text-body">
-            {tasksQuery.data.map((task) => (
-              <tr key={task.id} className="hover:bg-neutral-surface-alt/40 transition">
-                <td className="py-3 px-4 font-medium text-text-primary">
-                  <Link
-                    to={`/admin/tugas/${task.id}`}
-                    className="hover:text-brand-primary underline decoration-dotted"
-                  >
-                    {task.title}
-                  </Link>
-                </td>
-                <td className="py-3 px-4">
-                  <Pill status={task.type === 'QUIZ' ? 'terbuka' : 'perhatian'}>
-                    {task.type === 'QUIZ' ? 'Dengar-Pilih' : 'Dengar-Tirukan'}
-                  </Pill>
-                </td>
-                <td className="py-3 px-4 text-body-s text-text-secondary">
-                  <div>{task.stageTitle}</div>
-                  {task.materialTitle && <div className="text-text-muted">{task.materialTitle}</div>}
-                </td>
-                <td className="py-3 px-4 text-text-secondary">#{task.order}</td>
-                <td className="py-3 px-4 text-body-s">
-                  {task.type === 'QUIZ' ? (
-                    <span className="font-medium text-text-primary">{task.questionCount} Soal</span>
-                  ) : (
-                    <span className="text-text-secondary">
-                      {task.referenceAudioId ? 'Audio Terpasang' : 'Belum Ada Audio'}
-                    </span>
-                  )}
-                </td>
-                <td className="py-3 px-4">
-                  <Pill status={task.status === 'ACTIVE' ? 'selesai' : 'terkunci'}>
-                    {task.status === 'ACTIVE' ? 'Aktif' : 'Draf'}
-                  </Pill>
-                </td>
-                <td className="py-3 px-4 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {task.status !== 'ACTIVE' && (
-                      <Button
-                        variant="outline"
-                        className="!h-9 !px-3 text-body-s"
-                        onClick={() => handlePublish(task)}
-                        isLoading={mutations.publish.isPending}
-                        title="Terbitkan tugas agar santri dapat mengerjakannya"
-                      >
-                        <CheckCircle2 size={14} className="mr-1 text-feedback-benar" /> Terbitkan
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      className="!h-9 !px-3 text-body-s"
-                      onClick={() => navigate(`/admin/tugas/${task.id}`)}
-                      title="Edit tugas dan butir soal"
-                    >
-                      <Edit2 size={14} className="mr-1" /> Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="!h-9 !px-3 text-body-s text-feedback-salah hover:bg-feedback-salah-soft disabled:opacity-40"
-                      onClick={() => {
-                        setDeletingTask(task);
-                        setDeleteError(null);
-                      }}
-                      disabled={task.isReferenced}
-                      title={task.isReferenced ? 'Tugas sudah dikerjakan, tidak dapat dihapus' : 'Hapus tugas'}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    content = (
+      <ReorderableList
+        items={reorder.items}
+        getId={(task) => task.id}
+        getLabel={(task) => task.title}
+        onMove={reorder.move}
+        disabled={mutations.reorder.isPending}
+        label={`Daftar tugas ${material.title}`}
+        renderItem={(task, index) => (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-body-s text-text-secondary">
+                {index + 1}. {TYPE_LABEL[task.type]}
+              </span>
+              <ContentStatusPill status={task.status} />
+              {!task.isComplete && <span className="text-label text-semantic-warning">BELUM LENGKAP</span>}
+            </div>
+            <p className="break-words text-h3 text-text-primary">{task.title}</p>
+            <div className="flex flex-wrap items-center gap-x-4 text-body-s text-text-secondary">
+              <span>{completenessText(task)}</span>
+              <Link to={`/admin/tugas/${encodeURIComponent(task.id)}`} className={textLink} aria-label={`Atur tugas: ${task.title}`}>
+                Atur tugas
+              </Link>
+            </div>
+            <ContentStatusActions
+              status={task.status}
+              isReferenced={task.isReferenced}
+              name={task.title}
+              disabled={busy}
+              onAction={(action, trigger) => onAction(task, action, trigger)}
+            />
+            {task.status !== 'ACTIVE' && !task.isComplete && (
+              <p className="text-body-s text-text-secondary">Lengkapi {task.type === 'QUIZ' ? 'soal' : 'audio referensi'} sebelum mengaktifkan tugas.</p>
+            )}
+          </div>
+        )}
+      />
     );
   }
 
-  const stageOptions = (stagesQuery.data ?? []).map((s) => ({ value: s.id, label: s.title }));
-  const materialOptions = [
-    { value: '', label: 'Tugas Akhir Tahapan (Tanpa Materi)' },
-    ...(materialsQuery.data ?? []).map((m) => ({ value: m.id, label: m.title })),
-  ];
-  const audioOptions = (audioQuery.data ?? []).map((a) => ({
-    value: a.id,
-    label: `${a.originalName} (${Math.round((a.durationMs || 0) / 1000)} dtk)`,
-  }));
-
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-8 max-w-6xl mx-auto">
-      {notice.element}
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-h1 font-bold text-text-primary">Manajemen Tugas & Soal</h1>
-          <p className="text-body text-text-secondary">
-            Kelola tugas evaluasi santri: Kuis (Dengar-Pilih) dan Peniruan Makhraj (Dengar-Tirukan).
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus size={18} className="mr-2" /> Tambah Tugas
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-body-s text-text-secondary">{tasks.data ? `${tasks.data.length} tugas` : ''}</p>
+        <Button
+          disabled={reorder.dirty}
+          onClick={(event) => {
+            triggerRef.current = event.currentTarget;
+            notice.clear();
+            setCreating(true);
+          }}
+        >
+          TAMBAH TUGAS
         </Button>
       </div>
-
-      <div className="w-full sm:w-64">
-        <SelectField
-          label="Filter Jenis Tugas"
-          value={selectedType}
-          onChange={(val) => setSelectedType(val)}
-        >
-          <option value="ALL">Semua Jenis</option>
-          <option value="QUIZ">Kuis (Dengar-Pilih)</option>
-          <option value="IMITATION">Imitasi (Dengar-Tirukan)</option>
-        </SelectField>
-      </div>
-
-      {listContent}
-
-      {/* Modal Tambah Tugas */}
-      {createOpen && (
-        <dialog
-          open
-          className="fixed inset-0 z-50 flex items-center justify-center w-full h-full bg-text-primary/40 backdrop:bg-text-primary/40 p-4"
-        >
-          <div className="w-full max-w-lg bg-neutral-surface rounded-lg shadow-raised p-6 flex flex-col gap-4">
-            <h2 className="text-h2 font-bold text-text-primary">Buat Tugas Baru</h2>
-            <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
-              <TextField
-                label="Judul Tugas"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Contoh: Kuis Dengar-Pilih Huruf Hijaiyah"
-                required
-              />
-
-              <SelectField
-                label="Jenis Tugas"
-                value={taskType}
-                onChange={(val) => setTaskType(val as TaskType)}
-              >
-                <option value="QUIZ">Kuis (Dengar-Pilih / Pilihan Ganda Audio)</option>
-                <option value="IMITATION">Imitasi (Dengar-Tirukan / Evaluasi Suara Santri)</option>
-              </SelectField>
-
-              <SelectField
-                label="Pilih Tahapan"
-                value={stageId}
-                onChange={(val) => {
-                  setStageId(val);
-                  setMaterialId('');
-                }}
-              >
-                <option value="">-- Pilih Tahapan --</option>
-                {stageOptions.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </SelectField>
-
-              {stageId && (
-                <SelectField
-                  label="Pilih Materi (Opsional)"
-                  value={materialId}
-                  onChange={(val) => setMaterialId(val)}
-                >
-                  {materialOptions.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </SelectField>
-              )}
-
-              <TextField
-                label="Nomor Urutan"
-                type="number"
-                min="1"
-                value={order}
-                onChange={(e) => setOrder(e.target.value)}
-                required
-              />
-
-              {taskType === 'IMITATION' && (
-                <SelectField
-                  label="Audio Referensi Makhraj (Wajib untuk Imitasi)"
-                  value={referenceAudioId}
-                  onChange={(val) => setReferenceAudioId(val)}
-                >
-                  <option value="">-- Pilih Audio Referensi --</option>
-                  {audioOptions.map((a) => (
-                    <option key={a.value} value={a.value}>
-                      {a.label}
-                    </option>
-                  ))}
-                </SelectField>
-              )}
-
-              {createError && (
-                <p className="rounded-md bg-feedback-salah-soft px-4 py-2 text-body-s text-feedback-salah">
-                  {createError}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setCreateOpen(false);
-                    setCreateError(null);
-                  }}
-                  disabled={mutations.create.isPending}
-                >
-                  Batal
-                </Button>
-                <Button type="submit" isLoading={mutations.create.isPending}>
-                  Buat & Lanjut Edit
-                </Button>
-              </div>
-            </form>
-          </div>
-        </dialog>
+      {notice.element}
+      {content}
+      {reorder.dirty && <ReorderBar onSave={saveOrder} onCancel={reorder.reset} saving={mutations.reorder.isPending} />}
+      {creating && (
+        <TaskCreateDialog
+          materialTitle={material.title}
+          onSubmit={async ({ type, title }) => {
+            const created = await mutations.create.mutateAsync({ materialId: material.id, type, title });
+            navigate(`/admin/tugas/${encodeURIComponent(created.id)}`);
+          }}
+          onClose={closeCreate}
+        />
       )}
-
-      {/* Delete Confirmation Dialog */}
-      {deletingTask && (
+      {deleting && (
         <ConfirmDialog
-          title="Hapus Tugas?"
-          message={`Apakah Anda yakin ingin menghapus tugas "${deletingTask.title}" beserta seluruh butir soalnya? Tindakan ini tidak dapat dibatalkan.`}
-          confirmLabel="HAPUS TUGAS"
-          confirmVariant="salah"
+          title="Hapus tugas?"
+          message={`Apakah Anda yakin ingin menghapus "${deleting.title}"? Tindakan ini tidak dapat dibatalkan.`}
+          confirmLabel="HAPUS"
           pending={mutations.remove.isPending}
           error={deleteError}
-          onConfirm={handleDeleteConfirm}
-          onClose={() => setDeletingTask(null)}
+          onConfirm={confirmDelete}
+          onClose={closeDelete}
         />
+      )}
+    </>
+  );
+}
+
+/** Pilihan materi untuk tahapan terpilih; materi pertama dipakai bila belum ada di URL. */
+function MaterialPicker({ stageId, materialId, onChange }: { stageId: string; materialId: string; onChange: (materialId: string) => void }): JSX.Element {
+  const materials = useAdminMaterials(stageId);
+  if (materials.isPending) return <ListSkeleton rows={2} />;
+  if (materials.isError) return <ErrorState error={materials.error} onRetry={() => void materials.refetch()} backTo="/admin/materi" backLabel="Kembali ke daftar materi" />;
+  const material = materials.data.find((item) => item.id === materialId) ?? materials.data[0];
+  if (!material) return <EmptyState>Tahapan ini belum memiliki materi. Tambahkan materi terlebih dahulu di halaman Materi.</EmptyState>;
+  return (
+    <>
+      <div className="sm:max-w-md">
+        <SelectField label="Materi" value={material.id} onChange={onChange}>
+          {materials.data.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.code} — {item.title} ({STATUS_LABEL[item.status]})
+            </option>
+          ))}
+        </SelectField>
+      </div>
+      <TaskList key={material.id} material={material} />
+    </>
+  );
+}
+
+// Manajemen Tugas (SDD 5.17, 3.7; UI-ADMIN-TASK-01 sampai 03; FR-TASK-03, 05, 06).
+// [ASUMSI] SDD 7.7 tidak punya bagian UI tugas dan tidak ada desain Figma admin; pola mengikuti halaman Materi (A4).
+export function TaskManagementPage(): JSX.Element {
+  const stages = useAdminStages();
+  const [params, setParams] = useSearchParams();
+  const stage = stages.data?.find((item) => item.id === params.get('stageId')) ?? stages.data?.[0];
+
+  return (
+    <div className="mx-auto flex max-w-[1040px] flex-col gap-6">
+      <h1 className="sr-only">Manajemen Tugas</h1>
+      {stages.isPending ? (
+        <ListSkeleton rows={3} />
+      ) : stages.isError ? (
+        <ErrorState error={stages.error} onRetry={() => void stages.refetch()} backTo="/admin" backLabel="Kembali ke dashboard" />
+      ) : !stage ? (
+        <EmptyState>Belum ada tahapan. Tambahkan tahapan terlebih dahulu di halaman Tahapan.</EmptyState>
+      ) : (
+        <>
+          <div className="sm:max-w-md">
+            <SelectField label="Tahapan" value={stage.id} onChange={(stageId) => setParams({ stageId })}>
+              {stages.data.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.code} — {item.title} ({STATUS_LABEL[item.status]})
+                </option>
+              ))}
+            </SelectField>
+          </div>
+          <MaterialPicker key={stage.id} stageId={stage.id} materialId={params.get('materialId') ?? ''} onChange={(materialId) => setParams({ stageId: stage.id, materialId })} />
+        </>
       )}
     </div>
   );

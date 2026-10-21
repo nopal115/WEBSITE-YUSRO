@@ -1,528 +1,358 @@
-import { ArrowLeft, CheckCircle2, Edit2, Plus, Trash2, Volume2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useId, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { OnDemandAudioPlayer } from '../../../components/audio/OnDemandAudioPlayer';
 import { Button } from '../../../components/ui/Button';
-import { Card } from '../../../components/ui/Card';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
-import { Pill } from '../../../components/ui/Pill';
 import { SelectField } from '../../../components/ui/SelectField';
 import { TextField } from '../../../components/ui/TextField';
 import { ApiError } from '../../../lib/api/ApiError';
-import { EmptyState, ErrorState, ListSkeleton } from '../../learning/QueryStates';
+import { ErrorState, ListSkeleton } from '../../learning/QueryStates';
 import { adminAudioApi } from '../audio/api';
 import { useAdminAudioList } from '../audio/hooks';
+import { formatDuration } from '../audio/view';
+import { ContentStatusActions, ContentStatusPill } from '../content/ContentStatusActions';
 import { useContentNotice } from '../content/useContentNotice';
-import { useAdminTaskDetail, useTaskMutations } from './hooks';
-import type { QuestionInput, QuestionItem } from './types';
+import { STATUS_LABEL, type ContentAction } from '../content/view';
+import { useAdminTask, useQuestionMutations, useTaskMutations, useTaskQuestions } from './hooks';
+import { QuestionFormDialog } from './QuestionFormDialog';
+import type { AdminQuestion, AdminTaskDetail, TaskUpdateInput } from './types';
+import { statusRequest, TITLE_MAX, TYPE_LABEL } from './view';
 
-export function TaskEditorPage(): JSX.Element {
-  const { taskId = '' } = useParams<{ taskId: string }>();
-  const navigate = useNavigate();
+const textButton =
+  'min-h-11 rounded-md px-3 text-body text-brand-primary hover:bg-neutral-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary disabled:cursor-not-allowed disabled:text-text-muted';
+const REFERENCE_FILTER = { kind: 'REFERENCE', status: 'ACTIVE' } as const;
 
-  const taskQuery = useAdminTaskDetail(taskId);
+type FieldErrors = { title?: string; instruction?: string; arabicText?: string; referenceAudioId?: string; general?: string };
+
+/** Pengaturan tugas (UI-ADMIN-TASK-02, FR-TASK-04): judul, instruksi, dan untuk Dengar-Tirukan audio referensi. */
+function TaskSettingsForm({ task, onSaved }: { task: AdminTaskDetail; onSaved: (text: string) => void }): JSX.Element {
   const mutations = useTaskMutations();
-  const audioListQuery = useAdminAudioList();
-  const notice = useContentNotice();
+  const references = useAdminAudioList(REFERENCE_FILTER);
+  const instructionId = useId();
+  const arabicId = useId();
+  const [title, setTitle] = useState(task.title);
+  const [instruction, setInstruction] = useState(task.instruction ?? '');
+  const [arabicText, setArabicText] = useState(task.arabicText ?? '');
+  const [referenceAudioId, setReferenceAudioId] = useState(task.referenceAudioId ?? '');
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const imitation = task.type === 'IMITATION';
 
-  // Edit Task Metadata state
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskOrder, setTaskOrder] = useState('1');
-  const [taskRefAudioId, setTaskRefAudioId] = useState('');
-  const [isSavingMeta, setIsSavingMeta] = useState(false);
-
-  // Question Modal state
-  const [questionModalOpen, setQuestionModalOpen] = useState(false);
-  const [editingQuestion, setEditingQuestion] = useState<QuestionItem | null>(null);
-  const [prompt, setPrompt] = useState('');
-  const [audioId, setAudioId] = useState('');
-  const [options, setOptions] = useState<Array<{ id?: string; text: string; isCorrect: boolean }>>([
-    { text: '', isCorrect: true },
-    { text: '', isCorrect: false },
-    { text: '', isCorrect: false },
-    { text: '', isCorrect: false },
-  ]);
-  const [questionError, setQuestionError] = useState<string | null>(null);
-
-  // Delete Question state
-  const [deletingQuestion, setDeletingQuestion] = useState<QuestionItem | null>(null);
-  const [deleteQuestionError, setDeleteQuestionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (taskQuery.data) {
-      setTaskTitle(taskQuery.data.title);
-      setTaskOrder(String(taskQuery.data.order));
-      setTaskRefAudioId(taskQuery.data.referenceAudioId || '');
-    }
-  }, [taskQuery.data]);
-
-  const handleSaveMeta = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskTitle.trim()) {
-      notice.failureText('Judul tugas tidak boleh kosong.');
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const trimmed = title.trim();
+    if (!trimmed) {
+      setErrors({ title: 'Judul wajib diisi.' });
       return;
     }
-    setIsSavingMeta(true);
+    const input: TaskUpdateInput = { title: trimmed, instruction: instruction.trim() };
+    if (imitation) {
+      input.arabicText = arabicText.trim();
+      if (referenceAudioId && referenceAudioId !== task.referenceAudioId) input.referenceAudioId = referenceAudioId;
+    }
+    setErrors({});
     mutations.update.mutate(
+      { id: task.id, input },
       {
-        id: taskId,
-        input: {
-          title: taskTitle.trim(),
-          order: Number(taskOrder) || 1,
-          referenceAudioId: taskQuery.data?.type === 'IMITATION' ? taskRefAudioId || null : null,
-        },
-      },
-      {
-        onSuccess: () => {
-          setIsSavingMeta(false);
-          notice.success('Informasi tugas berhasil diperbarui.');
-        },
-        onError: (err) => {
-          setIsSavingMeta(false);
-          notice.failureText(err instanceof ApiError ? err.message : 'Gagal memperbarui informasi tugas.');
+        onSuccess: () => onSaved('Data berhasil disimpan.'),
+        onError: (error) => {
+          const details = error instanceof ApiError && Array.isArray(error.details) ? (error.details as { field?: string; message?: string }[]) : [];
+          const fieldError = (name: string) => details.find((item) => item.field === name)?.message;
+          const referenceInactive = error instanceof ApiError && error.code === 'TASK_REFERENCE_NOT_ACTIVE';
+          setErrors({
+            title: fieldError('title'),
+            instruction: fieldError('instruction'),
+            arabicText: fieldError('arabicText'),
+            referenceAudioId: fieldError('referenceAudioId') ?? (referenceInactive ? error.message : undefined),
+            general: details.length === 0 && !referenceInactive ? (error instanceof ApiError ? error.message : 'Data gagal disimpan. Silakan coba lagi.') : undefined,
+          });
         },
       },
     );
   };
 
-  const handlePublish = () => {
-    notice.clear();
-    mutations.publish.mutate(taskId, {
-      onSuccess: () => {
-        notice.success('Tugas berhasil diterbitkan dan siap dikerjakan santri.');
-      },
-      onError: (err) => {
-        const msg =
-          err instanceof ApiError
-            ? err.message === 'TASK_INCOMPLETE'
-              ? 'Tugas belum lengkap: Kuis harus memiliki minimal 1 soal dengan minimal 2 opsi, atau imitasi belum memiliki audio referensi.'
-              : err.message === 'TASK_ANSWER_KEY_INVALID'
-                ? 'Kunci jawaban belum valid: Setiap soal harus memiliki tepat satu jawaban benar.'
-                : err.message === 'TASK_REFERENCE_NOT_ACTIVE'
-                  ? 'Audio referensi imitasi tidak aktif.'
-                  : err.message
-            : 'Gagal menerbitkan tugas.';
-        notice.failureText(msg);
-      },
-    });
-  };
-
-  const openAddQuestion = () => {
-    setEditingQuestion(null);
-    setPrompt('');
-    setAudioId('');
-    setOptions([
-      { text: '', isCorrect: true },
-      { text: '', isCorrect: false },
-      { text: '', isCorrect: false },
-      { text: '', isCorrect: false },
-    ]);
-    setQuestionError(null);
-    setQuestionModalOpen(true);
-  };
-
-  const openEditQuestion = (q: QuestionItem) => {
-    setEditingQuestion(q);
-    setPrompt(q.prompt);
-    setAudioId(q.audioId || '');
-    setOptions(
-      q.options.map((opt) => ({
-        id: opt.id,
-        text: opt.text || opt.label || '',
-        isCorrect: opt.isCorrect,
-      })),
-    );
-    setQuestionError(null);
-    setQuestionModalOpen(true);
-  };
-
-  const handleQuestionSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prompt.trim()) {
-      setQuestionError('Teks soal wajib diisi.');
-      return;
-    }
-    const filledOptions = options.filter((o) => o.text.trim() !== '');
-    if (filledOptions.length < 2) {
-      setQuestionError('Soal harus memiliki minimal 2 pilihan jawaban.');
-      return;
-    }
-    const correctCount = filledOptions.filter((o) => o.isCorrect).length;
-    if (correctCount !== 1) {
-      setQuestionError('Tepat satu pilihan jawaban harus ditandai sebagai BENAR.');
-      return;
-    }
-
-    setQuestionError(null);
-    const input: QuestionInput = {
-      prompt: prompt.trim(),
-      audioId: audioId || null,
-      options: filledOptions.map((o) => ({
-        id: o.id,
-        text: o.text.trim(),
-        isCorrect: o.isCorrect,
-      })),
-    };
-
-    if (editingQuestion) {
-      mutations.updateQuestion.mutate(
-        { questionId: editingQuestion.id, input },
-        {
-          onSuccess: () => {
-            setQuestionModalOpen(false);
-            notice.success('Soal berhasil diperbarui.');
-          },
-          onError: (err) => {
-            setQuestionError(err instanceof ApiError ? err.message : 'Gagal memperbarui soal.');
-          },
-        },
-      );
-    } else {
-      mutations.addQuestion.mutate(
-        { taskId, input },
-        {
-          onSuccess: () => {
-            setQuestionModalOpen(false);
-            notice.success('Soal berhasil ditambahkan.');
-          },
-          onError: (err) => {
-            setQuestionError(err instanceof ApiError ? err.message : 'Gagal menambahkan soal.');
-          },
-        },
-      );
-    }
-  };
-
-  const handleDeleteQuestionConfirm = () => {
-    if (!deletingQuestion) return;
-    setDeleteQuestionError(null);
-    mutations.deleteQuestion.mutate(deletingQuestion.id, {
-      onSuccess: () => {
-        setDeletingQuestion(null);
-        notice.success('Soal berhasil dihapus.');
-      },
-      onError: (err) => {
-        setDeleteQuestionError(err instanceof ApiError ? err.message : 'Gagal menghapus soal.');
-      },
-    });
-  };
-
-  if (taskQuery.isPending) {
-    return (
-      <div className="p-8 max-w-4xl mx-auto">
-        <ListSkeleton rows={4} />
-      </div>
-    );
-  }
-
-  if (taskQuery.isError || !taskQuery.data) {
-    return (
-      <div className="p-8 max-w-4xl mx-auto">
-        <ErrorState
-          error={taskQuery.error}
-          onRetry={() => void taskQuery.refetch()}
-          backTo="/admin/tugas"
-          backLabel="Kembali ke daftar tugas"
-        />
-      </div>
-    );
-  }
-
-  const task = taskQuery.data;
-  const audioOptions = (audioListQuery.data ?? []).map((a) => ({
-    value: a.id,
-    label: `${a.originalName} (${Math.round((a.durationMs || 0) / 1000)} dtk)`,
-  }));
+  // Audio yang sedang terpasang tetap tampil walau sudah diarsipkan, agar admin tahu perlu menggantinya.
+  const current = task.referenceAudio;
+  const choices = references.data ?? [];
+  const currentMissing = current && !choices.some((item) => item.id === current.id);
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-8 max-w-5xl mx-auto">
-      {notice.element}
-
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/admin/tugas"
-            className="p-2 rounded-md hover:bg-neutral-surface-alt transition text-text-secondary"
-            title="Kembali ke daftar tugas"
-          >
-            <ArrowLeft size={20} />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-h2 font-bold text-text-primary">{task.title}</h1>
-              <Pill status={task.type === 'QUIZ' ? 'terbuka' : 'perhatian'}>
-                {task.type === 'QUIZ' ? 'Dengar-Pilih' : 'Dengar-Tirukan'}
-              </Pill>
-              <Pill status={task.status === 'ACTIVE' ? 'selesai' : 'terkunci'}>
-                {task.status === 'ACTIVE' ? 'Aktif' : 'Draf'}
-              </Pill>
-            </div>
-            <p className="text-body-s text-text-secondary mt-1">
-              Tahapan: <strong>{task.stageTitle}</strong>
-              {task.materialTitle ? ` • Materi: ${task.materialTitle}` : ''}
-            </p>
-          </div>
-        </div>
-
-        {task.status !== 'ACTIVE' && (
-          <Button
-            onClick={handlePublish}
-            isLoading={mutations.publish.isPending}
-            className="shrink-0"
-          >
-            <CheckCircle2 size={18} className="mr-2 text-feedback-benar" /> Terbitkan Tugas
-          </Button>
-        )}
+    <form className="flex flex-col gap-5 rounded-lg border-2 border-neutral-border bg-neutral-surface p-5 shadow-card" onSubmit={submit} noValidate>
+      <h2 className="text-h3">Pengaturan tugas</h2>
+      <TextField label="Judul" value={title} maxLength={TITLE_MAX} onChange={(event) => setTitle(event.target.value)} error={errors.title} />
+      <div>
+        <label htmlFor={instructionId} className={`flex flex-col gap-1 rounded-sm border-2 bg-neutral-surface px-5 py-3 ${errors.instruction ? 'border-feedback-salah' : 'border-neutral-border-strong focus-within:border-brand-primary'}`}>
+          <span className="text-body-s text-text-muted">Instruksi (opsional)</span>
+          <textarea id={instructionId} value={instruction} rows={2} onChange={(event) => setInstruction(event.target.value)} className="w-full resize-y bg-transparent p-0 text-body text-text-primary outline-none" />
+        </label>
+        {errors.instruction && <p className="mt-1 text-body-s text-feedback-salah">{errors.instruction}</p>}
       </div>
-
-      {/* Form Informasi Tugas */}
-      <Card className="p-6">
-        <h2 className="text-h3 font-bold text-text-primary mb-4">Pengaturan Tugas</h2>
-        <form onSubmit={handleSaveMeta} className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <TextField
-              label="Judul Tugas"
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
-              required
-            />
-            <TextField
-              label="Nomor Urutan"
-              type="number"
-              min="1"
-              value={taskOrder}
-              onChange={(e) => setTaskOrder(e.target.value)}
-              required
-            />
-          </div>
-
-          {task.type === 'IMITATION' && (
-            <div className="flex flex-col gap-2">
-              <SelectField
-                label="Audio Referensi Makhraj (Wajib)"
-                value={taskRefAudioId}
-                onChange={(val) => setTaskRefAudioId(val)}
-              >
-                <option value="">-- Tanpa Audio --</option>
-                {audioOptions.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-              </SelectField>
-              {task.referenceAudioId && (
-                <div className="mt-2 p-3 bg-neutral-surface-alt rounded-md flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-body-s font-medium text-text-primary">
-                    <Volume2 size={18} className="text-brand-primary" />
-                    <span>{task.referenceAudio?.originalName ?? 'Audio Referensi'}</span>
-                  </div>
-                  <OnDemandAudioPlayer
-                    fetchUrl={async () => (await adminAudioApi.getUrl(task.referenceAudioId!)).url}
-                    label="Audio Referensi"
-                    buttonText="Putar Referensi"
-                  />
-                </div>
+      {imitation && (
+        <>
+          <div className="flex flex-col gap-2">
+            <SelectField label="Audio referensi" value={referenceAudioId} onChange={setReferenceAudioId}>
+              <option value="">Pilih audio referensi</option>
+              {currentMissing && current && (
+                <option value={current.id}>
+                  {current.originalName} ({current.status === 'ACTIVE' ? 'aktif' : 'arsip'})
+                </option>
               )}
-            </div>
-          )}
-
-          <div className="flex justify-end pt-2">
-            <Button type="submit" variant="outline" isLoading={isSavingMeta}>
-              Simpan Pengaturan
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {/* Editor Soal (Khusus Kuis / Dengar-Pilih) */}
-      {task.type === 'QUIZ' && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-h2 font-bold text-text-primary">Butir Soal ({task.questions.length})</h2>
-              <p className="text-body-s text-text-secondary">
-                Setiap soal memuat instruksi/pertanyaan, opsi audio suara makhraj, dan 2-4 pilihan jawaban.
-              </p>
-            </div>
-            <Button onClick={openAddQuestion}>
-              <Plus size={18} className="mr-2" /> Tambah Soal
-            </Button>
-          </div>
-
-          {task.questions.length === 0 ? (
-            <EmptyState>Belum ada soal pada kuis ini. Tambahkan minimal 1 soal untuk menerbitkan tugas.</EmptyState>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {task.questions.map((q, idx) => (
-                <Card key={q.id} className="p-5 flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-brand-primary/10 text-brand-primary font-bold text-body-s">
-                        {idx + 1}
-                      </span>
-                      <h3 className="text-body font-semibold text-text-primary">{q.prompt}</h3>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        className="!h-9 !px-3 text-body-s"
-                        onClick={() => openEditQuestion(q)}
-                        title="Edit soal"
-                      >
-                        <Edit2 size={16} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="!h-9 !px-3 text-body-s text-feedback-salah hover:bg-feedback-salah-soft"
-                        onClick={() => {
-                          setDeletingQuestion(q);
-                          setDeleteQuestionError(null);
-                        }}
-                        title="Hapus soal"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {q.audioId && (
-                    <div className="flex items-center gap-2 pl-10">
-                      <OnDemandAudioPlayer
-                        fetchUrl={async () => (await adminAudioApi.getUrl(q.audioId!)).url}
-                        label={`Soal ${idx + 1}`}
-                        buttonText="Putar Audio Soal"
-                      />
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-10 mt-1">
-                    {q.options.map((opt) => (
-                      <div
-                        key={opt.id ?? opt.text}
-                        className={`p-3 rounded-md border text-body-s flex items-center justify-between ${
-                          opt.isCorrect
-                            ? 'bg-feedback-benar-soft border-feedback-benar text-feedback-benar font-medium'
-                            : 'bg-neutral-surface border-neutral-border text-text-primary'
-                        }`}
-                      >
-                        <span>{opt.text || opt.label}</span>
-                        {opt.isCorrect && (
-                          <span className="text-xs uppercase font-bold tracking-wider">Jawaban Benar</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
+              {choices.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.originalName} · versi {item.version} ({formatDuration(item.durationMs)})
+                </option>
               ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Modal Tambah / Edit Soal */}
-      {questionModalOpen && (
-        <dialog
-          open
-          className="fixed inset-0 z-50 flex items-center justify-center w-full h-full bg-text-primary/40 backdrop:bg-text-primary/40 p-4"
-        >
-          <div className="w-full max-w-lg bg-neutral-surface rounded-lg shadow-raised p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-h2 font-bold text-text-primary">
-              {editingQuestion ? 'Edit Butir Soal' : 'Tambah Butir Soal Kuis'}
-            </h2>
-            <form onSubmit={handleQuestionSubmit} className="flex flex-col gap-4">
-              <TextField
-                label="Pertanyaan / Instruksi Soal"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Contoh: Manakah huruf yang dibaca dengan makhraj tersebut?"
-                required
-              />
-
-              <SelectField
-                label="Audio Soal (Opsional)"
-                value={audioId}
-                onChange={(val) => setAudioId(val)}
-              >
-                <option value="">-- Tanpa Audio --</option>
-                {audioOptions.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-              </SelectField>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-body-s font-semibold text-text-primary">
-                  Pilihan Jawaban (Tandai Tepat Satu Jawaban Benar)
-                </label>
-                {options.map((opt, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="correctOption"
-                      checked={opt.isCorrect}
-                      onChange={() => {
-                        setOptions(options.map((o, index) => ({ ...o, isCorrect: index === i })));
-                      }}
-                      className="w-4 h-4 text-brand-primary focus:ring-brand-primary"
-                      title="Tandai sebagai jawaban benar"
-                    />
-                    <input
-                      type="text"
-                      value={opt.text}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setOptions(options.map((o, index) => (index === i ? { ...o, text: val } : o)));
-                      }}
-                      placeholder={`Pilihan ${String.fromCharCode(65 + i)}`}
-                      className="flex-1 rounded-md border border-neutral-border px-3 py-2 text-body focus:outline-none focus:border-brand-primary"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {questionError && (
-                <p className="rounded-md bg-feedback-salah-soft px-4 py-2 text-body-s text-feedback-salah">
-                  {questionError}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setQuestionModalOpen(false);
-                    setQuestionError(null);
-                  }}
-                  disabled={mutations.addQuestion.isPending || mutations.updateQuestion.isPending}
-                >
-                  Batal
-                </Button>
-                <Button
-                  type="submit"
-                  isLoading={mutations.addQuestion.isPending || mutations.updateQuestion.isPending}
-                >
-                  {editingQuestion ? 'Perbarui Soal' : 'Simpan Soal'}
-                </Button>
-              </div>
-            </form>
+            </SelectField>
+            {errors.referenceAudioId && <p className="text-body-s text-feedback-salah">{errors.referenceAudioId}</p>}
+            {references.isError && <p className="text-body-s text-text-secondary">Daftar audio referensi gagal dimuat.</p>}
+            {current && current.status !== 'ACTIVE' && <p className="text-body-s text-semantic-warning">Audio referensi yang terpasang sudah diarsipkan. Pilih audio referensi yang aktif.</p>}
+            <p className="text-body-s text-text-secondary">
+              Unggah atau ganti versi audio referensi di halaman{' '}
+              <Link to="/admin/audio?kind=REFERENCE" className="text-brand-primary hover:underline">
+                Audio
+              </Link>
+              .
+            </p>
+            {referenceAudioId && <OnDemandAudioPlayer key={referenceAudioId} fetchUrl={async () => (await adminAudioApi.getUrl(referenceAudioId)).url} label="pratinjau audio referensi" buttonText="Putar pratinjau" />}
           </div>
-        </dialog>
+          <div>
+            {/* [ASUMSI] Teks yang ditirukan tampil di halaman Dengar-Tirukan Santri; SDD 4.5.9 tidak menyebut kolomnya. */}
+            <label htmlFor={arabicId} className={`flex flex-col gap-1 rounded-sm border-2 bg-neutral-surface px-5 py-3 ${errors.arabicText ? 'border-feedback-salah' : 'border-neutral-border-strong focus-within:border-brand-primary'}`}>
+              <span className="text-body-s text-text-muted">Teks Arab yang ditirukan (opsional)</span>
+              <textarea id={arabicId} lang="ar" dir="rtl" value={arabicText} rows={2} onChange={(event) => setArabicText(event.target.value)} className="w-full resize-y bg-transparent p-0 font-arabic text-arabic-s text-text-primary outline-none" />
+            </label>
+            {errors.arabicText && <p className="mt-1 text-body-s text-feedback-salah">{errors.arabicText}</p>}
+          </div>
+          {/* FR-TASK-04 "Evaluasi otomatis": selalu aktif untuk Dengar-Tirukan, bukan pengaturan. */}
+          <p className="rounded-md bg-brand-primary-soft px-5 py-3 text-body-s text-brand-primary">Evaluasi otomatis: rekaman Santri dinilai otomatis oleh sistem dengan membandingkannya dengan audio referensi.</p>
+        </>
       )}
+      {errors.general && (
+        <p className="rounded-md bg-feedback-salah-soft px-5 py-3 text-body-s text-feedback-salah" role="alert">
+          {errors.general}
+        </p>
+      )}
+      <div className="flex justify-end">
+        <Button type="submit" isLoading={mutations.update.isPending} loadingText="MENYIMPAN…">
+          SIMPAN
+        </Button>
+      </div>
+    </form>
+  );
+}
 
-      {/* Delete Question Confirmation Dialog */}
-      {deletingQuestion && (
+/** Daftar soal Dengar-Pilih (FR-TASK-01/02). Kunci jawaban ditandai dengan teks, bukan hanya warna. */
+function QuestionList({ task, onNotice }: { task: AdminTaskDetail; onNotice: (text: string) => void }): JSX.Element {
+  const questions = useTaskQuestions(task.id, true);
+  const mutations = useQuestionMutations(task.id);
+  const [form, setForm] = useState<{ question?: AdminQuestion } | null>(null);
+  const [deleting, setDeleting] = useState<AdminQuestion | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  const closeForm = useCallback((saved: boolean) => {
+    setForm(null);
+    if (!saved) triggerRef.current?.focus();
+  }, []);
+  const closeDelete = useCallback(() => {
+    setDeleting(null);
+    setDeleteError(null);
+    triggerRef.current?.focus();
+  }, []);
+
+  const confirmDelete = () => {
+    if (!deleting) return;
+    mutations.remove.mutate(deleting.id, {
+      onSuccess: () => {
+        onNotice('Soal dihapus.');
+        setDeleting(null);
+      },
+      onError: (error) => setDeleteError(error instanceof ApiError ? error.message : 'Soal gagal dihapus. Silakan coba lagi.'),
+    });
+  };
+
+  return (
+    <section className="flex flex-col gap-4" aria-labelledby="question-heading">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 id="question-heading" className="text-h3">
+          Soal {questions.data ? `(${questions.data.length})` : ''}
+        </h2>
+        <Button
+          onClick={(event) => {
+            triggerRef.current = event.currentTarget;
+            setForm({});
+          }}
+        >
+          TAMBAH SOAL
+        </Button>
+      </div>
+      {questions.isPending ? (
+        <ListSkeleton rows={2} />
+      ) : questions.isError ? (
+        <ErrorState error={questions.error} onRetry={() => void questions.refetch()} backTo="/admin/tugas" backLabel="Kembali ke daftar tugas" />
+      ) : questions.data.length === 0 ? (
+        <p className="rounded-lg border-2 border-dashed border-neutral-border p-5 text-body text-text-secondary">Belum ada soal. Tugas Dengar-Pilih membutuhkan minimal satu soal sebelum diaktifkan.</p>
+      ) : (
+        <ol className="flex flex-col gap-4">
+          {questions.data.map((question, index) => (
+            <li key={question.id} className="flex flex-col gap-3 rounded-lg border-2 border-neutral-border bg-neutral-surface p-5 shadow-card">
+              <p className="text-body-s text-text-secondary">Soal {index + 1}</p>
+              <p className="break-words text-body-l text-text-primary">{question.prompt}</p>
+              <p className="break-words text-body-s text-text-secondary">Audio: {question.audio ? question.audio.originalName : 'tidak ditemukan'}</p>
+              {question.audio && <OnDemandAudioPlayer fetchUrl={async () => (await adminAudioApi.getUrl(question.audioId)).url} label={`audio soal ${index + 1}`} buttonText="Putar" />}
+              <ul className="flex flex-col gap-2" aria-label={`Pilihan jawaban soal ${index + 1}`}>
+                {question.options.map((option) => (
+                  <li key={option.id} className={`flex flex-wrap items-center gap-3 rounded-md border px-4 py-2 ${option.isCorrect ? 'border-feedback-benar bg-feedback-benar-soft' : 'border-neutral-border'}`}>
+                    {option.arabicLabel && (
+                      <span lang="ar" dir="rtl" className="font-arabic text-arabic-s">
+                        {option.arabicLabel}
+                      </span>
+                    )}
+                    <span className="text-body">{option.label}</span>
+                    {option.isCorrect && <span className="text-label text-feedback-benar">JAWABAN BENAR</span>}
+                  </li>
+                ))}
+              </ul>
+              <div className="-mx-3 flex flex-wrap">
+                <button
+                  type="button"
+                  className={textButton}
+                  onClick={(event) => {
+                    triggerRef.current = event.currentTarget;
+                    setForm({ question });
+                  }}
+                  aria-label={`Ubah soal ${index + 1}`}
+                >
+                  Ubah
+                </button>
+                <button
+                  type="button"
+                  className={`${textButton} text-feedback-salah`}
+                  onClick={(event) => {
+                    triggerRef.current = event.currentTarget;
+                    setDeleting(question);
+                  }}
+                  aria-label={`Hapus soal ${index + 1}`}
+                >
+                  Hapus
+                </button>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+      {form && (
+        <QuestionFormDialog
+          initial={form.question}
+          onSubmit={async (input) => {
+            if (form.question) await mutations.update.mutateAsync({ id: form.question.id, input });
+            else await mutations.create.mutateAsync(input);
+            onNotice(form.question ? 'Soal tersimpan.' : 'Soal ditambahkan.');
+          }}
+          onClose={closeForm}
+        />
+      )}
+      {deleting && (
         <ConfirmDialog
-          title="Hapus Soal?"
-          message={`Apakah Anda yakin ingin menghapus soal "${deletingQuestion.prompt}"?`}
-          confirmLabel="HAPUS SOAL"
-          confirmVariant="salah"
-          pending={mutations.deleteQuestion.isPending}
-          error={deleteQuestionError}
-          onConfirm={handleDeleteQuestionConfirm}
-          onClose={() => setDeletingQuestion(null)}
+          title="Hapus soal?"
+          message="Soal ini akan dihapus dari tugas. Riwayat pengerjaan lama tetap tersimpan."
+          confirmLabel="HAPUS"
+          pending={mutations.remove.isPending}
+          error={deleteError}
+          onConfirm={confirmDelete}
+          onClose={closeDelete}
+        />
+      )}
+    </section>
+  );
+}
+
+// Penyunting Tugas (SDD 5.17, 3.7.3; UI-ADMIN-TASK-02/03, UI-ADMIN-QUESTION-01/02).
+// [ASUMSI] SDD 7.7 tidak punya bagian UI tugas dan tidak ada desain Figma admin.
+export function TaskEditorPage(): JSX.Element {
+  const { taskId = '' } = useParams();
+  const task = useAdminTask(taskId);
+  const navigate = useNavigate();
+  const mutations = useTaskMutations();
+  const notice = useContentNotice();
+  const [missing, setMissing] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  if (task.isPending) return <ListSkeleton rows={4} />;
+  if (task.isError) return <ErrorState error={task.error} onRetry={() => void task.refetch()} backTo="/admin/tugas" backLabel="Kembali ke daftar tugas" />;
+  const data = task.data;
+  const backTo = `/admin/tugas?stageId=${encodeURIComponent(data.stageId)}&materialId=${encodeURIComponent(data.materialId)}`;
+
+  const success = (text: string) => {
+    setMissing([]);
+    notice.success(text);
+  };
+
+  const onAction = (action: ContentAction, trigger: HTMLElement) => {
+    triggerRef.current = trigger;
+    notice.clear();
+    setMissing([]);
+    const request = statusRequest(action);
+    if (request.kind === 'delete') {
+      setDeleting(true);
+      return;
+    }
+    const onError = (error: unknown) => {
+      // 422 TASK_INCOMPLETE: daftar komponen yang belum lengkap (SDD 3.7.3).
+      const details = error instanceof ApiError && error.code === 'TASK_INCOMPLETE' && Array.isArray(error.details) ? (error.details as { message?: string }[]) : [];
+      setMissing(details.map((item) => item.message ?? '').filter(Boolean));
+      notice.failure(error);
+    };
+    const onSettled = () => triggerRef.current?.focus();
+    if (request.kind === 'publish') mutations.publish.mutate(data.id, { onSuccess: () => success('Tugas diaktifkan.'), onError, onSettled });
+    else mutations.update.mutate({ id: data.id, input: request.input }, { onSuccess: (saved) => success(`Status tugas menjadi ${STATUS_LABEL[saved.status]}.`), onError, onSettled });
+  };
+
+  return (
+    <div className="mx-auto flex max-w-[1040px] flex-col gap-6">
+      <Link to={backTo} className="flex min-h-11 w-fit items-center text-body text-brand-primary hover:underline">
+        ← Kembali ke daftar tugas
+      </Link>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-body-s text-text-secondary">{TYPE_LABEL[data.type]}</span>
+          <ContentStatusPill status={data.status} />
+        </div>
+        <h1 className="break-words text-h2">{data.title}</h1>
+        <p className="break-words text-body-s text-text-secondary">
+          {data.stageTitle} · {data.materialTitle}
+        </p>
+        <ContentStatusActions status={data.status} isReferenced={data.isReferenced} name={data.title} disabled={mutations.update.isPending || mutations.publish.isPending} onAction={onAction} />
+      </div>
+      {notice.element}
+      {missing.length > 0 && (
+        <ul className="list-disc rounded-md bg-feedback-salah-soft py-3 pl-10 pr-5 text-body-s text-feedback-salah">
+          {missing.map((text) => (
+            <li key={text}>{text}</li>
+          ))}
+        </ul>
+      )}
+      <TaskSettingsForm key={data.id} task={data} onSaved={success} />
+      {data.type === 'QUIZ' && <QuestionList task={data} onNotice={success} />}
+      {deleting && (
+        <ConfirmDialog
+          title="Hapus tugas?"
+          message={`Apakah Anda yakin ingin menghapus "${data.title}"? Tindakan ini tidak dapat dibatalkan.`}
+          confirmLabel="HAPUS"
+          pending={mutations.remove.isPending}
+          error={deleteError}
+          onConfirm={() =>
+            mutations.remove.mutate(data.id, {
+              onSuccess: () => navigate(backTo, { replace: true }),
+              onError: (error) => setDeleteError(error instanceof ApiError ? error.message : 'Data gagal dihapus. Silakan coba lagi.'),
+            })
+          }
+          onClose={() => {
+            setDeleting(false);
+            setDeleteError(null);
+            triggerRef.current?.focus();
+          }}
         />
       )}
     </div>

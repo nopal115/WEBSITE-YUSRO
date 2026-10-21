@@ -17,6 +17,9 @@ export interface MockUser {
   role: UserRole;
   status: AccountStatus;
   joinedAt: string;
+  /** PROPOSED API CONTRACT - sinkronkan dengan backend (kolom belum ada di tabel User). */
+  phone?: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface QuizAttemptRecord {
@@ -29,6 +32,8 @@ export interface QuizAttemptRecord {
   questionCount: number;
   results: QuizQuestionResult[];
   submittedAt: string;
+  /** Snapshot soal saat dikerjakan (SDD 3.7.5); perubahan soal kemudian tidak mengubah riwayat. */
+  questions?: { id: string; orderIndex: number; prompt: string; options: { id: string; label: string; arabicLabel: string; orderIndex: number }[] }[];
 }
 
 export interface SubmissionRecord {
@@ -108,7 +113,9 @@ export function findTask<T extends MockTask['type']>(id: string, type: T): Extra
   return task as Extract<MockTask, { type: T }>;
 }
 
-export const tasksOf = (materialId: string): MockTask[] => CONTENT.tasks.filter((task) => task.materialId === materialId);
+/** Tugas yang terlihat Santri: hanya AKTIF, urut orderIndex (SDD 3.7.3, FR-TASK-05, FR-TASK-06). */
+export const tasksOf = (materialId: string): MockTask[] =>
+  CONTENT.tasks.filter((task) => task.materialId === materialId && task.status === 'ACTIVE').sort((a, b) => a.orderIndex - b.orderIndex);
 
 export function completions(userId: string): Map<string, string> {
   let map = db.materialCompletions.get(userId);
@@ -162,6 +169,13 @@ export function assertMaterialOpen(userId: string, materialId: string): void {
   if (accessFor(userId).materialStatus.get(materialId) === 'LOCKED') {
     throw httpError(403, 'LEARNING_MATERIAL_LOCKED', 'Materi ini belum terbuka. Selesaikan materi sebelumnya.');
   }
+}
+
+/** Membuka/mengerjakan tugas: DRAFT → 404; NONAKTIF → 409 TASK_INACTIVE (FR-TASK-05); lalu aturan materi. */
+export function assertTaskOpen(userId: string, task: MockTask): void {
+  if (task.status === 'DRAFT') throw NOT_FOUND();
+  if (task.status === 'INACTIVE') throw httpError(409, 'TASK_INACTIVE', 'Tugas ini sedang tidak tersedia.');
+  assertMaterialOpen(userId, task.materialId);
 }
 
 export const quizAttemptsOf = (userId: string, taskId?: string) =>

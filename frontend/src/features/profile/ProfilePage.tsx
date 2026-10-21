@@ -1,22 +1,23 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useForm, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { TextField } from '../../components/ui/TextField';
 import { ApiError } from '../../lib/api/ApiError';
-import { AUTH_ME_QUERY_KEY, useAuth } from '../../lib/hooks/useAuth';
+import { AUTH_ME_QUERY_KEY } from '../../lib/hooks/useAuth';
 import { reportFileName, saveBlob } from '../../lib/utils/download';
-import { changePasswordSchema, profileNameSchema, type ChangePasswordFormValues, type ProfileNameFormValues } from '../auth/authSchemas';
+import { changePasswordSchema, type ChangePasswordFormValues } from '../auth/authSchemas';
 import { ErrorState, ListSkeleton } from '../learning/QueryStates';
 import { reportApi } from '../report/api';
 import { profileApi } from './api';
+import { PROFILE_KEY, useProfile } from './hooks';
 import type { Profile } from './types';
+import { AVATAR_ACCEPTED_TYPES, AVATAR_MAX_BYTES, profileSchema, toProfileInput, validateAvatarFile, type ProfileFormValues } from './validation';
 
-const PROFILE_KEY = ['profile'] as const;
 const STATUS_LABEL = { ACTIVE: 'Aktif', INACTIVE: 'Nonaktif' } as const;
 
 /** Galat per kolom dari server (errors[] SDD 5.5) dipasang ke kolom form; mengembalikan true bila ada. */
@@ -51,24 +52,25 @@ function AlertMessage({ children }: { children: string }): JSX.Element {
   );
 }
 
-function NameForm({ profile }: { profile: Profile }): JSX.Element {
+function ProfileForm({ profile }: { profile: Profile }): JSX.Element {
   const queryClient = useQueryClient();
   const [done, setDone] = useState(false);
-  const { register, handleSubmit, setError, formState: { errors } } = useForm<ProfileNameFormValues>({
-    resolver: zodResolver(profileNameSchema),
-    defaultValues: { name: profile.name },
+  const { register, handleSubmit, setError, reset, formState: { errors } } = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: { name: profile.name, phone: profile.phone ?? '' },
   });
   const mutation = useMutation({
-    // PATCH /profile hanya mengirim { name } (SDD 5.7).
-    mutationFn: (values: ProfileNameFormValues) => profileApi.update({ name: values.name }),
+    // PROPOSED API CONTRACT - sinkronkan dengan backend: PATCH /profile mengirim { name, phone }.
+    mutationFn: (values: ProfileFormValues) => profileApi.update(toProfileInput(values)),
     onSuccess: (updated) => {
       queryClient.setQueryData(PROFILE_KEY, updated);
+      reset({ name: updated.name, phone: updated.phone ?? '' });
       // Nama di header dan sapaan Dashboard ikut diperbarui.
       void queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       setDone(true);
     },
-    onError: (error) => applyFieldErrors(error, setError, ['name']),
+    onError: (error) => applyFieldErrors(error, setError, ['name', 'phone']),
   });
   const onSubmit = handleSubmit((values) => {
     setDone(false);
@@ -79,12 +81,116 @@ function NameForm({ profile }: { profile: Profile }): JSX.Element {
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
       <TextField label="Nama" autoComplete="name" error={errors.name?.message} {...register('name')} />
+      <div>
+        <TextField label="Nomor telepon (opsional)" type="tel" inputMode="tel" autoComplete="tel" placeholder="08xx atau +628xx" error={errors.phone?.message} {...register('phone')} />
+        {!errors.phone && <p className="mt-2 text-body-s text-text-secondary">Format 08xx atau +628xx, 10–15 digit.</p>}
+      </div>
       {done && <StatusMessage>Data berhasil disimpan.</StatusMessage>}
       {serverError && <AlertMessage>{serverError}</AlertMessage>}
       <Button type="submit" className="self-start" isLoading={mutation.isPending} loadingText="MENYIMPAN…">
-        SIMPAN NAMA
+        SIMPAN PERUBAHAN
       </Button>
     </form>
+  );
+}
+
+/** Foto profil: pilih → pratinjau → simpan, atau hapus. Format dan ukuran diperiksa di client (validation.ts). */
+function AvatarSection({ profile }: { profile: Profile }): JSX.Element {
+  const queryClient = useQueryClient();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const [preview, setPreview] = useState<{ file: File; url: string } | null>(null);
+  const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // URL pratinjau dilepas saat diganti, dibatalkan, atau komponen dilepas.
+  useEffect(() => () => (preview ? URL.revokeObjectURL(preview.url) : undefined), [preview]);
+
+  const focusActions = () => actionsRef.current?.querySelector('button')?.focus();
+  const setAvatar = (avatarUrl: string | null) => queryClient.setQueryData<Profile>(PROFILE_KEY, (current) => (current ? { ...current, avatarUrl } : current));
+  const upload = useMutation({
+    mutationFn: (file: File) => profileApi.uploadAvatar(file),
+    onSuccess: ({ avatarUrl }) => {
+      setAvatar(avatarUrl);
+      setPreview(null);
+      setMessage({ tone: 'success', text: 'Foto profil berhasil disimpan.' });
+      requestAnimationFrame(focusActions);
+    },
+    onError: (error) => setMessage({ tone: 'error', text: errorText(error) }),
+  });
+  const remove = useMutation({
+    mutationFn: () => profileApi.deleteAvatar(),
+    onSuccess: () => {
+      setAvatar(null);
+      setConfirmDelete(false);
+      setMessage({ tone: 'success', text: 'Foto profil dihapus.' });
+    },
+  });
+  const { reset: resetRemove } = remove;
+  const closeDelete = useCallback(() => {
+    setConfirmDelete(false);
+    resetRemove();
+    requestAnimationFrame(() => actionsRef.current?.querySelector('button')?.focus());
+  }, [resetRemove]);
+
+  const onPick = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const invalid = validateAvatarFile(file);
+    if (invalid) {
+      setMessage({ tone: 'error', text: invalid });
+      return;
+    }
+    setMessage(null);
+    setPreview({ file, url: URL.createObjectURL(file) });
+  };
+
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <Avatar name={profile.name} src={preview?.url ?? profile.avatarUrl} size="lg" />
+      <div className="flex min-w-0 flex-col gap-3">
+        <p className="text-body-s text-text-secondary">
+          {preview ? 'Pratinjau foto baru, belum disimpan.' : `Foto profil: JPG, PNG, atau WebP, maksimal ${AVATAR_MAX_BYTES / 1024 / 1024} MB.`}
+        </p>
+        <input ref={inputRef} type="file" accept={AVATAR_ACCEPTED_TYPES.join(',')} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onPick} />
+        <div ref={actionsRef} className="flex flex-wrap gap-3">
+          {preview ? (
+            <>
+              <Button isLoading={upload.isPending} loadingText="MENGUNGGAH…" onClick={() => upload.mutate(preview.file)}>
+                SIMPAN FOTO
+              </Button>
+              <Button variant="outline" disabled={upload.isPending} onClick={() => setPreview(null)}>
+                BATAL
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => inputRef.current?.click()}>
+                {profile.avatarUrl ? 'GANTI FOTO' : 'UNGGAH FOTO'}
+              </Button>
+              {profile.avatarUrl && (
+                <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
+                  HAPUS FOTO
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+        {message && (message.tone === 'success' ? <StatusMessage>{message.text}</StatusMessage> : <AlertMessage>{message.text}</AlertMessage>)}
+      </div>
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Hapus foto profil?"
+          message="Foto akan dihapus dan diganti inisial nama Anda."
+          confirmLabel="HAPUS"
+          pending={remove.isPending}
+          error={remove.isError ? errorText(remove.error) : null}
+          onConfirm={() => remove.mutate()}
+          onClose={closeDelete}
+        />
+      )}
+    </div>
   );
 }
 
@@ -142,37 +248,10 @@ function ReportSection({ studentCode }: { studentCode: string }): JSX.Element {
   );
 }
 
-function LogoutSection(): JSX.Element {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
-  const [pending, setPending] = useState(false);
-
-  const handleLogout = async (): Promise<void> => {
-    setPending(true);
-    await logout();
-    navigate('/login', { replace: true });
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-body text-text-secondary">Keluar dari sesi pembelajaran saat ini pada perangkat ini.</p>
-      <Button
-        variant="salah"
-        className="self-start"
-        isLoading={pending}
-        loadingText="KELUAR…"
-        onClick={() => void handleLogout()}
-      >
-        <LogOut size={20} className="mr-2 shrink-0" aria-hidden="true" />
-        KELUAR DARI AKUN
-      </Button>
-    </div>
-  );
-}
-
 // SDD 7.7.15 (UI-PROFILE-01/02). [REKOMENDASI] Tampilan disusun dari SDD dan UI kit; Figma 20 belum dicocokkan.
+// Tombol logout ada di sidebar dan laci (AppLayout), bukan di halaman ini.
 export function ProfilePage(): JSX.Element {
-  const { data, isPending, isError, error, refetch } = useQuery({ queryKey: PROFILE_KEY, queryFn: ({ signal }) => profileApi.get(signal) });
+  const { data, isPending, isError, error, refetch } = useProfile();
 
   if (isPending) {
     return (
@@ -193,6 +272,7 @@ export function ProfilePage(): JSX.Element {
     <div className="mx-auto flex max-w-[760px] flex-col gap-6">
       <Card className="flex flex-col gap-5">
         <h2 className="text-h3">Data diri</h2>
+        <AvatarSection profile={data} />
         {/* ID Santri, email, dan status sebagai teks biasa: tidak dapat diubah (SDD 7.7.15). */}
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
@@ -208,7 +288,7 @@ export function ProfilePage(): JSX.Element {
             <dd className="mt-1 text-body text-text-primary">{STATUS_LABEL[data.status]}</dd>
           </div>
         </dl>
-        <NameForm profile={data} />
+        <ProfileForm profile={data} />
       </Card>
 
       <Card className="flex flex-col gap-5">
@@ -219,11 +299,6 @@ export function ProfilePage(): JSX.Element {
       <Card className="flex flex-col gap-5">
         <h2 className="text-h3">Laporan</h2>
         <ReportSection studentCode={data.studentCode} />
-      </Card>
-
-      <Card className="flex flex-col gap-5 border-status-salah/20">
-        <h2 className="text-h3 text-status-salah">Keluar dari akun</h2>
-        <LogoutSection />
       </Card>
     </div>
   );

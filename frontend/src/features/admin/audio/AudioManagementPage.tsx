@@ -1,5 +1,5 @@
-import { Archive, RefreshCw, Upload, Volume2 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { OnDemandAudioPlayer } from '../../../components/audio/OnDemandAudioPlayer';
 import { Button } from '../../../components/ui/Button';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
@@ -9,346 +9,209 @@ import { ApiError } from '../../../lib/api/ApiError';
 import { EmptyState, ErrorState, ListSkeleton } from '../../learning/QueryStates';
 import { useContentNotice } from '../content/useContentNotice';
 import { adminAudioApi } from './api';
+import { AudioUploadDialog } from './AudioUploadDialog';
+import { AudioVersionsDialog } from './AudioVersionsDialog';
 import { useAdminAudioList, useAudioMutations } from './hooks';
-import type { AdminAudioItem, AudioKind } from './types';
+import type { AdminAudio, AudioFilter } from './types';
+import { availableActions, formatDuration, formatSize, KIND_LABEL, parseFilter, STATUS_LABEL, STATUS_TONE } from './view';
 
-function formatDuration(durationMs?: number): string {
-  if (!durationMs) return '0 dtk';
-  const seconds = Math.round(durationMs / 1000);
-  const mins = Math.floor(seconds / 60);
-  const remainingSecs = seconds % 60;
-  if (mins > 0) {
-    return `${mins}m ${remainingSecs}d`;
-  }
-  return `${seconds} dtk`;
-}
+type UploadState = { mode: 'create' } | { mode: 'replace'; audio: AdminAudio } | null;
 
+const linkButton =
+  'min-h-11 whitespace-nowrap rounded-md px-3 text-body text-brand-primary hover:bg-neutral-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary disabled:cursor-not-allowed disabled:text-text-muted';
+
+// Manajemen Audio (SDD 7.7.19, UI-ADMIN-AUDIO-01 sampai 03, FR-AUDIO-01 sampai 03).
+// [REKOMENDASI] Tidak ada desain Figma untuk admin; tampilan mengikuti halaman Konten (A4).
 export function AudioManagementPage(): JSX.Element {
-  const [selectedKind, setSelectedKind] = useState('ALL');
-  const notice = useContentNotice();
-
-  // Upload modal state
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadKind, setUploadKind] = useState<AudioKind>('LEARNING');
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  // Replace modal state
-  const [replacingItem, setReplacingItem] = useState<AdminAudioItem | null>(null);
-  const [replaceFile, setReplaceFile] = useState<File | null>(null);
-  const [replaceError, setReplaceError] = useState<string | null>(null);
-
-  // Archive modal state
-  const [archivingItem, setArchivingItem] = useState<AdminAudioItem | null>(null);
-  const [archiveError, setArchiveError] = useState<string | null>(null);
-
-  const audioQuery = useAdminAudioList(selectedKind);
+  const [params, setParams] = useSearchParams();
+  const filter = parseFilter(params);
+  const list = useAdminAudioList(filter);
   const mutations = useAudioMutations();
+  const notice = useContentNotice();
+  const [upload, setUpload] = useState<UploadState>(null);
+  const [versionsOf, setVersionsOf] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState<AdminAudio | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
-  const handleUploadSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!uploadFile) {
-      setUploadError('Pilih berkas audio terlebih dahulu.');
-      return;
-    }
-    setUploadError(null);
-    mutations.upload.mutate(
-      { file: uploadFile, kind: uploadKind },
-      {
-        onSuccess: () => {
-          setUploadOpen(false);
-          setUploadFile(null);
-          notice.success('Berkas audio berhasil diunggah.');
-        },
-        onError: (err) => {
-          setUploadError(err instanceof ApiError ? err.message : 'Gagal mengunggah audio.');
-        },
-      },
-    );
+  const setFilter = (patch: Partial<AudioFilter>) => {
+    const next = { ...filter, ...patch };
+    const search = new URLSearchParams();
+    if (next.kind) search.set('kind', next.kind);
+    if (next.status) search.set('status', next.status);
+    setParams(search, { replace: true });
   };
 
-  const handleReplaceSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replacingItem || !replaceFile) {
-      setReplaceError('Pilih berkas audio pengganti.');
-      return;
-    }
-    setReplaceError(null);
-    mutations.replace.mutate(
-      { id: replacingItem.id, file: replaceFile },
-      {
-        onSuccess: () => {
-          setReplacingItem(null);
-          setReplaceFile(null);
-          notice.success('Audio berhasil diganti dan versi baru aktif.');
-        },
-        onError: (err) => {
-          setReplaceError(err instanceof ApiError ? err.message : 'Gagal mengganti audio.');
-        },
-      },
-    );
-  };
-
-  const handleArchiveConfirm = () => {
-    if (!archivingItem) return;
+  const closeUpload = useCallback((saved: boolean) => {
+    setUpload(null);
+    if (!saved) triggerRef.current?.focus();
+  }, []);
+  const closeVersions = useCallback(() => {
+    setVersionsOf(null);
+    triggerRef.current?.focus();
+  }, []);
+  const closeArchive = useCallback(() => {
+    setArchiving(null);
     setArchiveError(null);
-    mutations.archive.mutate(archivingItem.id, {
+    triggerRef.current?.focus();
+  }, []);
+
+  const confirmArchive = () => {
+    if (!archiving) return;
+    const target = archiving;
+    mutations.archive.mutate(target.id, {
       onSuccess: () => {
-        setArchivingItem(null);
-        notice.success('Audio berhasil diarsipkan.');
+        notice.success(`"${target.originalName}" diarsipkan.`);
+        setArchiving(null);
       },
-      onError: (err) => {
-        setArchiveError(err instanceof ApiError ? err.message : 'Gagal mengarsipkan audio.');
-      },
+      onError: (error) => setArchiveError(error instanceof ApiError ? error.message : 'Audio gagal diarsipkan. Silakan coba lagi.'),
     });
   };
 
-  let listContent: JSX.Element;
-  if (audioQuery.isPending) {
-    listContent = <ListSkeleton rows={5} />;
-  } else if (audioQuery.isError) {
-    listContent = (
-      <ErrorState
-        error={audioQuery.error}
-        onRetry={() => void audioQuery.refetch()}
-        backTo="/admin"
-        backLabel="Kembali ke dashboard"
-      />
-    );
-  } else if (!audioQuery.data || audioQuery.data.length === 0) {
-    listContent = <EmptyState>Belum ada audio dalam pustaka. Klik tombol di atas untuk mengunggah.</EmptyState>;
+  const busy = mutations.archive.isPending;
+  let content: JSX.Element;
+  if (list.isPending) {
+    content = <ListSkeleton rows={4} />;
+  } else if (list.isError) {
+    content = <ErrorState error={list.error} onRetry={() => void list.refetch()} backTo="/admin" backLabel="Kembali ke dashboard" />;
+  } else if (list.data.length === 0) {
+    content = <EmptyState>{filter.kind || filter.status ? 'Tidak ada audio yang sesuai penyaring.' : 'Belum ada audio.'}</EmptyState>;
   } else {
-    listContent = (
-      <div className="overflow-x-auto rounded-lg border border-neutral-border bg-neutral-surface">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-neutral-border bg-neutral-surface-alt text-body-s font-semibold text-text-secondary">
-              <th className="py-3 px-4">Nama Berkas</th>
-              <th className="py-3 px-4">Jenis</th>
-              <th className="py-3 px-4">Durasi</th>
-              <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4">Pratinjau</th>
-              <th className="py-3 px-4 text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-border text-body">
-            {audioQuery.data.map((item) => (
-              <tr key={item.id} className="hover:bg-neutral-surface-alt/40 transition">
-                <td className="py-3 px-4 font-medium text-text-primary">
-                  <div className="flex items-center gap-2">
-                    <Volume2 size={18} className="shrink-0 text-brand-primary" aria-hidden="true" />
-                    <span className="truncate max-w-[240px]" title={item.originalName}>
-                      {item.originalName}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-3 px-4">
-                  <Pill status={item.kind === 'REFERENCE' ? 'perhatian' : 'terbuka'}>
-                    {item.kind === 'REFERENCE' ? 'Referensi' : item.kind === 'RECORDING' ? 'Rekaman' : 'Pembelajaran'}
-                  </Pill>
-                </td>
-                <td className="py-3 px-4 text-text-secondary">{formatDuration(item.durationMs)}</td>
-                <td className="py-3 px-4">
-                  <Pill status={item.status === 'ACTIVE' ? 'selesai' : 'terkunci'}>
-                    {item.status === 'ACTIVE' ? 'Aktif' : 'Diarsipkan'}
-                  </Pill>
-                </td>
-                <td className="py-3 px-4">
-                  {item.status === 'ACTIVE' ? (
-                    <OnDemandAudioPlayer
-                      fetchUrl={async () => (await adminAudioApi.getUrl(item.id)).url}
-                      label={item.originalName}
-                      buttonText="Putar"
-                    />
-                  ) : (
-                    <span className="text-body-s text-text-muted italic">Tidak tersedia</span>
-                  )}
-                </td>
-                <td className="py-3 px-4 text-right">
-                  {item.status === 'ACTIVE' && (
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        className="!h-9 !px-3 text-body-s"
-                        onClick={() => {
-                          setReplacingItem(item);
-                          setReplaceError(null);
-                        }}
-                        title="Ganti berkas audio"
-                      >
-                        <RefreshCw size={14} className="mr-1" /> Ganti
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="!h-9 !px-3 text-body-s text-feedback-salah hover:bg-feedback-salah-soft"
-                        onClick={() => {
-                          setArchivingItem(item);
-                          setArchiveError(null);
-                        }}
-                        title="Arsipkan audio"
-                      >
-                        <Archive size={14} className="mr-1" /> Arsip
-                      </Button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    content = (
+      <ul className="flex flex-col gap-4" aria-label="Daftar audio">
+        {list.data.map((audio) => {
+          const actions = availableActions(audio);
+          return (
+            <li key={audio.id} className="flex flex-col gap-2 rounded-lg border-2 border-neutral-border bg-neutral-surface p-5 shadow-card">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="text-body-s text-text-secondary">
+                  {KIND_LABEL[audio.kind]} · versi {audio.version}
+                </span>
+                <Pill status={STATUS_TONE[audio.status]}>{STATUS_LABEL[audio.status]}</Pill>
+                {audio.usedBySubmission && <Pill status="perhatian">DIPAKAI SUBMISSION</Pill>}
+              </div>
+              <p className="break-words text-h3 text-text-primary">{audio.originalName}</p>
+              <p className="text-body-s text-text-secondary">
+                {formatDuration(audio.durationMs)} · {formatSize(audio.sizeBytes)}
+              </p>
+              {audio.usage && (
+                <p className="break-words text-body-s text-text-secondary">
+                  Tugas: {audio.usage.taskTitle} ({audio.usage.materialTitle})
+                </p>
+              )}
+              <OnDemandAudioPlayer fetchUrl={async () => (await adminAudioApi.getUrl(audio.id)).url} label={audio.originalName} buttonText="Putar" />
+              <div className="-mx-3 flex flex-wrap items-center">
+                {(audio.version > 1 || audio.kind === 'REFERENCE') && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      triggerRef.current = event.currentTarget;
+                      setVersionsOf(audio.id);
+                    }}
+                    aria-label={`Riwayat versi: ${audio.originalName}`}
+                    className={linkButton}
+                  >
+                    Riwayat versi
+                  </button>
+                )}
+                {actions.includes('replace') && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={(event) => {
+                      triggerRef.current = event.currentTarget;
+                      notice.clear();
+                      setUpload({ mode: 'replace', audio });
+                    }}
+                    aria-label={`Ganti versi: ${audio.originalName}`}
+                    className={linkButton}
+                  >
+                    Ganti Versi
+                  </button>
+                )}
+                {actions.includes('archive') && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={(event) => {
+                      triggerRef.current = event.currentTarget;
+                      notice.clear();
+                      setArchiving(audio);
+                    }}
+                    aria-label={`Arsipkan: ${audio.originalName}`}
+                    className={linkButton}
+                  >
+                    Arsipkan
+                  </button>
+                )}
+              </div>
+              {audio.usedBySubmission && audio.status === 'ACTIVE' && (
+                <p className="text-body-s text-text-secondary">Audio ini sudah dipakai submission, sehingga hanya dapat diganti versinya.</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-8 max-w-6xl mx-auto">
-      {notice.element}
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-h1 font-bold text-text-primary">Pustaka Audio</h1>
-          <p className="text-body text-text-secondary">
-            Kelola berkas audio materi pembelajaran dan audio referensi peniruan makhraj.
-          </p>
-        </div>
-        <Button onClick={() => setUploadOpen(true)}>
-          <Upload size={18} className="mr-2" /> Unggah Audio
-        </Button>
-      </div>
-
-      <div className="w-full sm:w-64">
-        <SelectField
-          label="Filter Jenis Audio"
-          value={selectedKind}
-          onChange={(val) => setSelectedKind(val)}
-        >
-          <option value="ALL">Semua Jenis</option>
-          <option value="LEARNING">Pembelajaran</option>
-          <option value="REFERENCE">Referensi Imitasi</option>
+    <div className="mx-auto flex max-w-[1040px] flex-col gap-6">
+      <h1 className="sr-only">Manajemen Audio</h1>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SelectField label="Jenis" value={filter.kind} onChange={(value) => setFilter({ kind: value as AudioFilter['kind'] })}>
+          <option value="">Semua jenis</option>
+          <option value="LEARNING">{KIND_LABEL.LEARNING}</option>
+          <option value="REFERENCE">{KIND_LABEL.REFERENCE}</option>
+        </SelectField>
+        <SelectField label="Status" value={filter.status} onChange={(value) => setFilter({ status: value as AudioFilter['status'] })}>
+          <option value="">Semua status</option>
+          <option value="ACTIVE">Aktif</option>
+          <option value="ARCHIVED">Arsip</option>
         </SelectField>
       </div>
-
-      {listContent}
-
-      {/* Upload Modal */}
-      {uploadOpen && (
-        <dialog
-          open
-          className="fixed inset-0 z-50 flex items-center justify-center w-full h-full bg-text-primary/40 backdrop:bg-text-primary/40 p-4"
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-body-s text-text-secondary" aria-live="polite">
+          {list.data ? `${list.data.length} audio` : ''}
+        </p>
+        <Button
+          onClick={(event) => {
+            triggerRef.current = event.currentTarget;
+            notice.clear();
+            setUpload({ mode: 'create' });
+          }}
         >
-          <div className="w-full max-w-md bg-neutral-surface rounded-lg shadow-raised p-6 flex flex-col gap-4">
-            <h2 className="text-h2 font-bold text-text-primary">Unggah Berkas Audio</h2>
-            <form onSubmit={handleUploadSubmit} className="flex flex-col gap-4">
-              <SelectField
-                label="Jenis Audio"
-                value={uploadKind}
-                onChange={(val) => setUploadKind(val as AudioKind)}
-              >
-                <option value="LEARNING">Audio Pembelajaran (Materi)</option>
-                <option value="REFERENCE">Audio Referensi (Peniruan/Imitasi)</option>
-              </SelectField>
-              <div>
-                <label className="block text-body-s font-medium text-text-primary mb-1">
-                  Pilih Berkas Audio (.mp3, .wav, .m4a)
-                </label>
-                <input
-                  type="file"
-                  accept="audio/*"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                  className="w-full text-body file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-body-s file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-brand-primary-hover"
-                />
-              </div>
-
-              {uploadError && (
-                <p className="rounded-md bg-feedback-salah-soft px-4 py-2 text-body-s text-feedback-salah">
-                  {uploadError}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setUploadOpen(false);
-                    setUploadError(null);
-                  }}
-                  disabled={mutations.upload.isPending}
-                >
-                  Batal
-                </Button>
-                <Button type="submit" isLoading={mutations.upload.isPending}>
-                  Unggah
-                </Button>
-              </div>
-            </form>
-          </div>
-        </dialog>
+          UNGGAH AUDIO
+        </Button>
+      </div>
+      {notice.element}
+      {content}
+      {upload && (
+        <AudioUploadDialog
+          replacing={upload.mode === 'replace' ? upload.audio : undefined}
+          onSubmit={async ({ file, kind }) => {
+            if (upload.mode === 'replace') {
+              const created = await mutations.replace.mutateAsync({ id: upload.audio.id, file });
+              notice.success(`Versi ${created.version} aktif. Versi lama diarsipkan.`);
+            } else {
+              const created = await mutations.upload.mutateAsync({ file, kind });
+              notice.success(`"${created.originalName}" berhasil diunggah.`);
+            }
+          }}
+          onClose={closeUpload}
+        />
       )}
-
-      {/* Replace Modal */}
-      {replacingItem && (
-        <dialog
-          open
-          className="fixed inset-0 z-50 flex items-center justify-center w-full h-full bg-text-primary/40 backdrop:bg-text-primary/40 p-4"
-        >
-          <div className="w-full max-w-md bg-neutral-surface rounded-lg shadow-raised p-6 flex flex-col gap-4">
-            <h2 className="text-h2 font-bold text-text-primary">Ganti Berkas Audio</h2>
-            <p className="text-body text-text-secondary">
-              Mengganti audio untuk <strong>{replacingItem.originalName}</strong>. Berkas lama akan otomatis
-              diarsipkan secara aman dan versi baru akan diterbitkan.
-            </p>
-            <form onSubmit={handleReplaceSubmit} className="flex flex-col gap-4">
-              <div>
-                <label className="block text-body-s font-medium text-text-primary mb-1">
-                  Berkas Audio Baru (.mp3, .wav, .m4a)
-                </label>
-                <input
-                  type="file"
-                  accept="audio/*"
-                  onChange={(e) => setReplaceFile(e.target.files?.[0] || null)}
-                  className="w-full text-body file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-body-s file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-brand-primary-hover"
-                />
-              </div>
-
-              {replaceError && (
-                <p className="rounded-md bg-feedback-salah-soft px-4 py-2 text-body-s text-feedback-salah">
-                  {replaceError}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setReplacingItem(null);
-                    setReplaceError(null);
-                  }}
-                  disabled={mutations.replace.isPending}
-                >
-                  Batal
-                </Button>
-                <Button type="submit" isLoading={mutations.replace.isPending}>
-                  Ganti & Terbitkan
-                </Button>
-              </div>
-            </form>
-          </div>
-        </dialog>
-      )}
-
-      {/* Archive Confirmation Dialog */}
-      {archivingItem && (
+      {versionsOf && <AudioVersionsDialog audioId={versionsOf} onClose={closeVersions} />}
+      {archiving && (
         <ConfirmDialog
-          title="Arsipkan Audio?"
-          message={`Apakah Anda yakin ingin mengarsipkan audio "${archivingItem.originalName}"? Audio ini tidak akan dapat diputar oleh santri baru, namun riwayat evaluasi yang menggunakan versi ini tetap terjaga.`}
+          title="Arsipkan audio?"
+          message={`"${archiving.originalName}" tidak dapat dipilih lagi untuk konten baru, tetapi tetap tersimpan untuk data historis.`}
           confirmLabel="ARSIPKAN"
-          confirmVariant="salah"
+          confirmVariant="primary"
           pending={mutations.archive.isPending}
           error={archiveError}
-          onConfirm={handleArchiveConfirm}
-          onClose={() => setArchivingItem(null)}
+          onConfirm={confirmArchive}
+          onClose={closeArchive}
         />
       )}
     </div>
