@@ -8,3 +8,6 @@ venv/
 models/*.pt
 models/*.pkl
 ml-service/dataset/splits/
+
+# Rekaman Santri tidak boleh masuk repo (NFR-PRIV-02).
+backend/uploads/recordings/
