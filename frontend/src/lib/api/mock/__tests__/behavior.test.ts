@@ -663,6 +663,9 @@ describe('admin tugas dan soal (SDD 5.17, 3.7) dan dampaknya ke Santri', () => {
     const created = (await call('POST', 'admin/audio/ref-l001m002/replace', form)).body.data as { id: string };
     const task = (await call('GET', 'admin/tasks/tsk-l001m002-imitation')).body.data as Task & { referenceAudioId: string };
     expect(task.referenceAudioId).toBe(created.id);
+  });
+});
+
 describe('profil: telepon dan foto (PROPOSED API CONTRACT)', () => {
   const photo = (type = 'image/png', bytes = 1000) => {
     const form = new FormData();
