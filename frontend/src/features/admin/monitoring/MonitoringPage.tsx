@@ -5,7 +5,6 @@ import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../../components/ui/Button';
 import { DataTable, type DataColumn } from '../../../components/ui/DataTable';
 import { Pagination } from '../../../components/ui/Pagination';
-import { ApiError } from '../../../lib/api/ApiError';
 import type { EvaluationStatus } from '../../../lib/api/types';
 import { formatDateTime } from '../../../lib/utils/format';
 import { formatScore } from '../../dashboard/view';
@@ -13,7 +12,7 @@ import { ErrorState, ListSkeleton } from '../../learning/QueryStates';
 import { EvaluationPanel } from './EvaluationPanel';
 import { EvaluationStatusLabel } from './EvaluationStatusLabel';
 import { GradeModal } from './GradeModal';
-import { adminMonitoringKeys, useEvaluationQueue, useRetrySubmission, useSubmissions } from './hooks';
+import { adminMonitoringKeys, useEvaluationQueue, useSubmissions } from './hooks';
 import { MonitoringFilters } from './MonitoringFilters';
 import { RecordingPlayer } from './RecordingPlayer';
 import { hasMonitoringFilters, parseMonitoringQuery, toMonitoringParams, type MonitoringQuery } from './query';
@@ -28,9 +27,7 @@ export function MonitoringPage(): JSX.Element {
   const query = parseMonitoringQuery(params);
   const submissions = useSubmissions(query);
   const queue = useEvaluationQueue();
-  const retry = useRetrySubmission();
   const queryClient = useQueryClient();
-  const [scheduled, setScheduled] = useState<Set<string>>(() => new Set());
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [selectedForGrade, setSelectedForGrade] = useState<AdminSubmission | null>(null);
 

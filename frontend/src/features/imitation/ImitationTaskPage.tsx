@@ -12,7 +12,6 @@ import { ExitConfirmDialog } from '../quiz/ExitConfirmDialog';
 import { useEvaluationMonitor, useImitationTask, useSubmitRecording, type MonitoredSubmission } from './hooks';
 import {
   durationHint,
-  formatElapsed,
   initialRecorderState,
   MIC_READY_MESSAGE,
   needsLeaveGuard,
@@ -89,7 +88,7 @@ function Notice({ tone, children }: { tone: 'info' | 'error'; children: string }
 
 /** Tampilan 5, 6a, 6b SDD 7.7.10 dengan pemantauan SDD 7.7.11. Di-key dengan submissionId. */
 function EvaluationPanel({ taskId, submission, onRetry, onContinue }: { taskId: string; submission: MonitoredSubmission; onRetry: () => void; onContinue: () => void }): JSX.Element {
-  const { latest, stopped, checking, checkNow, elapsedMs } = useEvaluationMonitor(taskId, submission);
+  const { latest, checking, checkNow } = useEvaluationMonitor(taskId, submission);
 
   let content: JSX.Element;
   if (latest?.evaluationStatus === 'EVALUATED') {
