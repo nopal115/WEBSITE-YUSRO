@@ -14,4 +14,4 @@ Mode dev:
 
 Database development menggunakan kredensial lokal di atas dan tidak untuk production. Untuk mengisi akun Admin, atur `SEED_ADMIN_PASSWORD` lalu jalankan `npm run db:seed` dari folder `backend`.
 
-Role sistem hanya SANTRI dan ADMIN_PENGAJAR, evaluasi bersifat otomatis via ML - lihat SRS Bab 7.6.
+Role sistem hanya SANTRI dan ADMIN_PENGAJAR. Evaluasi Dengar-Tirukan dirancang otomatis via ML (SRS Bab 7.6, BR-ML-01). Implementasi saat ini juga menyediakan penilaian manual oleh Admin/Pengajar; fitur ini berstatus [TBD], menunggu konfirmasi pembimbing dan revisi SRS (SDD v1.1 Bab 12.12).

@@ -59,12 +59,18 @@
 - /riwayat/:attemptId (detail percobaan; tidak ada di sitemap SDD 12.5)
   dan /tugas (placeholder menu Tugas) adalah penyimpangan sitemap yang
   sudah disetujui, berstatus [TBD].
-- Sapaan Dashboard "Assalamu'alaikum, [nama]" (menyimpang dari SDD 7.7.4).
-- Sisi santri: tombol logout belum ditambahkan; menunggu desain.
-- Sisi admin: tombol logout ada di tata letak admin.
-- Token akses disimpan di sessionStorage, penyimpangan sementara dari SDD
-  6.3 (refresh token + cookie HttpOnly), sampai backend menyediakan refresh
-  token.
+- Sapaan Beranda "Assalamu'alaikum, [nama]" (menyimpang dari SDD 7.7.4).
+- Sisi santri (revisi desain pembimbing, SDD v1.1 7.5.2): navbar atas berisi
+  lima menu teks, tombol tema, tombol Keluar dengan dialog konfirmasi, dan
+  tombol ikon Profil paling kanan; di bawah 1024 px menu dan Keluar ada di
+  laci navigasi. Tanpa sidebar dan bilah bawah. Label "Keluar" vs "Logout" [TBD].
+- Sisi admin: tetap sidebar; tombol Keluar ada di sidebar dan laci, tanpa
+  dialog konfirmasi [TBD].
+- Tombol pasang aplikasi (PWA) tidak ditampilkan; infrastruktur PWA tetap.
+  Service worker hanya didaftarkan di build produksi.
+- Refresh token lewat cookie (POST auth/refresh) sudah ada sejak 502e5f4;
+  token akses masih disimpan di sessionStorage (src/lib/auth/tokenStore.ts).
+  Status penyimpangan SDD 6.3 perlu ditinjau ulang [TBD].
 
 ## Verifikasi standar
 tsc --noEmit, npm run lint, npx vitest run, dan npm run build harus lolos.

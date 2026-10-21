@@ -3,8 +3,8 @@
 Dokumen ini mencatat apa yang **diharapkan frontend** dari backend, supaya penggabungan dengan backend mudah dicocokkan baris per baris.
 
 - Disusun dari kode frontend: `src/lib/api/`, `src/features/*/api.ts`, dan `src/features/*/types.ts`. Bukan dikarang dari SDD.
-- Patokan frontend: branch `feature/dengar-tirukan`, commit `593bbf0`.
-- Patokan backend: `origin/backend-noval` commit `a8af544ff3eea628eb03d2cd4b295c5bd3e84b99` ("Update backend and CI", 2026-10-02 19:40 +0700). Dibaca dengan `git show`/`git ls-tree` saja.
+- Patokan frontend: `main` `7bfed3f` (21 Oktober 2026). Isi awal disusun pada `feature/dengar-tirukan` (`593bbf0`), lalu diperbarui per fitur (A1–A6, profil, navbar).
+- Patokan backend awal: `origin/backend-noval` commit `a8af544ff3eea628eb03d2cd4b295c5bd3e84b99` ("Update backend and CI", 2026-10-02 19:40 +0700). Dibaca dengan `git show`/`git ls-tree` saja.
 - Audit ulang: backend `main` `423918c` (21 Oktober 2026), dijalankan ke backend lokal dengan basis data hasil seed. Status terkini per butir ditandai **[SELESAI 423918c]** atau **[TERBUKA 423918c]** di Bagian 2 dan diringkas di 1.9. Kolom "Backend" pada tabel Bagian 2 masih mencerminkan patokan lama.
 - Acuan dokumen: SDD Bab 5 (`../../SDD.md`). Kalau SDD bertentangan dengan SRS, SRS yang berlaku.
 
