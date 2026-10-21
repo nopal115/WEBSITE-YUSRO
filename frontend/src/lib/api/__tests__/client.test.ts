@@ -3,6 +3,9 @@ import { tokenStore } from '../../auth/tokenStore';
 import { ApiError } from '../ApiError';
 import { apiRequest, apiRequestBlob, apiRequestWithMeta, setUnauthorizedHandler } from '../client';
 
+// Mode mock memakai modul ini; di sini selalu menjawab 401 agar alur sesi berakhir dapat diuji tanpa data mock.
+vi.mock('../mock', () => ({ mockFetch: vi.fn(async () => new Response(JSON.stringify({ message: 'Sesi berakhir.' }), { status: 401 })) }));
+
 const BASE_URL = 'http://localhost:3000/api/v1';
 
 function createMemoryStorage(): Storage {
@@ -217,5 +220,18 @@ it('mengirim FormData tanpa Content-Type manual dan meneruskan header tambahan',
 
     expect(result.filename).toBe('Laporan-YSR-000001-2026-10-02.pdf');
     expect(await result.blob.text()).toBe('%PDF');
+  });
+});
+
+describe('apiRequest mode mock', () => {
+  it('401 mengakhiri sesi tanpa memanggil auth/refresh ke jaringan', async () => {
+    vi.stubEnv('VITE_USE_MOCK', 'true');
+    tokenStore.set('token-lama');
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    await expect(apiRequest('progress')).rejects.toBeInstanceOf(ApiError);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(handler).toHaveBeenCalledWith({ reason: 'unauthorized' });
+    expect(tokenStore.get()).toBeNull();
   });
 });

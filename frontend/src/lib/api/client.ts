@@ -118,17 +118,13 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     // Sesi berakhir: token tidak berlaku, atau akun dinonaktifkan saat sesi masih aktif (SDD 3.16.5).
     const inactive = response.status === 403 && error.code === 'AUTH_ACCOUNT_INACTIVE';
 
-    if (auth && response.status === 401 && path !== 'auth/refresh') {
+    // Mode mock tidak punya refresh token: 401 langsung mengakhiri sesi tanpa memanggil auth/refresh ke jaringan.
+    if (auth && response.status === 401 && path !== 'auth/refresh' && import.meta.env.VITE_USE_MOCK !== 'true') {
       const nextToken = await refreshAccessToken();
       if (nextToken) {
         const retryHeaders: Record<string, string> = { ...headers, Authorization: `Bearer ${nextToken}` };
         try {
-          if (import.meta.env.VITE_USE_MOCK === 'true') {
-            const { mockFetch } = await import('./mock');
-            response = await mockFetch(method, path, { headers: retryHeaders, body: requestBody });
-          } else {
-            response = await fetch(url, { method, headers: retryHeaders, body: requestBody, signal, credentials: 'include' });
-          }
+          response = await fetch(url, { method, headers: retryHeaders, body: requestBody, signal, credentials: 'include' });
         } catch (retryError) {
           if (isAbortError(retryError)) throw retryError;
           throw createNetworkError(retryError);
