@@ -137,23 +137,22 @@ function EvaluationPanel({ taskId, submission, onRetry, onContinue }: { taskId: 
       <Card className="flex flex-col gap-4">
         <h1 className="flex items-center gap-2 text-h3 text-state-processing">
           <Hourglass size={24} aria-hidden="true" />
-          {stopped ? 'Evaluasi masih diproses.' : 'Evaluasi sedang diproses…'}
+          Rekaman Berhasil Dikirim
         </h1>
-        {stopped ? (
-          <>
-            <p className="text-body text-text-secondary">Pemeriksaan otomatis dihentikan.</p>
-            <Button variant="primary" className="w-full sm:w-auto sm:self-start" isLoading={checking} loadingText="MEMERIKSA…" onClick={() => void checkNow()}>
-              PERIKSA STATUS SEKARANG
-            </Button>
-          </>
-        ) : (
-          <p className="text-body text-text-secondary">
-            Hasil akan muncul sendiri di halaman ini.
-            <br />
-            Anda tidak perlu menekan apa pun.
-          </p>
-        )}
-        <p className="text-body-s tabular-nums text-text-secondary">Sudah berjalan {formatElapsed(elapsedMs)}</p>
+        <p className="text-body text-text-primary">
+          Rekaman Anda telah tersimpan dan sedang menunggu penilaian dari Guru/Admin.
+        </p>
+        <p className="text-body-s text-text-secondary">
+          Nilai dan catatan akan otomatis diperbarui setelah dinilai oleh Guru/Admin. Anda juga dapat melanjutkan ke materi lain terlebih dahulu.
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row pt-2">
+          <Button variant="primary" className="w-full sm:w-auto" isLoading={checking} loadingText="MEMERIKSA…" onClick={() => void checkNow()}>
+            PERIKSA STATUS NILAI
+          </Button>
+          <Button variant="outline" className="w-full sm:w-auto" onClick={onContinue}>
+            LANJUT MATERI LAIN
+          </Button>
+        </div>
       </Card>
     );
   }

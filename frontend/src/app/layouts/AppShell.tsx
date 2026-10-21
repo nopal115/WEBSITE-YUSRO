@@ -1,6 +1,7 @@
 import { Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useCallback, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
+import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import type { NavItem } from './navigation';
 import { NavDrawer } from './NavDrawer';
 
@@ -25,8 +26,7 @@ function writeCollapsed(value: boolean): void {
 
 const TABLET_QUERY = '(min-width: 768px) and (max-width: 1023px)';
 
-/** true di lebar tablet, satu-satunya lebar tempat sidebar dapat terlipat. */
-function useIsTablet(): boolean {
+function useTablet(): boolean {
   return useSyncExternalStore(
     (onChange) => {
       const media = window.matchMedia(TABLET_QUERY);
@@ -78,15 +78,17 @@ interface AppShellProps {
 }
 
 /**
- * Kerangka bersama santri dan admin (SDD 7.5): mobile < 768 px laci (+ bilah bawah bila ada);
- * tablet 768–1023 px sidebar dapat dilipat; desktop ≥ 1024 px sidebar tetap 240 px.
+ * Bingkai tata letak utama (SDD 7.5).
+ * - Mobile (< 768 px): header + hamburger -> laci, bilah bawah bila ada.
+ * - Tablet (768–1023 px): sidebar terlipat secara bawaan (ikon saja) + tombol lipat; tanpa bilah bawah.
+ * - Desktop (>= 1024 px): sidebar selalu terbuka (60/240 px); tanpa bilah bawah.
  */
 export function AppShell({ items, isActive, title, headerEnd, sidebarFooter, drawerFooter, bottomNav }: AppShellProps): JSX.Element {
-  const { pathname } = useLocation();
-  const [collapsed, setCollapsed] = useState(readCollapsed);
-  const isTablet = useIsTablet();
-  const iconOnly = collapsed && isTablet;
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const isTablet = useTablet();
+  const iconOnly = isTablet && collapsed;
+  const { pathname } = useLocation();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
@@ -147,11 +149,14 @@ export function AppShell({ items, isActive, title, headerEnd, sidebarFooter, dra
               <Menu size={24} aria-hidden="true" />
             </button>
             <p className="min-w-0 flex-1 truncate text-h2">{title}</p>
-            {headerEnd}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {headerEnd}
+            </div>
           </div>
         </header>
 
-        {/* Dengan bilah bawah: ruang bawah = tinggi bilah 64 px + 24 px + area aman (pengecualian skala jarak SDD 7.2.2: offset kompensasi elemen fixed). */}
+        {/* Dengan bilah bawah: ruang bawah = tinggi bilah 64 px + 24 px + area aman. */}
         <main
           className={`flex-1 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-6 md:p-8 lg:p-12 ${bottomNav ? 'pb-[calc(88px+env(safe-area-inset-bottom))]' : 'pb-[calc(1.5rem+env(safe-area-inset-bottom))]'}`}
         >

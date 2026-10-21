@@ -12,7 +12,7 @@ export interface AuthUser {
   status: AccountStatus;
 }
 
-/** [ASUMSI] GET /auth/me = ringkasan login ditambah email (SDD tidak merinci isinya). */
+/** GET /user/me = ringkasan login ditambah email saat sesi berlaku. */
 export interface User extends AuthUser {
   email: string;
 }

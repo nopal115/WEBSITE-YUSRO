@@ -2,19 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Laci navigasi mobile; dimatikan saat prefers-reduced-motion (SDD 7.11). */
-@keyframes drawer-in {
-	from {
-		transform: translateX(-100%);
-	}
-	to {
-		transform: none;
-	}
-}
-
+/* CSS Variables for Light / Dark Mode Tokens */
 @layer base {
+	:root {
+		--color-neutral-bg: 255 255 255;
+		--color-neutral-surface: 255 255 255;
+		--color-neutral-surface-alt: 251 249 244;
+		--color-neutral-border: 230 224 212;
+		--color-neutral-border-strong: 213 219 224;
+		--color-neutral-locked: 229 231 235;
+
+		--color-text-primary: 22 33 29;
+		--color-text-secondary: 74 90 84;
+		--color-text-muted: 106 118 111;
+		--color-text-on-brand: 255 255 255;
+
+		--color-brand-primary: 15 76 92;
+		--color-brand-primary-hover: 12 61 74;
+		--color-brand-primary-soft: 227 237 240;
+		--color-brand-primary-line: 198 220 225;
+
+		--color-brand-accent: 255 183 3;
+		--color-brand-accent-hover: 217 155 2;
+		--color-brand-accent-soft: 255 243 214;
+
+		--color-feedback-benar: 47 122 43;
+		--color-feedback-benar-hover: 46 106 0;
+		--color-feedback-benar-soft: 231 244 228;
+
+		--color-feedback-salah: 196 43 43;
+		--color-feedback-salah-hover: 155 32 32;
+		--color-feedback-salah-soft: 252 235 235;
+	}
+
+	.dark {
+		--color-neutral-bg: 12 19 23;
+		--color-neutral-surface: 21 32 38;
+		--color-neutral-surface-alt: 16 25 30;
+		--color-neutral-border: 35 52 60;
+		--color-neutral-border-strong: 47 69 80;
+		--color-neutral-locked: 27 40 48;
+
+		--color-text-primary: 237 243 245;
+		--color-text-secondary: 157 176 183;
+		--color-text-muted: 110 132 140;
+		--color-text-on-brand: 255 255 255;
+
+		--color-brand-primary: 25 123 148;
+		--color-brand-primary-hover: 30 141 170;
+		--color-brand-primary-soft: 20 45 54;
+		--color-brand-primary-line: 33 67 79;
+
+		--color-brand-accent: 255 183 3;
+		--color-brand-accent-hover: 229 164 3;
+		--color-brand-accent-soft: 56 45 16;
+
+		--color-feedback-benar: 60 163 54;
+		--color-feedback-benar-hover: 50 142 44;
+		--color-feedback-benar-soft: 18 40 20;
+
+		--color-feedback-salah: 224 72 72;
+		--color-feedback-salah-hover: 194 56 56;
+		--color-feedback-salah-soft: 47 20 20;
+	}
+
 	html {
-		background: theme('colors.neutral.bg');
+		background: rgb(var(--color-neutral-bg));
+		color: rgb(var(--color-text-primary));
+		transition: background-color 150ms ease, color 150ms ease;
 	}
 
 	body {
@@ -24,5 +79,15 @@
 
 	button {
 		font: inherit;
+	}
+}
+
+/* Laci navigasi mobile; dimatikan saat prefers-reduced-motion (SDD 7.11). */
+@keyframes drawer-in {
+	from {
+		transform: translateX(-100%);
+	}
+	to {
+		transform: none;
 	}
 }

@@ -24,7 +24,7 @@ export class EvaluationService {
 
 	async retryByAdmin(adminId: string, attemptId: string) {
 		return this.prisma.$transaction(async (tx) => {
-			const attempt = await tx.attempt.findUnique({ where: { id: attemptId }, select: { id: true, evaluationStatus: true } });
+			const attempt = await tx.attempt.findUnique({ where: { id: attemptId }, select: { id: true, attemptNo: true, evaluationStatus: true } });
 			if (!attempt) throw new NotFoundException('Submission not found');
 			if (attempt.evaluationStatus !== EvaluationStatus.FAILED) throw new ConflictException('EVAL_RETRY_NOT_ALLOWED');
 			const reset = await tx.attempt.updateMany({
@@ -34,47 +34,91 @@ export class EvaluationService {
 			if (reset.count === 0) throw new ConflictException('EVAL_RETRY_NOT_ALLOWED');
 			const job = await tx.evaluationJob.create({ data: { attemptId, isRetry: true, requestedById: adminId } });
 			await tx.auditLog.create({ data: { actorId: adminId, action: 'EVALUATION_RETRY_REQUESTED', entityType: 'Attempt', entityId: attemptId } });
-			return { submissionId: attemptId, jobId: job.id, status: EvaluationStatus.SUBMITTED };
+			return {
+				submissionId: attemptId,
+				jobId: job.id,
+				status: EvaluationStatus.SUBMITTED,
+				evaluationStatus: EvaluationStatus.SUBMITTED,
+				attemptNo: attempt.attemptNo,
+				isRetry: true,
+			};
 		});
 	}
 
 	async getQueue() {
-		const [jobs, grouped] = await Promise.all([
+		const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+		const [jobs, submitted, processing, evaluated, failed, oldestWaiting] = await Promise.all([
 			this.prisma.evaluationJob.findMany({
-			where: { status: { in: [JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.FAILED] } },
-			orderBy: [{ runAfter: 'asc' }, { createdAt: 'asc' }],
-			include: { attempt: { select: { id: true, userId: true, taskId: true, evaluationStatus: true, createdAt: true } } },
+				where: { status: { in: [JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.FAILED] } },
+				orderBy: [{ runAfter: 'asc' }, { createdAt: 'asc' }],
+				include: { attempt: { select: { id: true, userId: true, taskId: true, evaluationStatus: true, createdAt: true } } },
 			}),
-			this.prisma.evaluationJob.groupBy({ by: ['status'], _count: { _all: true } }),
+			this.prisma.attempt.count({ where: { evaluationStatus: EvaluationStatus.SUBMITTED } }),
+			this.prisma.attempt.count({ where: { evaluationStatus: EvaluationStatus.PROCESSING } }),
+			this.prisma.attempt.count({ where: { evaluationStatus: EvaluationStatus.EVALUATED, evaluatedAt: { gte: since } } }),
+			this.prisma.attempt.count({ where: { evaluationStatus: EvaluationStatus.FAILED, failedAt: { gte: since } } }),
+			this.prisma.attempt.findFirst({
+				where: { evaluationStatus: EvaluationStatus.SUBMITTED },
+				orderBy: { submittedAt: 'asc' },
+				select: { submittedAt: true },
+			}),
 		]);
 		return {
 			jobs,
-			counts: Object.fromEntries(grouped.map(({ status, _count }) => [status, _count._all])),
+			counts: {
+				SUBMITTED: submitted,
+				PROCESSING: processing,
+				EVALUATED: evaluated,
+				FAILED: failed,
+			},
+			oldestWaitingSince: oldestWaiting?.submittedAt.toISOString() ?? null,
 		};
+	}
+
+	async getHealth() {
+		const checkedAt = new Date().toISOString();
+		try {
+			const health = await this.mlClient.getHealth();
+			return {
+				serviceStatus: health.model_loaded ? 'ok' : 'loading',
+				modelVersion: health.model_version || null,
+				modelLoaded: health.model_loaded,
+				checkedAt,
+			};
+		} catch {
+			return { serviceStatus: 'unavailable', modelVersion: null, modelLoaded: false, checkedAt };
+		}
 	}
 
 	@Interval(Number(process.env.EVAL_WORKER_INTERVAL_MS ?? 2000))
 	async processNextJob(): Promise<void> {
-		const job = await this.prisma.$transaction(async (tx) => {
-			const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "evaluation_jobs" WHERE status = 'QUEUED' AND "runAfter" <= now() ORDER BY "runAfter", "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1`;
-			if (!rows[0]) return null;
-			const now = new Date();
-			const workerId = process.env.EVAL_WORKER_ID ?? `worker-${process.pid}`;
-			const claim = await tx.evaluationJob.updateMany({
-				where: { id: rows[0].id, status: JobStatus.QUEUED, runAfter: { lte: now } },
-				data: { status: JobStatus.RUNNING, startedAt: now, lockedAt: now, lockedBy: workerId, runCount: { increment: 1 } },
+		if (process.env.ENABLE_ML_WORKER !== 'true' && process.env.NODE_ENV !== 'test') return;
+		let job: any = null;
+		try {
+			job = await this.prisma.$transaction(async (tx) => {
+				const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "evaluation_jobs" WHERE status = 'QUEUED' AND "runAfter" <= now() ORDER BY "runAfter", "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1`;
+				if (!rows[0]) return null;
+				const now = new Date();
+				const workerId = process.env.EVAL_WORKER_ID ?? `worker-${process.pid}`;
+				const claim = await tx.evaluationJob.updateMany({
+					where: { id: rows[0].id, status: JobStatus.QUEUED, runAfter: { lte: now } },
+					data: { status: JobStatus.RUNNING, startedAt: now, lockedAt: now, lockedBy: workerId, runCount: { increment: 1 } },
+				});
+				if (claim.count === 0) return null;
+				const claimed = await tx.evaluationJob.findUniqueOrThrow({
+					where: { id: rows[0].id }, include: { attempt: { include: { recordingAudio: true, referenceAudio: true } } },
+				});
+				const transition = await tx.attempt.updateMany({ where: { id: claimed.attemptId, evaluationStatus: EvaluationStatus.SUBMITTED }, data: { evaluationStatus: EvaluationStatus.PROCESSING, processingStartedAt: new Date() } });
+				if (transition.count === 0) {
+					await tx.evaluationJob.updateMany({ where: { id: claimed.id, status: JobStatus.RUNNING }, data: { status: JobStatus.FAILED, finishedAt: new Date(), lockedAt: null, lockedBy: null, lastErrorCode: 'EVAL_JOB_STALE', lastErrorDetail: 'Attempt is no longer awaiting evaluation' } });
+					return null;
+				}
+				return claimed;
 			});
-			if (claim.count === 0) return null;
-			const claimed = await tx.evaluationJob.findUniqueOrThrow({
-				where: { id: rows[0].id }, include: { attempt: { include: { recordingAudio: true, referenceAudio: true } } },
-			});
-			const transition = await tx.attempt.updateMany({ where: { id: claimed.attemptId, evaluationStatus: EvaluationStatus.SUBMITTED }, data: { evaluationStatus: EvaluationStatus.PROCESSING, processingStartedAt: new Date() } });
-			if (transition.count === 0) {
-				await tx.evaluationJob.updateMany({ where: { id: claimed.id, status: JobStatus.RUNNING }, data: { status: JobStatus.FAILED, finishedAt: new Date(), lockedAt: null, lockedBy: null, lastErrorCode: 'EVAL_JOB_STALE', lastErrorDetail: 'Attempt is no longer awaiting evaluation' } });
-				return null;
-			}
-			return claimed;
-		});
+		} catch (error: any) {
+			this.logger.warn(`Worker claim query error: ${error?.message ?? error}`);
+			return;
+		}
 		if (!job) return;
 		const requestId = randomUUID();
 		this.logger.log(`Evaluation job=${job.id} attempt=${job.attemptId} worker=${job.lockedBy ?? 'unknown'} run=${job.runCount} request=${requestId} claimed`);

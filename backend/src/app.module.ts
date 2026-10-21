@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AudioModule } from './modules/audio/audio.module';
+import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
+import { AdminMonitoringModule } from './modules/admin-monitoring/admin-monitoring.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ContentModule } from './modules/content/content.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { EvaluationModule } from './modules/evaluation/evaluation.module';
 import { HealthModule } from './health/health.module';
 import { ImitationModule } from './modules/imitation/imitation.module';
@@ -32,6 +35,9 @@ import { StorageModule } from './shared/storage/storage.module';
     AudioProcessingModule,
     BrowserModule,
     AuthModule,
+    DashboardModule,
+    AdminDashboardModule,
+    AdminMonitoringModule,
     UserModule,
     ProfileModule,
     ContentModule,

@@ -167,7 +167,7 @@ export const learningRoutes: MockRoute[] = [
     handler: (req) => {
       const userId = req.userId as string;
       const user = findUser(userId);
-      const { materialStatus } = accessFor(userId);
+      const { materialStatus, stageAccess } = accessFor(userId);
       const progress = progressSnapshot(userId);
       const lastId = db.lastOpened.get(userId);
       const last = lastId ? activeMaterials().find((m) => m.id === lastId) : undefined;
@@ -181,6 +181,12 @@ export const learningRoutes: MockRoute[] = [
       const latest = results[results.length - 1];
       const latestTask = latest ? CONTENT.tasks.find((t) => t.id === latest.taskId) : undefined;
       const target = continueTarget(userId);
+
+      const completedStages = activeStages()
+        .filter((s) => stageAccess.get(s.id) === 'UNLOCKED')
+        .slice(0, 1)
+        .map((s) => ({ stageId: s.id, stageTitle: s.title, order: 1 }));
+
       return ok({
         greeting: { name: user.name, studentCode: user.studentCode ?? '' },
         learningProgressPct: progress.learningProgressPct,
@@ -190,6 +196,18 @@ export const learningRoutes: MockRoute[] = [
         materialsCompleted: progress.materialsCompleted,
         tasksCompleted: progress.tasksCompleted,
         continueTarget: target ? { materialId: target.materialId } : null,
+        streak: {
+          days: 3,
+          activeToday: true,
+        },
+        dailyTarget: {
+          targetMaterials: 1,
+          completedMaterialsToday: 1,
+          targetTasks: 1,
+          completedTasksToday: 1,
+          isTargetMet: true,
+        },
+        completedStages,
       });
     },
   },

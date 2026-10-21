@@ -13,9 +13,9 @@ export interface MonitoringQuery {
 }
 
 export const STATUS_OPTIONS: { value: EvaluationStatus; label: string }[] = [
-  { value: 'SUBMITTED', label: 'Dalam antrean' },
+  { value: 'SUBMITTED', label: 'Menunggu dinilai' },
   { value: 'PROCESSING', label: 'Sedang diproses' },
-  { value: 'EVALUATED', label: 'Selesai' },
+  { value: 'EVALUATED', label: 'Sudah dinilai' },
   { value: 'FAILED', label: 'Gagal diproses' },
 ];
 

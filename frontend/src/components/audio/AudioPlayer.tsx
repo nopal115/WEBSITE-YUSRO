@@ -1,5 +1,7 @@
 import { Pause, Play } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const PLAYBACK_RATES = [1, 0.75, 1.25] as const;
 
 interface AudioPlayerProps {
   src: string;
@@ -15,6 +17,8 @@ interface AudioPlayerProps {
    * (mis. tombol Putar rekaman di Monitoring), sehingga tetap tidak ada autoplay (SDD 7.11).
    */
   playOnLoad?: boolean;
+  /** Kecepatan awal putar audio (default: 1.0). */
+  initialPlaybackRate?: number;
 }
 
 type PlayerStatus = 'loading' | 'ready' | 'playing' | 'error';
@@ -26,17 +30,34 @@ function formatTime(seconds: number): string {
 }
 
 /**
- * Pemutar audio SDD 7.6.1 / 7.11: tombol putar, durasi, dan bilah posisi yang dapat dipakai
- * dengan papan ketik (Tab, Spasi/Enter, panah). Audio tidak pernah diputar otomatis.
- * [REKOMENDASI] Tampilan menunggu Figma.
+ * Pemutar audio SDD 7.6.1 / 7.11: tombol putar, durasi, kecepatan putar (0.75x, 1x, 1.25x),
+ * dan bilah posisi yang dapat dipakai dengan papan ketik (Tab, Spasi/Enter, panah).
+ * Audio tidak pernah diputar otomatis.
  */
-export function AudioPlayer({ src, label, onExpired, playOnLoad = false }: AudioPlayerProps): JSX.Element {
+export function AudioPlayer({ src, label, onExpired, playOnLoad = false, initialPlaybackRate = 1 }: AudioPlayerProps): JSX.Element {
   const audioRef = useRef<HTMLAudioElement>(null);
   const retriedRef = useRef(false);
   const startedRef = useRef(false);
   const [status, setStatus] = useState<PlayerStatus>('loading');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState<number>(initialPlaybackRate);
+
+  // Selalu sinkronkan playbackRate ke audio element saat state berubah
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate, src]);
+
+  const cycleSpeed = (): void => {
+    const currentIndex = PLAYBACK_RATES.indexOf(playbackRate as (typeof PLAYBACK_RATES)[number]);
+    const nextRate = PLAYBACK_RATES[(currentIndex + 1) % PLAYBACK_RATES.length] ?? 1;
+    setPlaybackRate(nextRate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = nextRate;
+    }
+  };
 
   const handleError = async (): Promise<void> => {
     if (retriedRef.current || !onExpired) {
@@ -70,6 +91,9 @@ export function AudioPlayer({ src, label, onExpired, playOnLoad = false }: Audio
   const playing = status === 'playing';
   const disabled = status === 'loading' || status === 'error';
 
+  const currentIndex = PLAYBACK_RATES.indexOf(playbackRate as (typeof PLAYBACK_RATES)[number]);
+  const nextRate = PLAYBACK_RATES[(currentIndex + 1) % PLAYBACK_RATES.length] ?? 1;
+
   return (
     <div className="flex items-center gap-4 rounded-md border border-neutral-border bg-neutral-surface p-4">
       <audio
@@ -78,6 +102,7 @@ export function AudioPlayer({ src, label, onExpired, playOnLoad = false }: Audio
         preload="metadata"
         onLoadedMetadata={(event) => {
           setDuration(event.currentTarget.duration);
+          event.currentTarget.playbackRate = playbackRate;
           setStatus('ready');
           if (playOnLoad && !startedRef.current) {
             startedRef.current = true;
@@ -85,7 +110,10 @@ export function AudioPlayer({ src, label, onExpired, playOnLoad = false }: Audio
           }
         }}
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
-        onPlay={() => setStatus('playing')}
+        onPlay={(event) => {
+          event.currentTarget.playbackRate = playbackRate;
+          setStatus('playing');
+        }}
         onPause={() => setStatus('ready')}
         onEnded={() => setStatus('ready')}
         onError={() => void handleError()}
@@ -127,6 +155,22 @@ export function AudioPlayer({ src, label, onExpired, playOnLoad = false }: Audio
           <span className="shrink-0 whitespace-nowrap text-caption text-text-secondary" aria-live="off">
             {status === 'loading' ? 'Memuat…' : `${formatTime(currentTime)} / ${formatTime(duration)}`}
           </span>
+
+          {/* Pengatur Kecepatan Putar Audio (0.75x, 1x, 1.25x) */}
+          <button
+            type="button"
+            onClick={cycleSpeed}
+            disabled={disabled}
+            title={`Kecepatan putar: ${playbackRate}x (klik untuk mengubah ke ${nextRate}x)`}
+            aria-label={`Kecepatan putar saat ini ${playbackRate}x. Klik untuk mengubah ke ${nextRate}x`}
+            className={`shrink-0 rounded-md border px-2.5 py-1 text-caption font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary disabled:cursor-not-allowed disabled:opacity-50 ${
+              playbackRate !== 1
+                ? 'border-brand-primary bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20'
+                : 'border-neutral-border bg-neutral-surface-alt text-text-secondary hover:bg-neutral-border hover:text-text-primary'
+            }`}
+          >
+            {playbackRate}x
+          </button>
         </div>
       )}
     </div>

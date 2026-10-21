@@ -60,8 +60,8 @@ afterEach(() => {
 });
 
 describe('auth tiruan', () => {
-  it('login dengan akun contoh dan membaca /auth/me', async () => {
-    const me = await call('GET', 'auth/me');
+  it('login dengan akun contoh dan membaca /user/me', async () => {
+    const me = await call('GET', 'user/me');
     expect(me.status).toBe(200);
     expect(me.body.data).toMatchObject({ email: 'santri@yusro.mock', role: 'SANTRI', studentCode: 'YSR-000001' });
   });
@@ -73,7 +73,7 @@ describe('auth tiruan', () => {
 
   it('logout membatalkan token', async () => {
     await call('POST', 'auth/logout');
-    expect((await call('GET', 'auth/me')).status).toBe(401);
+    expect((await call('GET', 'user/me')).status).toBe(401);
   });
 
   it('akun ADMIN ditolak di endpoint Santri', async () => {

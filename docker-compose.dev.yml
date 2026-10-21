@@ -5,7 +5,7 @@ services:
       POSTGRES_DB: yusro_dev
       POSTGRES_USER: yusro_dev
       POSTGRES_PASSWORD: yusro_dev_only
-    ports: ["127.0.0.1:5432:5432"]
+    ports: ["127.0.0.1:5433:5432"]
     volumes:
       - yusro-dev-db:/var/lib/postgresql/data
     healthcheck:
@@ -16,10 +16,11 @@ services:
   ml:
     build: ./ml-service
     ports: ["8000:8000"]
-  minio:
-    image: minio/minio
-    ports: ["9000:9000"]
-    command: server /data
+  # minio tidak diperlukan untuk dev lokal karena backend menggunakan local filesystem storage (./uploads)
+  # minio:
+  #   image: minio/minio
+  #   ports: ["9000:9000"]
+  #   command: server /data
 
 volumes:
   yusro-dev-db:

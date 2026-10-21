@@ -21,17 +21,43 @@ function Block({ block, onAudioExpired }: { block: MaterialBlock; onAudioExpired
     return <img src={block.imageUrl} alt="Gambar materi" loading="lazy" className="w-full rounded-md" />;
   }
   if (block.arabicContent) {
-    // SDD 7.4.1: Arab L untuk teks pada blok materi; besar dan terpusat (SDD 7.7.7).
+    // Jika merupakan baris tabel huruf (berisi tanda pipa |)
+    if (block.arabicContent.includes('|')) {
+      const cells = block.arabicContent
+        .split('|')
+        .map((c) => c.replace(/<td[^>]*\/>/g, '').trim())
+        .filter((c) => c.length > 0 && c !== '-');
+
+      if (cells.length > 0) {
+        return (
+          <div className="flex flex-wrap items-center justify-center gap-3 py-1.5" dir="rtl">
+            {cells.map((cell, idx) => (
+              <span
+                key={idx}
+                className="inline-flex min-h-12 min-w-14 items-center justify-center rounded-lg border border-neutral-border bg-neutral-surface-alt px-4 py-2 font-arabic text-arabic-l text-text-primary shadow-sm"
+                lang="ar"
+              >
+                {cell}
+              </span>
+            ))}
+          </div>
+        );
+      }
+    }
+
+    // Teks Arab biasa (mis: ayat, doa, atau kalimat bersambung)
     return (
-      <div className="text-center">
-        <p className="font-arabic text-arabic-l text-text-primary" lang="ar" dir="rtl">
+      <div className="py-2 text-center">
+        <p className="font-arabic text-arabic-l leading-loose text-text-primary" lang="ar" dir="rtl">
           {block.arabicContent}
         </p>
         {block.transliteration && <p className="mt-2 text-body text-text-secondary">{block.transliteration}</p>}
       </div>
     );
   }
-  return <p className="text-body-l text-text-primary">{block.textContent}</p>;
+
+  // Teks instruksi pembelajaran bahasa Indonesia
+  return <p className="text-body-l font-medium text-text-primary">{block.textContent}</p>;
 }
 
 function TaskItem({ task }: { task: MaterialTask }): JSX.Element {
@@ -74,8 +100,35 @@ function MaterialContent({ material, onAudioExpired }: { material: MaterialDetai
     return () => observer.disconnect();
   }, [reachedEnd]);
 
-  const state = completionState(material.status, reachedEnd);
-  const blocks = [...material.blocks].sort((a, b) => a.orderIndex - b.orderIndex);
+  const hasPendingTasks = material.tasks.some((t) => t.status !== 'COMPLETED');
+  const state = completionState(material.status, reachedEnd, hasPendingTasks);
+
+  // Normalisasi blocks: jika ada blok yang berupa raw JSON string, unwrap ke blok terpisah
+  const rawBlocks = [...material.blocks].sort((a, b) => a.orderIndex - b.orderIndex);
+  const blocks: MaterialBlock[] = [];
+  for (const b of rawBlocks) {
+    if (b.type === 'TEXT' && b.textContent && b.textContent.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(b.textContent);
+        if (Array.isArray(parsed)) {
+          for (let i = 0; i < parsed.length; i++) {
+            const item = parsed[i];
+            blocks.push({
+              type: item.type ?? 'TEXT',
+              orderIndex: blocks.length + 1,
+              textContent: item.textContent,
+              arabicContent: item.arabicContent,
+              transliteration: item.transliteration,
+            });
+          }
+          continue;
+        }
+      } catch {
+        // Fallback gunakan blok asli bila parse gagal
+      }
+    }
+    blocks.push(b);
+  }
   const { previousMaterialId, nextMaterialId, nextMaterialLocked } = material.navigation;
 
   return (
@@ -141,7 +194,9 @@ function MaterialContent({ material, onAudioExpired }: { material: MaterialDetai
           </Button>
           {state === 'blocked' && (
             <p id="petunjuk-selesai" className="text-center text-body-s text-text-secondary">
-              Pelajari materi sampai akhir untuk menyelesaikannya.
+              {hasPendingTasks
+                ? 'Selesaikan kuis/tugas di atas dan pelajari materi sampai akhir untuk menyelesaikannya.'
+                : 'Pelajari materi sampai akhir untuk menyelesaikannya.'}
             </p>
           )}
         </div>

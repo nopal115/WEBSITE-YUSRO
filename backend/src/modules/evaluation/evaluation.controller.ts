@@ -26,4 +26,10 @@ export class EvaluationController {
 	queue() {
 		return this.evaluationService.getQueue();
 	}
+
+	@Get('admin/evaluation/health')
+	@Roles(UserRole.ADMIN)
+	health() {
+		return this.evaluationService.getHealth();
+	}
 }

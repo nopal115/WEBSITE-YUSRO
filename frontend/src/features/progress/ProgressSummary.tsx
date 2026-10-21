@@ -1,7 +1,9 @@
-import { Lock, LockOpen } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Award, Download, Lock, LockOpen } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { Card } from '../../components/ui/Card';
 import { ProgressBar } from '../../components/ui/ProgressBar';
+import { saveBlob } from '../../lib/utils/download';
+import { reportApi } from '../report/api';
 import type { Progress, ProgressRatio } from './types';
 
 function Companion({ label, ratio }: { label: string; ratio: ProgressRatio }): JSX.Element {
@@ -21,6 +23,20 @@ function Companion({ label, ratio }: { label: string; ratio: ProgressRatio }): J
  * Progress Santri dan Detail Santri (Admin). afterSummary disisipkan setelah dua angka pendamping.
  */
 export function ProgressSummary({ data, afterSummary }: { data: Progress; afterSummary?: ReactNode }): JSX.Element {
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadCertificate = async (stageId: string, stageTitle: string) => {
+    try {
+      setDownloadingId(stageId);
+      const { blob, filename } = await reportApi.downloadCertificate(stageId);
+      saveBlob(blob, filename ?? `Syahadah-${stageTitle.replace(/\s+/g, '_')}.pdf`);
+    } catch {
+      alert('Gagal mengunduh syahadah. Silakan coba beberapa saat lagi.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
     <>
       {/* Tiga ukuran progress selalu berlabel; materi dan tugas hanya rincian (BR-PROGRESS-01/02). */}
@@ -44,20 +60,40 @@ export function ProgressSummary({ data, afterSummary }: { data: Progress; afterS
           {data.stages.map((stage) => {
             const locked = stage.access === 'LOCKED';
             const Icon = locked ? Lock : LockOpen;
+            const completed = stage.pct === 100;
+
             return (
               <li key={stage.id} className="rounded-md border border-neutral-border bg-neutral-surface p-4">
                 <div className="flex items-start justify-between gap-4">
                   <p className="text-body font-semibold text-text-primary">{stage.title}</p>
-                  {/* Hanya Terbuka/Terkunci: field stages tidak memuat status selesai. */}
                   <span className={`flex shrink-0 items-center gap-1 text-label ${locked ? 'text-text-secondary' : 'text-brand-primary'}`}>
                     <Icon size={16} aria-hidden="true" />
-                    {locked ? 'Terkunci' : 'Terbuka'}
+                    {locked ? 'Terkunci' : completed ? 'Selesai' : 'Terbuka'}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-3">
                   <ProgressBar className="flex-1" value={stage.pct} max={100} />
                   <span className="w-12 text-right text-body-s text-text-secondary">{stage.pct}%</span>
                 </div>
+
+                {/* Tombol Unduh Syahadah jika Tahapan telah 100% tuntas */}
+                {completed && (
+                  <div className="mt-3 flex items-center justify-between border-t border-neutral-border pt-3">
+                    <span className="flex items-center gap-1.5 text-caption font-bold text-brand-primary">
+                      <Award size={16} className="text-brand-accent" aria-hidden="true" />
+                      Tahapan Tuntas
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleDownloadCertificate(stage.id, stage.title)}
+                      disabled={downloadingId === stage.id}
+                      className="flex items-center gap-1.5 rounded-md border border-brand-primary bg-brand-primary/10 px-3 py-1.5 text-caption font-bold text-brand-primary hover:bg-brand-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary transition-colors disabled:opacity-50"
+                    >
+                      <Download size={14} aria-hidden="true" />
+                      {downloadingId === stage.id ? 'Mengunduh…' : 'Unduh Syahadah'}
+                    </button>
+                  </div>
+                )}
               </li>
             );
           })}

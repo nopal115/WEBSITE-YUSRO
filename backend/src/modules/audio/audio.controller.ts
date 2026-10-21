@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
@@ -8,33 +10,39 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
-  BadRequestException,
-  Body,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AudioType, UserRole } from '@prisma/client';
-import { IsEnum } from 'class-validator';
+import { IsEnum, IsOptional } from 'class-validator';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { AudioService } from './audio.service';
 
 class UploadAudioDto {
-  @IsEnum(AudioType)
+  @IsEnum(AudioType, { message: 'Tipe audio tidak valid.' })
   type!: AudioType;
 }
 
-@Controller('audio')
+class AdminAudioQueryDto {
+  @IsOptional()
+  @IsEnum(AudioType, { message: 'Jenis audio tidak valid.' })
+  kind?: AudioType;
+
+  @IsOptional()
+  @IsEnum(AudioType, { message: 'Tipe audio tidak valid.' })
+  type?: AudioType;
+}
+
+@Controller('admin/audio')
+@UseGuards(RolesGuard)
+@Roles(UserRole.ADMIN)
 export class AudioController {
   constructor(private readonly audioService: AudioService) {}
 
   @Get()
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
-  list(@Query('type') type?: AudioType) {
-    if (type && !Object.values(AudioType).includes(type)) {
-      throw new BadRequestException('Invalid audio type');
-    }
-    return this.audioService.listAudio(type);
+  list(@Query() query: AdminAudioQueryDto) {
+    const selectedType = query.kind || query.type;
+    return this.audioService.listAudio(selectedType);
   }
 
   @Get(':audioId/url')
@@ -43,10 +51,27 @@ export class AudioController {
   }
 
   @Post()
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 25 * 1024 * 1024 } }))
-  upload(@UploadedFile() file: Express.Multer.File, @Body() input: UploadAudioDto) {
-    return this.audioService.uploadAudio(file, input.type);
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }))
+  upload(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('kind') kind?: AudioType,
+    @Body('type') type?: AudioType,
+  ) {
+    const selectedType = kind || type || AudioType.LEARNING;
+    return this.audioService.uploadAudio(file, selectedType);
+  }
+
+  @Post(':audioId/archive')
+  archive(@Param('audioId', ParseUUIDPipe) audioId: string) {
+    return this.audioService.archiveAudio(audioId);
+  }
+
+  @Post(':audioId/replace')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }))
+  replace(
+    @Param('audioId', ParseUUIDPipe) audioId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.audioService.replaceAudio(audioId, file);
   }
 }

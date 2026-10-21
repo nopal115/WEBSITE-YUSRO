@@ -108,3 +108,68 @@ export class UpdateTaskDto {
   @IsUUID()
   referenceAudioId?: string | null;
 }
+
+export class AdminTaskQueryDto {
+  @IsOptional()
+  @IsEnum(TaskType)
+  type?: TaskType;
+}
+
+export class OptionInputDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
+  @IsOptional()
+  @IsString()
+  text?: string;
+
+  @IsOptional()
+  @IsString()
+  label?: string;
+
+  @IsBoolean()
+  isCorrect!: boolean;
+}
+
+export class AddQuestionDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  prompt!: string;
+
+  @IsOptional()
+  @IsUUID()
+  audioId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  order?: number;
+
+  @IsArray()
+  @ArrayMinSize(2)
+  @ValidateNested({ each: true })
+  @Type(() => OptionInputDto)
+  options!: OptionInputDto[];
+}
+
+export class UpdateQuestionDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  prompt?: string;
+
+  @IsOptional()
+  @IsUUID()
+  audioId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(2)
+  @ValidateNested({ each: true })
+  @Type(() => OptionInputDto)
+  options?: OptionInputDto[];
+}

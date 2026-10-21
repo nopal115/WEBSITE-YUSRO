@@ -73,7 +73,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: authApi.login,
     onSuccess: ({ accessToken }) => {
-      // Buang cache sesi sebelumnya. Data user lengkap (termasuk email) diambil dari /auth/me,
+      // Buang cache sesi sebelumnya. Data user lengkap (termasuk email) diambil dari /user/me,
       // karena ringkasan pada respons login tidak memuat email (SDD 5.6).
       queryClient.clear();
       tokenStore.set(accessToken);

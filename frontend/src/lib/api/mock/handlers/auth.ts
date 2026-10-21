@@ -124,7 +124,7 @@ export const authRoutes: MockRoute[] = [
   },
   {
     method: 'GET',
-    pattern: '/auth/me',
+    pattern: '/user/me',
     access: 'any',
     handler: (req) => ok(toUser(findUser(req.userId))),
   },

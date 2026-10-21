@@ -1,31 +1,24 @@
 import { ContentStatus } from '@prisma/client';
-import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
-  IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
-  Min,
-  MinLength,
 } from 'class-validator';
 
 export class CreateStageDto {
   @IsString()
-  @MinLength(1)
-  @MaxLength(150)
+  @IsNotEmpty({ message: 'Judul tahapan wajib diisi.' })
+  @MaxLength(150, { message: 'Judul tahapan maksimal 150 karakter.' })
   title!: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(2_000)
+  @MaxLength(2000, { message: 'Deskripsi maksimal 2000 karakter.' })
   description?: string;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  order!: number;
 
   @IsOptional()
   @IsEnum(ContentStatus)
@@ -35,20 +28,13 @@ export class CreateStageDto {
 export class UpdateStageDto {
   @IsOptional()
   @IsString()
-  @MinLength(1)
-  @MaxLength(150)
+  @MaxLength(150, { message: 'Judul tahapan maksimal 150 karakter.' })
   title?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(2_000)
-  description?: string | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  order?: number;
+  @MaxLength(2000, { message: 'Deskripsi maksimal 2000 karakter.' })
+  description?: string;
 
   @IsOptional()
   @IsEnum(ContentStatus)
@@ -57,23 +43,18 @@ export class UpdateStageDto {
 
 export class CreateMaterialDto {
   @IsString()
-  @MinLength(1)
-  @MaxLength(150)
+  @IsNotEmpty({ message: 'Tahapan wajib dipilih.' })
+  stageId!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Judul materi wajib diisi.' })
+  @MaxLength(200, { message: 'Judul materi maksimal 200 karakter.' })
   title!: string;
 
   @IsOptional()
   @IsString()
-  contentText?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(2_048)
-  contentImageUrl?: string;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  order!: number;
+  @MaxLength(2000, { message: 'Ringkasan materi maksimal 2000 karakter.' })
+  summary?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -87,24 +68,13 @@ export class CreateMaterialDto {
 export class UpdateMaterialDto {
   @IsOptional()
   @IsString()
-  @MinLength(1)
-  @MaxLength(150)
+  @MaxLength(200, { message: 'Judul materi maksimal 200 karakter.' })
   title?: string;
 
   @IsOptional()
   @IsString()
-  contentText?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(2_048)
-  contentImageUrl?: string | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  order?: number;
+  @MaxLength(2000, { message: 'Ringkasan materi maksimal 2000 karakter.' })
+  summary?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -113,4 +83,14 @@ export class UpdateMaterialDto {
   @IsOptional()
   @IsEnum(ContentStatus)
   status?: ContentStatus;
+}
+
+export class ReorderDto {
+  @IsArray()
+  orderedIds!: string[];
+}
+
+export class SaveBlocksDto {
+  @IsArray()
+  blocks!: any[];
 }

@@ -21,5 +21,8 @@ export const adminMonitoringApi = {
 
   getHealth: (signal?: AbortSignal): Promise<ServiceHealth> => apiRequest<ServiceHealth>('admin/evaluation/health', { signal }),
 
+  grade: (id: string, payload: { score: number; feedbackCategory?: string; notes?: string }): Promise<AdminSubmission> =>
+    apiRequest<AdminSubmission>(`${base(id)}/grade`, { method: 'POST', body: JSON.stringify(payload) }),
+
   getTasks: (type: TaskType, signal?: AbortSignal): Promise<TaskOption[]> => apiRequest<TaskOption[]>(`admin/tasks?type=${type}`, { signal }),
 };

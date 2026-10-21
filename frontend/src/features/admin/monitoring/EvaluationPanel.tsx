@@ -44,9 +44,9 @@ export function EvaluationPanel(): JSX.Element {
           ) : (
             <>
               <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Count label="Dalam antrean" value={queue.data.counts.SUBMITTED} />
+                <Count label="Menunggu dinilai" value={queue.data.counts.SUBMITTED} />
                 <Count label="Sedang diproses" value={queue.data.counts.PROCESSING} />
-                <Count label="Selesai (24 jam)" value={queue.data.counts.EVALUATED} />
+                <Count label="Sudah dinilai (24 jam)" value={queue.data.counts.EVALUATED} />
                 <Count label="Gagal diproses (24 jam)" value={queue.data.counts.FAILED} />
               </dl>
               {queue.data.oldestWaitingSince && <p className="text-body-s text-text-secondary">Antrean tertua sejak {formatDateTime(queue.data.oldestWaitingSince)}</p>}

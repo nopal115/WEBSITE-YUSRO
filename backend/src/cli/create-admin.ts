@@ -16,7 +16,12 @@ async function main(): Promise<void> {
   try {
     await prisma.user.upsert({
       where: { email },
-      update: { name, role: UserRole.ADMIN, status: AccountStatus.ACTIVE },
+      update: {
+        name,
+        password: await argon2.hash(password),
+        role: UserRole.ADMIN,
+        status: AccountStatus.ACTIVE,
+      },
       create: {
         email,
         name,

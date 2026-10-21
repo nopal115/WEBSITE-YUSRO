@@ -140,11 +140,15 @@ function QuizSession({ task, onAudioExpired }: { task: QuizTask; onAudioExpired:
     <QuizFrame indicator={`Soal ${step.index + 1} dari ${total}`} value={step.index + 1} max={total} onExit={handleExit} exitRef={exitRef}>
       <div>
         <p className="text-label text-brand-primary">{task.title}</p>
-        <p className="mt-1 text-body-s text-text-secondary">{task.instruction}</p>
+        <p className="mt-1 text-body-s text-text-secondary">
+          {question.audioUrl ? task.instruction : 'Pilihlah jawaban yang benar sesuai pertanyaan di bawah ini.'}
+        </p>
         <h1 className="mt-3 text-h2">{question.prompt}</h1>
       </div>
-      {/* Audio soal tidak pernah diputar otomatis (SDD 7.11). */}
-      <AudioPlayer key={question.id} src={question.audioUrl} label="audio soal" onExpired={onAudioExpired} />
+      {/* Audio soal hanya ditampilkan jika tersedia audio (SDD 7.11). */}
+      {Boolean(question.audioUrl) && (
+        <AudioPlayer key={question.id} src={question.audioUrl} label="audio soal" onExpired={onAudioExpired} />
+      )}
       <div className="grid grid-cols-2 gap-4" role="group" aria-label="Pilihan jawaban">
         {question.options.map((option) => (
           <LetterCard key={option.id} letter={option.arabicLabel} label={option.label} selected={selected === option.id} onClick={() => setAnswers((current) => ({ ...current, [question.id]: option.id }))} />

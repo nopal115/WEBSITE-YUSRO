@@ -63,3 +63,25 @@ export function useRetrySubmission() {
     },
   });
 }
+
+export function useGradeSubmission() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ submissionId, score, feedbackCategory, notes }: { submissionId: string; score: number; feedbackCategory?: string; notes?: string }) =>
+      adminMonitoringApi.grade(submissionId, { score, feedbackCategory, notes }),
+    onSuccess: (updated) => {
+      queryClient.setQueriesData<Paginated<AdminSubmission>>({ queryKey: adminMonitoringKeys.submissions }, (current) =>
+        current
+          ? {
+              ...current,
+              data: current.data.map((item) => (item.submissionId === updated.submissionId ? updated : item)),
+            }
+          : current,
+      );
+      void queryClient.invalidateQueries({ queryKey: adminMonitoringKeys.all });
+      void queryClient.invalidateQueries({ queryKey: adminDashboardKeys.summary, refetchType: 'all' });
+      void queryClient.invalidateQueries({ queryKey: adminStudentKeys.all, refetchType: 'all' });
+    },
+  });
+}
+

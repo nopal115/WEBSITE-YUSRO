@@ -62,6 +62,24 @@ function filenameFromDisposition(header: string | null): string | null {
   return match ? match[1] : null;
 }
 
+async function refreshAccessToken(): Promise<string | null> {
+  try {
+    const response = await fetch(`${getBaseUrl()}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    });
+    const payload = await readBody(response);
+    if (!response.ok) throw createApiError(response.status, payload);
+    const parsed = parseSuccess<{ accessToken: string }>(payload);
+    tokenStore.set(parsed.accessToken);
+    return parsed.accessToken;
+  } catch {
+    tokenStore.clear();
+    return null;
+  }
+}
+
 /** Mengirim request dan mengembalikan Response yang sukses; galat diubah menjadi ApiError. */
 async function send(path: string, options: RequestOptions): Promise<Response> {
   const { method = 'GET', body, auth = true, signal } = options;
@@ -86,7 +104,7 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
       const { mockFetch } = await import('./mock');
       response = await mockFetch(method, path, { headers, body: requestBody });
     } else {
-      response = await fetch(url, { method, headers, body: requestBody, signal });
+      response = await fetch(url, { method, headers, body: requestBody, signal, credentials: 'include' });
     }
   } catch (error) {
     // Pembatalan (mis. oleh TanStack Query) diteruskan apa adanya.
@@ -99,6 +117,26 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     const error = createApiError(response.status, payload);
     // Sesi berakhir: token tidak berlaku, atau akun dinonaktifkan saat sesi masih aktif (SDD 3.16.5).
     const inactive = response.status === 403 && error.code === 'AUTH_ACCOUNT_INACTIVE';
+
+    if (auth && response.status === 401 && path !== 'auth/refresh') {
+      const nextToken = await refreshAccessToken();
+      if (nextToken) {
+        const retryHeaders: Record<string, string> = { ...headers, Authorization: `Bearer ${nextToken}` };
+        try {
+          if (import.meta.env.VITE_USE_MOCK === 'true') {
+            const { mockFetch } = await import('./mock');
+            response = await mockFetch(method, path, { headers: retryHeaders, body: requestBody });
+          } else {
+            response = await fetch(url, { method, headers: retryHeaders, body: requestBody, signal, credentials: 'include' });
+          }
+        } catch (retryError) {
+          if (isAbortError(retryError)) throw retryError;
+          throw createNetworkError(retryError);
+        }
+        if (response.ok) return response;
+      }
+    }
+
     if (auth && (response.status === 401 || inactive)) {
       // Handler (navigasi ke /login) dipanggil sebelum token dihapus, agar pengalihan ProtectedRoute
       // tidak menimpa state navigasi (mis. pesan akun dinonaktifkan).

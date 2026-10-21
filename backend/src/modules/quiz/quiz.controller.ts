@@ -16,12 +16,28 @@ export class QuizController {
 		return this.quizService.listTasks(request.user.id);
 	}
 
-	@Post('tasks/:taskId/attempts')
+	@Get('tasks/:taskId')
+	getTask(
+		@Req() request: AuthenticatedRequest,
+		@Param('taskId', ParseUUIDPipe) taskId: string,
+	) {
+		return this.quizService.getTask(request.user.id, taskId);
+	}
+
+	@Post('tasks/:taskId/submit')
 	submitAttempt(
 		@Req() request: AuthenticatedRequest,
 		@Param('taskId', ParseUUIDPipe) taskId: string,
 		@Body() input: SubmitQuizDto,
 	) {
 		return this.quizService.submitAttempt(request.user.id, taskId, input);
+	}
+
+	@Get('attempts/:attemptId')
+	getAttempt(
+		@Req() request: AuthenticatedRequest,
+		@Param('attemptId', ParseUUIDPipe) attemptId: string,
+	) {
+		return this.quizService.getAttempt(request.user.id, attemptId);
 	}
 }

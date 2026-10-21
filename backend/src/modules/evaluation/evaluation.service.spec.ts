@@ -13,7 +13,7 @@ describe('EvaluationService worker rules', () => {
 		};
 		const prisma = {
 			$transaction: jest.fn(async (work: unknown) => typeof work === 'function' ? (work as (client: typeof tx) => unknown)(tx) : Promise.all(work as Promise<unknown>[])),
-			attempt: { findMany: jest.fn(), updateMany: jest.fn() },
+			attempt: { count: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
 			evaluationJob: { updateMany: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
 		};
 		const mlClient = { evaluate: jest.fn(), getHealth: jest.fn() };
@@ -168,12 +168,17 @@ describe('EvaluationService worker rules', () => {
 
 	it('creates an auditable retry only for a failed attempt', async () => {
 		const { service, tx } = createService();
-		tx.attempt.findUnique.mockResolvedValue({ id: 'attempt-1', evaluationStatus: EvaluationStatus.FAILED });
+		tx.attempt.findUnique.mockResolvedValue({ id: 'attempt-1', attemptNo: 2, evaluationStatus: EvaluationStatus.FAILED });
 		tx.attempt.updateMany.mockResolvedValue({ count: 1 });
 		tx.evaluationJob.create.mockResolvedValue({ id: 'job-2' });
 
 		await expect(service.retryByAdmin('admin-1', 'attempt-1')).resolves.toEqual({
-			submissionId: 'attempt-1', jobId: 'job-2', status: EvaluationStatus.SUBMITTED,
+			submissionId: 'attempt-1',
+			jobId: 'job-2',
+			status: EvaluationStatus.SUBMITTED,
+			evaluationStatus: EvaluationStatus.SUBMITTED,
+			attemptNo: 2,
+			isRetry: true,
 		});
 		expect(tx.evaluationJob.create).toHaveBeenCalledWith({ data: { attemptId: 'attempt-1', isRetry: true, requestedById: 'admin-1' } });
 		expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'EVALUATION_RETRY_REQUESTED' }) }));
@@ -190,11 +195,27 @@ describe('EvaluationService worker rules', () => {
 	it('includes failed jobs in the admin queue while retaining all status counts', async () => {
 		const { service, prisma } = createService();
 		prisma.evaluationJob.findMany.mockResolvedValue([]);
-		prisma.evaluationJob.groupBy.mockResolvedValue([{ status: JobStatus.FAILED, _count: { _all: 2 } }]);
+		prisma.attempt.count.mockResolvedValueOnce(1).mockResolvedValueOnce(2).mockResolvedValueOnce(3).mockResolvedValueOnce(4);
+		prisma.attempt.findFirst.mockResolvedValue({ submittedAt: new Date('2026-10-01T00:00:00Z') });
 
-		await expect(service.getQueue()).resolves.toEqual({ jobs: [], counts: { FAILED: 2 } });
+		await expect(service.getQueue()).resolves.toEqual({
+			jobs: [],
+			counts: { SUBMITTED: 1, PROCESSING: 2, EVALUATED: 3, FAILED: 4 },
+			oldestWaitingSince: '2026-10-01T00:00:00.000Z',
+		});
 		expect(prisma.evaluationJob.findMany).toHaveBeenCalledWith(expect.objectContaining({
 			where: { status: { in: [JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.FAILED] } },
 		}));
+	});
+
+	it('reports unavailable ML health as a usable admin status', async () => {
+		const { service, mlClient } = createService();
+		mlClient.getHealth.mockRejectedValue(new Error('offline'));
+
+		await expect(service.getHealth()).resolves.toMatchObject({
+			serviceStatus: 'unavailable',
+			modelVersion: null,
+			modelLoaded: false,
+		});
 	});
 });

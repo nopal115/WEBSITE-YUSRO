@@ -179,8 +179,181 @@ export const monitoringRoutes: MockRoute[] = [
       return ok(
         CONTENT.tasks
           .filter((task) => !type || task.type === type)
-          .map((task) => ({ id: task.id, title: task.title, type: task.type, materialTitle: taskInfo(task.id).materialTitle, status: 'ACTIVE' })),
+          .map((task, idx) => {
+            const info = taskInfo(task.id);
+            const mat = CONTENT.materials.find((m) => m.id === task.materialId);
+            const stg = mat ? CONTENT.stages.find((s) => s.id === mat.stageId) : CONTENT.stages[0];
+            return {
+              id: task.id,
+              title: task.title,
+              type: task.type,
+              status: 'ACTIVE' as const,
+              order: idx + 1,
+              stageId: stg?.id ?? '',
+              stageTitle: stg?.title ?? '',
+              materialId: task.materialId,
+              materialTitle: info.materialTitle,
+              questionCount: task.type === 'QUIZ' ? task.questions.length : 0,
+              isReferenced: false,
+            };
+          }),
       );
+    },
+  },
+  {
+    method: 'GET',
+    pattern: '/admin/tasks/:taskId',
+    access: 'ADMIN',
+    handler: (req) => {
+      const task = CONTENT.tasks.find((t) => t.id === req.params.taskId);
+      if (!task) throw httpError(404, 'NOT_FOUND', 'Tugas tidak ditemukan.');
+      const info = taskInfo(task.id);
+      const mat = CONTENT.materials.find((m) => m.id === task.materialId);
+      const stg = mat ? CONTENT.stages.find((s) => s.id === mat.stageId) : CONTENT.stages[0];
+      return ok({
+        id: task.id,
+        title: task.title,
+        type: task.type,
+        status: 'ACTIVE' as const,
+        order: 1,
+        stageId: stg?.id ?? '',
+        stageTitle: stg?.title ?? '',
+        materialId: task.materialId,
+        materialTitle: info.materialTitle,
+        referenceAudioId: task.type === 'IMITATION' ? 'aud-1' : null,
+        questionCount: task.type === 'QUIZ' ? task.questions.length : 0,
+        questions:
+          task.type === 'QUIZ'
+            ? task.questions.map((q, idx) => ({
+                id: q.id,
+                prompt: q.prompt,
+                order: idx + 1,
+                audioId: null,
+                options: q.options.map((opt) => ({
+                  id: opt.id,
+                  text: opt.label,
+                  label: opt.label,
+                  isCorrect: opt.id === q.correctOptionId,
+                })),
+              }))
+            : [],
+      });
+    },
+  },
+  {
+    method: 'POST',
+    pattern: '/admin/tasks',
+    access: 'ADMIN',
+    handler: (req) => {
+      const body = (req.body ?? {}) as any;
+      const id = `tsk-${Date.now()}`;
+      const newTask = {
+        id,
+        materialId: body.materialId || 'mat-t001m001',
+        type: body.type || 'QUIZ',
+        title: body.title || 'Tugas Baru',
+        instruction: 'Ikuti instruksi tugas.',
+        ...(body.type === 'QUIZ'
+          ? { questions: [] }
+          : { arabicText: 'ا', referenceDurationMs: 2000 }),
+      };
+      CONTENT.tasks.push(newTask as any);
+      return ok(newTask, { status: 201, message: 'Tugas berhasil dibuat.' });
+    },
+  },
+  {
+    method: 'PATCH',
+    pattern: '/admin/tasks/:taskId',
+    access: 'ADMIN',
+    handler: (req) => {
+      const task = CONTENT.tasks.find((t) => t.id === req.params.taskId);
+      if (!task) throw httpError(404, 'NOT_FOUND', 'Tugas tidak ditemukan.');
+      const body = (req.body ?? {}) as any;
+      if (body.title) task.title = body.title;
+      return ok(task, { message: 'Tugas berhasil diperbarui.' });
+    },
+  },
+  {
+    method: 'DELETE',
+    pattern: '/admin/tasks/:taskId',
+    access: 'ADMIN',
+    handler: (req) => {
+      const idx = CONTENT.tasks.findIndex((t) => t.id === req.params.taskId);
+      if (idx === -1) throw httpError(404, 'NOT_FOUND', 'Tugas tidak ditemukan.');
+      CONTENT.tasks.splice(idx, 1);
+      return ok(null, { message: 'Tugas berhasil dihapus.' });
+    },
+  },
+  {
+    method: 'POST',
+    pattern: '/admin/tasks/:taskId/publish',
+    access: 'ADMIN',
+    handler: (req) => {
+      const task = CONTENT.tasks.find((t) => t.id === req.params.taskId);
+      if (!task) throw httpError(404, 'NOT_FOUND', 'Tugas tidak ditemukan.');
+      return ok(task, { message: 'Tugas berhasil diterbitkan.' });
+    },
+  },
+  {
+    method: 'POST',
+    pattern: '/admin/tasks/:taskId/questions',
+    access: 'ADMIN',
+    handler: (req) => {
+      const task = CONTENT.tasks.find((t) => t.id === req.params.taskId);
+      if (!task || task.type !== 'QUIZ') throw httpError(404, 'NOT_FOUND', 'Tugas kuis tidak ditemukan.');
+      const body = (req.body ?? {}) as any;
+      const qId = `q-${Date.now()}`;
+      const correctOpt = body.options?.find((o: any) => o.isCorrect);
+      const newQ = {
+        id: qId,
+        orderIndex: task.questions.length + 1,
+        prompt: body.prompt || '',
+        audioKey: '',
+        options: (body.options || []).map((o: any, i: number) => ({
+          id: `opt-${i}`,
+          label: o.text || o.label || '',
+          arabicLabel: '',
+          orderIndex: i + 1,
+        })),
+        correctOptionId: correctOpt?.id || 'opt-0',
+      };
+      task.questions.push(newQ);
+      return ok(newQ, { status: 201, message: 'Soal berhasil ditambahkan.' });
+    },
+  },
+  {
+    method: 'PATCH',
+    pattern: '/admin/questions/:questionId',
+    access: 'ADMIN',
+    handler: (req) => {
+      for (const t of CONTENT.tasks) {
+        if (t.type === 'QUIZ') {
+          const q = t.questions.find((item) => item.id === req.params.questionId);
+          if (q) {
+            const body = (req.body ?? {}) as any;
+            if (body.prompt) q.prompt = body.prompt;
+            return ok(q, { message: 'Soal berhasil diperbarui.' });
+          }
+        }
+      }
+      throw httpError(404, 'NOT_FOUND', 'Soal tidak ditemukan.');
+    },
+  },
+  {
+    method: 'DELETE',
+    pattern: '/admin/questions/:questionId',
+    access: 'ADMIN',
+    handler: (req) => {
+      for (const t of CONTENT.tasks) {
+        if (t.type === 'QUIZ') {
+          const idx = t.questions.findIndex((item) => item.id === req.params.questionId);
+          if (idx !== -1) {
+            t.questions.splice(idx, 1);
+            return ok(null, { message: 'Soal berhasil dihapus.' });
+          }
+        }
+      }
+      throw httpError(404, 'NOT_FOUND', 'Soal tidak ditemukan.');
     },
   },
 ];

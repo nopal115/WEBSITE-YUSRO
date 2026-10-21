@@ -163,10 +163,11 @@ integrationDescribe('Backend business integration', () => {
 
   it('authenticates a student and carries role/status claims', async () => {
     const users = new UserService(prisma);
-    const auth = new AuthService(users, new JwtService({ secret: 'integration-secret' }));
+    const jwt = new JwtService({ secret: 'integration-secret' });
+    const auth = new AuthService(users, jwt, prisma);
     const login = await auth.login({ email: `integration-${suffix}@yusro.local`, password: 'integration-password' });
     const strategy = new JwtStrategy();
-    const payload = new JwtService({ secret: 'integration-secret' }).verify(login.accessToken);
+    const payload = jwt.verify(login.accessToken);
     expect(payload.role).toBe(UserRole.SANTRI);
     expect(payload.status).toBe(AccountStatus.ACTIVE);
     expect(strategy.validate(payload)).toMatchObject({ id: userId, role: UserRole.SANTRI });
@@ -182,7 +183,7 @@ integrationDescribe('Backend business integration', () => {
   });
 
   it('unlocks materials in order and completes material progress', async () => {
-    const learning = new LearningService(prisma);
+    const learning = new LearningService(prisma, { getSignedGetUrl: async () => '/mock/audio.mp3' } as any);
     let stages = await learning.getStages(userId);
     expect(stages.find(stage => stage.id === stageId)?.materials[0].isUnlocked).toBe(true);
     expect(stages.find(stage => stage.id === stageId)?.materials[1].isUnlocked).toBe(false);

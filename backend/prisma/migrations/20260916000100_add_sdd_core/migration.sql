@@ -55,5 +55,5 @@ CREATE TABLE "password_reset_tokens" (
 );
 CREATE TABLE "audit_logs" ("id" TEXT NOT NULL, "actorId" TEXT, "action" TEXT NOT NULL, "entityType" TEXT NOT NULL, "entityId" TEXT, "metadata" JSONB, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id"));
 
-ALTER TABLE "AudioAsset" ADD CONSTRAINT "chk_recording_duration" CHECK ("type" <> 'RECORDING' OR "durationMs" BETWEEN 2000 AND 60000);
+ALTER TABLE "AudioAsset" ADD CONSTRAINT "chk_recording_duration" CHECK ("type" <> 'RECORDING' OR "durationMs" BETWEEN 500 AND 60000);
 ALTER TABLE "AudioAsset" ADD CONSTRAINT "chk_recording_size" CHECK ("type" <> 'RECORDING' OR "sizeBytes" <= 10485760);

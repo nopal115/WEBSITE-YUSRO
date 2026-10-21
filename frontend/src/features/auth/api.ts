@@ -12,6 +12,8 @@ export const authApi = {
   login: (input: LoginInput): Promise<LoginResponse> =>
     apiRequest<LoginResponse>('auth/login', { method: 'POST', body: input, auth: false }),
 
+  refresh: (): Promise<LoginResponse> => apiRequest<LoginResponse>('auth/refresh', { method: 'POST', auth: false }),
+
   logout: (): Promise<void> => apiRequest<void>('auth/logout', { method: 'POST' }),
 
   forgotPassword: (input: ForgotPasswordInput): Promise<ParsedSuccess<null>> =>
@@ -20,7 +22,7 @@ export const authApi = {
   resetPassword: (input: ResetPasswordInput): Promise<ParsedSuccess<null>> =>
     apiRequestWithMeta<null>('auth/reset-password', { method: 'POST', body: input, auth: false }),
 
-  getMe: (signal?: AbortSignal): Promise<User> => apiRequest<User>('auth/me', { signal }),
+  getMe: (signal?: AbortSignal): Promise<User> => apiRequest<User>('user/me', { signal }),
 };
 
 /** Pesan khusus endpoint login (SDD 3.2.7); status lain memakai pesan umum ApiError. */

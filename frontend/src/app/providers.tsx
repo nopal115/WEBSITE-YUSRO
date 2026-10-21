@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ApiError } from '../lib/api/ApiError';
 import { setUnauthorizedHandler } from '../lib/api/client';
 import { sessionNotice } from '../lib/auth/sessionNotice';
+import { ThemeProvider } from '../lib/theme/ThemeContext';
 import { router } from './router';
 
 const MAX_QUERY_RETRIES = 2;
@@ -41,5 +42,9 @@ export function AppProviders({ children }: { children: ReactNode }): JSX.Element
     [queryClient],
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </ThemeProvider>
+  );
 }

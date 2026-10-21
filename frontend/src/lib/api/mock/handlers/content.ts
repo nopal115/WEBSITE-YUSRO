@@ -396,4 +396,42 @@ export const contentRoutes: MockRoute[] = [
       return ok({ url: mockAudioUrl(`audio:${audio.id}`, audio.durationMs), expiresInSeconds: AUDIO_URL_SECONDS });
     },
   },
+  {
+    method: 'POST',
+    pattern: '/admin/audio',
+    access: 'ADMIN',
+    handler: () => {
+      const newAudio = {
+        id: `aud-${Date.now()}`,
+        kind: 'LEARNING' as const,
+        originalName: 'audio-unggah.mp3',
+        durationMs: 3000,
+        status: 'ACTIVE' as const,
+      };
+      CONTENT.audio.push(newAudio);
+      return ok(newAudio, { status: 201, message: 'Audio berhasil diunggah.' });
+    },
+  },
+  {
+    method: 'POST',
+    pattern: '/admin/audio/:id/archive',
+    access: 'ADMIN',
+    handler: (req) => {
+      const audio = CONTENT.audio.find((item) => item.id === req.params.id);
+      if (!audio) throw httpError(404, 'NOT_FOUND', 'Data tidak ditemukan.');
+      audio.status = 'ARCHIVED';
+      return ok(audio, { message: 'Audio berhasil diarsipkan.' });
+    },
+  },
+  {
+    method: 'POST',
+    pattern: '/admin/audio/:id/replace',
+    access: 'ADMIN',
+    handler: (req) => {
+      const audio = CONTENT.audio.find((item) => item.id === req.params.id);
+      if (!audio) throw httpError(404, 'NOT_FOUND', 'Data tidak ditemukan.');
+      audio.originalName = 'audio-pengganti.mp3';
+      return ok(audio, { message: 'Audio berhasil diganti.' });
+    },
+  },
 ];

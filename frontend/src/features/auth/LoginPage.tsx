@@ -2,8 +2,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation } from 'react-router-dom';
+import { InstallPwaButton } from '../../components/pwa/InstallPwaButton';
 import { Button } from '../../components/ui/Button';
 import { TextField } from '../../components/ui/TextField';
+import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { sessionNotice } from '../../lib/auth/sessionNotice';
 import { useLogin } from '../../lib/hooks/useAuth';
 import { getLoginErrorMessage } from './api';
@@ -62,9 +64,13 @@ export function LoginPage(): JSX.Element {
         <p className="text-body-s opacity-[0.55]">Badan Riset dan Inovasi Nasional</p>
       </aside>
 
-      <main className="flex flex-1 items-center justify-center px-6 py-12">
+      <main className="relative flex flex-1 items-center justify-center px-6 py-12">
+        <div className="absolute right-6 top-6">
+          <ThemeToggle />
+        </div>
+
         <div className="w-full max-w-[440px]">
-          {/* [REKOMENDASI] Tidak ada di Figma: pengganti panel kiri di bawah 1024px. */}
+          {/* Pengganti panel kiri di bawah 1024px */}
           <div className="mb-10 flex items-center gap-4 lg:hidden">
             <BrandLogo />
             <span className="text-h1 text-brand-primary">Yusro</span>
@@ -74,7 +80,7 @@ export function LoginPage(): JSX.Element {
             <h1 className="text-display text-text-primary">Masuk</h1>
             <p className="text-body-l text-text-secondary">Lanjutkan pembelajaran Anda</p>
 
-            {/* [REKOMENDASI] Tidak ada di Figma: kotak pesan sukses. */}
+            {/* Kotak pesan status/sukses */}
             {typeof notice === 'string' && (
               <div className={`rounded-md px-5 py-3 text-body-s ${noticeClass}`} role="status">
                 {notice}
@@ -103,7 +109,6 @@ export function LoginPage(): JSX.Element {
               </Link>
             </div>
 
-            {/* [REKOMENDASI] Tidak ada di Figma: kotak error dari server (SDD 7.7.2). */}
             {serverError && (
               <div className="rounded-md bg-feedback-salah-soft px-5 py-3 text-body-s text-feedback-salah" role="alert">
                 {serverError}
@@ -120,6 +125,9 @@ export function LoginPage(): JSX.Element {
                 Registrasi
               </Link>
             </div>
+
+            {/* Tombol Install PWA untuk pengguna di HP */}
+            <InstallPwaButton className="mt-2 w-full justify-center" />
           </form>
         </div>
       </main>

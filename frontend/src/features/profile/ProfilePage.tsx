@@ -1,12 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { useForm, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { TextField } from '../../components/ui/TextField';
 import { ApiError } from '../../lib/api/ApiError';
-import { AUTH_ME_QUERY_KEY } from '../../lib/hooks/useAuth';
+import { AUTH_ME_QUERY_KEY, useAuth } from '../../lib/hooks/useAuth';
 import { reportFileName, saveBlob } from '../../lib/utils/download';
 import { changePasswordSchema, profileNameSchema, type ChangePasswordFormValues, type ProfileNameFormValues } from '../auth/authSchemas';
 import { ErrorState, ListSkeleton } from '../learning/QueryStates';
@@ -140,8 +142,35 @@ function ReportSection({ studentCode }: { studentCode: string }): JSX.Element {
   );
 }
 
+function LogoutSection(): JSX.Element {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const [pending, setPending] = useState(false);
+
+  const handleLogout = async (): Promise<void> => {
+    setPending(true);
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-body text-text-secondary">Keluar dari sesi pembelajaran saat ini pada perangkat ini.</p>
+      <Button
+        variant="salah"
+        className="self-start"
+        isLoading={pending}
+        loadingText="KELUAR…"
+        onClick={() => void handleLogout()}
+      >
+        <LogOut size={20} className="mr-2 shrink-0" aria-hidden="true" />
+        KELUAR DARI AKUN
+      </Button>
+    </div>
+  );
+}
+
 // SDD 7.7.15 (UI-PROFILE-01/02). [REKOMENDASI] Tampilan disusun dari SDD dan UI kit; Figma 20 belum dicocokkan.
-// Tombol logout belum ditambahkan (menunggu desain).
 export function ProfilePage(): JSX.Element {
   const { data, isPending, isError, error, refetch } = useQuery({ queryKey: PROFILE_KEY, queryFn: ({ signal }) => profileApi.get(signal) });
 
@@ -190,6 +219,11 @@ export function ProfilePage(): JSX.Element {
       <Card className="flex flex-col gap-5">
         <h2 className="text-h3">Laporan</h2>
         <ReportSection studentCode={data.studentCode} />
+      </Card>
+
+      <Card className="flex flex-col gap-5 border-status-salah/20">
+        <h2 className="text-h3 text-status-salah">Keluar dari akun</h2>
+        <LogoutSection />
       </Card>
     </div>
   );

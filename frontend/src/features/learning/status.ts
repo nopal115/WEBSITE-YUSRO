@@ -41,7 +41,7 @@ export type CompletionState = 'done' | 'ready' | 'blocked';
  * Syarat "audio wajib diputar" pada SDD 3.8.4 tidak dipakai karena kontrak API tidak menandai
  * audio mana yang wajib (keputusan proyek).
  */
-export function completionState(status: MaterialStatus, reachedEnd: boolean): CompletionState {
+export function completionState(status: MaterialStatus, reachedEnd: boolean, hasPendingTasks = false): CompletionState {
   if (status === 'COMPLETED') return 'done';
-  return reachedEnd ? 'ready' : 'blocked';
+  return reachedEnd && !hasPendingTasks ? 'ready' : 'blocked';
 }

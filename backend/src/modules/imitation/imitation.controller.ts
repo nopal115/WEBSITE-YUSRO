@@ -23,7 +23,7 @@ export class ImitationController {
 	@Post('tasks/:taskId/submissions')
 	@UseGuards(RolesGuard)
 	@Roles(UserRole.SANTRI)
-	@UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 10 * 1024 * 1024 } }))
+	@UseInterceptors(FileInterceptor('audio_file', { limits: { fileSize: 10 * 1024 * 1024 } }))
 	submitRecording(
 		@Req() request: Request & { user: { id: string } },
 		@Param('taskId', ParseUUIDPipe) taskId: string,

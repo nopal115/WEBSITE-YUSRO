@@ -47,4 +47,32 @@ export const progressRoutes: MockRoute[] = [
       };
     },
   },
+  {
+    method: 'GET',
+    pattern: '/report/certificate/:stageId',
+    access: 'SANTRI',
+    handler: (req) => {
+      const user = findUser(req.userId);
+      const date = new Date().toISOString().slice(0, 10);
+      return {
+        status: 200,
+        blob: mockPdf(`Syahadah Kelulusan Tahap [CONTOH] - ${user.name} - ${date}`),
+        headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="Syahadah-${user.studentCode}.pdf"` },
+      };
+    },
+  },
+  {
+    method: 'GET',
+    pattern: '/report/certificate',
+    access: 'SANTRI',
+    handler: (req) => {
+      const user = findUser(req.userId);
+      const date = new Date().toISOString().slice(0, 10);
+      return {
+        status: 200,
+        blob: mockPdf(`Syahadah Kelulusan Tahap [CONTOH] - ${user.name} - ${date}`),
+        headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="Syahadah-${user.studentCode}.pdf"` },
+      };
+    },
+  },
 ];

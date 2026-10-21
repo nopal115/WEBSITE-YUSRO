@@ -21,6 +21,9 @@ import { MonitoringPage } from '../features/admin/monitoring/MonitoringPage';
 import { MaterialEditorPage } from '../features/admin/content/MaterialEditorPage';
 import { MaterialManagementPage } from '../features/admin/content/MaterialManagementPage';
 import { StageManagementPage } from '../features/admin/content/StageManagementPage';
+import { AudioManagementPage } from '../features/admin/audio/AudioManagementPage';
+import { TaskManagementPage } from '../features/admin/tasks/TaskManagementPage';
+import { TaskEditorPage } from '../features/admin/tasks/TaskEditorPage';
 import { AdminLayout } from './layouts/AdminLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -98,19 +101,16 @@ export const router = createBrowserRouter([
             element: <MaterialEditorPage />,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A5 (Audio).
             path: '/admin/audio',
-            element: <PlaceholderPage>Audio</PlaceholderPage>,
+            element: <AudioManagementPage />,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A6 (Tugas & Soal).
             path: '/admin/tugas',
-            element: <PlaceholderPage>Tugas</PlaceholderPage>,
+            element: <TaskManagementPage />,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A6 (Tugas & Soal).
             path: '/admin/tugas/:taskId',
-            element: <PlaceholderPage>Editor Tugas</PlaceholderPage>,
+            element: <TaskEditorPage />,
           },
           {
             path: '/admin/monitoring',
