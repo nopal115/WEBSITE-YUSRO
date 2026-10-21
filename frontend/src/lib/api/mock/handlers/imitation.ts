@@ -1,9 +1,9 @@
 // SDD 5.10 / 3.10: satu evaluasi aktif per tugas (409), jeda 10 detik (429), status berpindah
 // SUBMITTED → PROCESSING → EVALUATED/FAILED seiring waktu, skor FAILED selalu null.
 import { takeNextEvaluation } from '../controls';
-import { IMITATION_CONSTRAINTS } from '../data/content';
+import { CONTENT, IMITATION_CONSTRAINTS, type MockImitationTask } from '../data/content';
 import {
-  assertMaterialOpen,
+  assertTaskOpen,
   attemptCount,
   bestScore,
   db,
@@ -92,6 +92,13 @@ const POLLING = {
 
 const ACCEPTED = { status: 202, message: 'Rekaman diterima dan sedang dievaluasi.' };
 
+/** Audio referensi yang berlaku saat ini (SDD 4.5.9 tasks.reference_audio_id). */
+function referenceAudioOf(task: MockImitationTask) {
+  const audio = CONTENT.audio.find((item) => item.id === task.referenceAudioId);
+  const durationMs = audio?.durationMs ?? task.referenceDurationMs;
+  return { id: task.referenceAudioId, url: mockAudioUrl(`reference:${task.referenceAudioId}`, durationMs), durationMs };
+}
+
 export const imitationRoutes: MockRoute[] = [
   {
     method: 'GET',
@@ -100,13 +107,13 @@ export const imitationRoutes: MockRoute[] = [
     handler: (req) => {
       const userId = req.userId as string;
       const task = findTask(req.params.taskId, 'IMITATION');
-      assertMaterialOpen(userId, task.materialId);
+      assertTaskOpen(userId, task);
       const active = submissionsOf(userId, task.id).find((s) => ['SUBMITTED', 'PROCESSING'].includes(submissionStatus(s)));
       return ok({
         id: task.id,
         title: task.title,
         instruction: task.instruction,
-        referenceAudio: { id: `ref-${task.id}`, url: mockAudioUrl(`reference:${task.id}`, task.referenceDurationMs), durationMs: task.referenceDurationMs },
+        referenceAudio: referenceAudioOf(task),
         arabicText: task.arabicText,
         constraints: IMITATION_CONSTRAINTS,
         // [ASUMSI] Kontrak baru: polling ikut dikirim agar pemantauan saat halaman dibuka ulang memakai jadwal backend.
@@ -123,7 +130,7 @@ export const imitationRoutes: MockRoute[] = [
     handler: (req) => {
       const userId = req.userId as string;
       const task = findTask(req.params.taskId, 'IMITATION');
-      assertMaterialOpen(userId, task.materialId);
+      assertTaskOpen(userId, task);
       const now = Date.now();
 
       // Kunci yang sama dalam 10 menit mengembalikan submission yang sama (SDD 5.23).

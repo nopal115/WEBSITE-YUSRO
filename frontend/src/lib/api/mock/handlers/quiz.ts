@@ -1,6 +1,7 @@
 // SDD 5.9 / 3.9: semua jawaban dikirim sekaligus; kunci hanya ada pada respons setelah dikirim.
 import type { QuizQuestionResult } from '../../../../features/quiz/types';
-import { assertMaterialOpen, attemptCount, bestScore, db, findTask, newId, progressSnapshot, quizAttemptsOf, type QuizAttemptRecord } from '../db';
+import type { MockQuizTask } from '../data/content';
+import { assertTaskOpen, attemptCount, bestScore, db, findTask, newId, progressSnapshot, quizAttemptsOf, type QuizAttemptRecord } from '../db';
 import { fail, httpError, ok } from '../http';
 import { mockAudioUrl } from '../media';
 import type { MockRoute } from '../router';
@@ -18,6 +19,9 @@ function attemptView(attempt: QuizAttemptRecord) {
   };
 }
 
+/** Soal tanpa audio dan tanpa kunci, disalin saat percobaan dikirim (SDD 3.7.5). */
+const snapshot = (task: MockQuizTask) => task.questions.map(({ id, orderIndex, prompt, options }) => ({ id, orderIndex, prompt, options: options.map((option) => ({ ...option })) }));
+
 export const quizRoutes: MockRoute[] = [
   {
     method: 'GET',
@@ -26,7 +30,7 @@ export const quizRoutes: MockRoute[] = [
     handler: (req) => {
       const userId = req.userId as string;
       const task = findTask(req.params.taskId, 'QUIZ');
-      assertMaterialOpen(userId, task.materialId);
+      assertTaskOpen(userId, task);
       return ok({
         id: task.id,
         title: task.title,
@@ -52,7 +56,7 @@ export const quizRoutes: MockRoute[] = [
     handler: (req) => {
       const userId = req.userId as string;
       const task = findTask(req.params.taskId, 'QUIZ');
-      assertMaterialOpen(userId, task.materialId);
+      assertTaskOpen(userId, task);
       const answers = (req.body as { answers?: unknown })?.answers;
       if (!Array.isArray(answers) || answers.length !== task.questions.length) {
         return fail(422, 'QUIZ_ANSWERS_INCOMPLETE', 'Jawab seluruh soal sebelum mengirim.');
@@ -78,6 +82,7 @@ export const quizRoutes: MockRoute[] = [
         questionCount: task.questions.length,
         results,
         submittedAt: new Date().toISOString(),
+        questions: snapshot(task),
       };
       db.quizAttempts.push(attempt);
       const { learningProgressPct, tasksCompleted } = progressSnapshot(userId);
@@ -93,8 +98,7 @@ export const quizRoutes: MockRoute[] = [
       const attempt = db.quizAttempts.find((a) => a.id === req.params.attemptId && a.userId === req.userId);
       if (!attempt) return fail(404, 'NOT_FOUND', 'Data tidak ditemukan.');
       // [ASUMSI] Snapshot soal ikut dikirim (SDD 5.9); tanpa audio dan tanpa kunci.
-      const task = findTask(attempt.taskId, 'QUIZ');
-      const questions = task.questions.map(({ id, orderIndex, prompt, options }) => ({ id, orderIndex, prompt, options }));
+      const questions = attempt.questions ?? snapshot(findTask(attempt.taskId, 'QUIZ'));
       return ok({ ...attemptView(attempt), taskId: attempt.taskId, submittedAt: attempt.submittedAt, questions });
     },
   },

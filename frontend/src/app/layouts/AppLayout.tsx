@@ -2,12 +2,15 @@ import { User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../lib/hooks/useAuth';
 import { AppShell } from './AppShell';
+import { LogoutButton } from './LogoutButton';
+import { useLogout } from './useLogout';
 import { BOTTOM_NAV_ITEMS, isNavItemActive, isPathActive, NAV_ITEMS, pageTitle } from './navigation';
 
 // Tata letak Santri: kerangka bersama (AppShell) + bilah bawah mobile empat butir (SDD 7.5.2).
 export function AppLayout(): JSX.Element {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const { onLogout, pending } = useLogout();
 
   return (
     <AppShell
@@ -20,7 +23,18 @@ export function AppLayout(): JSX.Element {
           <span className="max-w-40 truncate">{user?.name ?? 'Profil'}</span>
         </Link>
       }
-      // TODO: FR-AUTH-03 (logout) wajib menurut SRS; posisi tombol di sisi santri [TBD], menunggu desain.
+      // FR-AUTH-03: logout di sidebar dan laci, sama seperti admin. [TBD] Posisi sementara sampai ada desain;
+      // bilah bawah mobile tetap empat butir (SDD 7.5.2), logout lewat laci (tombol menu).
+      sidebarFooter={({ collapsed, iconOnly, labelClass }) => (
+        <div className="mb-4">
+          <LogoutButton onLogout={onLogout} pending={pending} collapsed={collapsed} iconOnly={iconOnly} labelClass={labelClass} />
+        </div>
+      )}
+      drawerFooter={
+        <div className="mt-auto border-t border-neutral-border pt-4">
+          <LogoutButton onLogout={onLogout} pending={pending} />
+        </div>
+      }
       bottomNav={
         // [REKOMENDASI] Bilah bawah memperhitungkan env(safe-area-inset-bottom).
         <nav

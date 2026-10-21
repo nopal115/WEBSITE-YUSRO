@@ -15,6 +15,9 @@ import { ProgressPage } from '../features/progress/ProgressPage';
 import { QuizTaskPage } from '../features/quiz/QuizTaskPage';
 import { StageMaterialsPage } from '../features/learning/StageMaterialsPage';
 import { ListSkeleton } from '../features/learning/QueryStates';
+import { TaskEditorPage } from '../features/admin/tasks/TaskEditorPage';
+import { TaskManagementPage } from '../features/admin/tasks/TaskManagementPage';
+import { AudioManagementPage } from '../features/admin/audio/AudioManagementPage';
 import { AdminDashboardPage } from '../features/admin/dashboard/AdminDashboardPage';
 import { StudentListPage } from '../features/admin/students/StudentListPage';
 import { MonitoringPage } from '../features/admin/monitoring/MonitoringPage';
@@ -98,19 +101,16 @@ export const router = createBrowserRouter([
             element: <MaterialEditorPage />,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A5 (Audio).
             path: '/admin/audio',
-            element: <PlaceholderPage>Audio</PlaceholderPage>,
+            element: <AudioManagementPage />,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A6 (Tugas & Soal).
             path: '/admin/tugas',
-            element: <PlaceholderPage>Tugas</PlaceholderPage>,
+            element: <TaskManagementPage />,
           },
           {
-            // [TBD] Placeholder; dikerjakan di tugas A6 (Tugas & Soal).
             path: '/admin/tugas/:taskId',
-            element: <PlaceholderPage>Editor Tugas</PlaceholderPage>,
+            element: <TaskEditorPage />,
           },
           {
             path: '/admin/monitoring',

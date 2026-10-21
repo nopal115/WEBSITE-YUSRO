@@ -1,8 +1,7 @@
-// Endpoint Monitoring Admin SDD 5.18 (+ GET admin/tasks minimal, SDD 5.17). Bentuk respons yang tidak
+// Endpoint Monitoring Admin SDD 5.18 (GET admin/tasks ada di handlers/tasks.ts). Bentuk respons yang tidak
 // dirinci SDD ditandai [ASUMSI] dan dicatat di docs/api-contract.md.
 import { formatDateStamp } from '../../../utils/format';
 import { getEvaluationService, takeNextEvaluation } from '../controls';
-import { CONTENT } from '../data/content';
 import { db, newId, submissionStatus, type SubmissionRecord } from '../db';
 import { fail, httpError, ok, paginate } from '../http';
 import { mockAudioUrl } from '../media';
@@ -168,19 +167,5 @@ export const monitoringRoutes: MockRoute[] = [
     pattern: '/admin/evaluation/health',
     access: 'ADMIN',
     handler: () => ok(serviceHealth()),
-  },
-  {
-    // [ASUMSI] Bentuk minimal untuk filter tugas; SDD 5.17 tidak merinci respons. ?type= menyaring jenis tugas.
-    method: 'GET',
-    pattern: '/admin/tasks',
-    access: 'ADMIN',
-    handler: (req) => {
-      const type = req.query.get('type');
-      return ok(
-        CONTENT.tasks
-          .filter((task) => !type || task.type === type)
-          .map((task) => ({ id: task.id, title: task.title, type: task.type, materialTitle: taskInfo(task.id).materialTitle, status: 'ACTIVE' })),
-      );
-    },
   },
 ];
