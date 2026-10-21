@@ -5,6 +5,7 @@ Dokumen ini mencatat apa yang **diharapkan frontend** dari backend, supaya pengg
 - Disusun dari kode frontend: `src/lib/api/`, `src/features/*/api.ts`, dan `src/features/*/types.ts`. Bukan dikarang dari SDD.
 - Patokan frontend: branch `feature/dengar-tirukan`, commit `593bbf0`.
 - Patokan backend: `origin/backend-noval` commit `a8af544ff3eea628eb03d2cd4b295c5bd3e84b99` ("Update backend and CI", 2026-10-02 19:40 +0700). Dibaca dengan `git show`/`git ls-tree` saja.
+- Audit ulang: backend `main` `423918c` (21 Oktober 2026), dijalankan ke backend lokal dengan basis data hasil seed. Status terkini per butir ditandai **[SELESAI 423918c]** atau **[TERBUKA 423918c]** di Bagian 2 dan diringkas di 1.9. Kolom "Backend" pada tabel Bagian 2 masih mencerminkan patokan lama.
 - Acuan dokumen: SDD Bab 5 (`../../SDD.md`). Kalau SDD bertentangan dengan SRS, SRS yang berlaku.
 
 **Arti kolom "Backend"**
@@ -99,6 +100,7 @@ Query GET dicoba ulang 2 kali untuk jaringan/5xx. Galat 4xx tidak dicoba ulang (
 - Akun contoh: `santri@yusro.mock` / `santri123` dan `admin@yusro.mock` / `admin1234`.
 
 ### 1.8 Kondisi umum backend-noval (berlaku untuk semua baris di Bagian 2)
+- **[STATUS 423918c]** Respons kini memakai format SDD 5.5 dengan `errorCode` (camelCase) dan `requestId`, path admin mengikuti SDD, dan refresh token tersedia (`POST auth/refresh` dengan cookie). Galat validasi masih dikirim sebagai **400** `VALIDATION_ERROR` (SDD 5.21: 422), dan pesan dari service untuk galat 400 diganti pesan umum oleh filter galat global (T15). Butir-butir di bawah ini mencatat kondisi patokan lama.
 - [FAKTA] `backend/src/shared/interceptors/` dan `shared/filters/` hanya berisi `.gitkeep`. Respons sukses berupa **JSON mentah** dan galat berformat **NestJS**. Frontend masih membaca keduanya (1.3), tetapi `message` siap tampil dan `errorCode` tidak tersedia, sehingga penanganan berdasarkan kode galat tidak berjalan.
 - [FAKTA] Sebagian galat backend mengirim objek kustom `{ message, error_code }`, misalnya di `imitation.service.ts`. Nama field `error_code` (snake_case) tidak dikenali `responseFormat.ts`, yang mencari `errorCode`.
 - [FAKTA] `JwtAuthGuard` dipasang global (`APP_GUARD` di `app.module.ts`). Semua endpoint wajib token kecuali yang bertanda `@Public()`. `RolesGuard` hanya dipakai di `imitation` (POST submissions), `evaluation`, dan `monitoring`.
@@ -106,6 +108,20 @@ Query GET dicoba ulang 2 kali untuk jaringan/5xx. Galat 4xx tidak dicoba ulang (
 - [FAKTA] Galat validasi dikembalikan sebagai **400**, bukan 422 seperti SDD 5.21.
 - [FAKTA] Masa berlaku JWT `1d` (`auth.module.ts`). SDD 6.11 menetapkan 15 menit + refresh 7 hari. Tidak ada refresh token.
 - [FAKTA] Path parameter divalidasi `ParseUUIDPipe`: id harus UUID.
+
+### 1.9 Status audit integrasi 21 Oktober 2026 (backend `423918c`)
+
+- Login Santri dan Admin dari frontend (`VITE_USE_MOCK=false`) berhasil, dan seluruh halaman utama terbuka tanpa panggilan API yang gagal. Uji ini hanya menangkap galat yang terlihat dan respons 4xx/5xx, bukan kelengkapan data yang ditampilkan.
+- Dari 75 endpoint yang dipanggil frontend, lima belum tersedia: `GET admin/tasks/:id/questions`, `GET admin/audio/:id`, `GET admin/stages/:id`, serta `POST` dan `DELETE profile/avatar`.
+- Bentuk respons yang masih beda: `admin/tasks` (daftar dan detail, K4), `admin/audio` (K3), dan `PATCH profile` yang menolak `phone` (P-1).
+
+| Status | Butir |
+| --- | --- |
+| Selesai | A1, A2, A3, A4, L1, L2, Q1, Q2, I1, I2, I4, P1, P2, S1, D1, D2, S2-1, S2-2, M5, M6, M7, K1, K2 |
+| Masih terbuka | P-1, L3, I3 (belum diverifikasi), R1, M4, K3, K4 |
+| Temuan baru | T13 (`getMe` → `user/me`), T14 (tombol "Coba lagi" hilang), T15 (pesan galat 400 tergeneralisasi) |
+
+Fitur backend/frontend baru di luar kontrak ini (penilaian manual, syahadah, streak, target harian, mode gelap, PWA) dicatat di SDD v1.1 Bab 12.12 dan belum masuk dokumen ini.
 
 ---
 
@@ -124,19 +140,19 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | POST `auth/reset-password` | publik (token reset) | body `{ token, password, passwordConfirmation }` | `data` null + `message` (cadangan [ASUMSI] "Password berhasil diubah. Silakan masuk.") | `AUTH_RESET_INVALID` (pesan + tautan minta ulang), `AUTH_WEAK_PASSWORD` | SDD 5.6 | **belum ada** (A3) |
 | GET `auth/me` | Santri, Admin | — | `User` = `AuthUser` + `email` [ASUMSI] | 401 → login; galat lain → layar "coba lagi" | SDD 5.6 (isi [ASUMSI]) | **belum ada** (A4) |
 
-- **A1:**
+- **A1:** **[SELESAI 423918c]** `passwordConfirmation` diterima; respons memakai format 5.5 dan `user` memuat `studentCode`.
   - `RegisterDto` hanya `{ email, password (min 8), name (min 1) }`. `passwordConfirmation` dari frontend akan **ditolak 400** karena `forbidNonWhitelisted`.
   - Respons berisi `{ accessToken, user }` (user tanpa `studentCode`), bukan `User` + `message`.
   - Email terpakai: `409 ConflictException('Email is already registered')` tanpa `errorCode`. Aturan huruf+angka (SDD 3.2.6) tidak diperiksa.
   - `@Public()` ada.
-- **A2:**
+- **A2:** **[SELESAI 423918c]** respons `{ accessToken, user }` dengan `studentCode`; `expiresIn` masih tidak ada, tetapi frontend hanya memakai token.
   - Respons `{ accessToken, user: { id, email, name, role, status, createdAt, updatedAt } }`. Tidak ada `expiresIn` dan `studentCode`.
   - Kredensial salah: `401 'Invalid email or password'` tanpa kode; frontend tetap menampilkan pesan seragam.
   - Status akun tidak diperiksa saat login, jadi tidak ada 403 akun nonaktif.
   - `@Public()` ada.
   - Karena `auth/me` belum ada, login berhasil tetapi pemulihan sesi gagal (lihat A4).
-- **A3:** model `PasswordResetToken` ada di `schema.prisma`, tetapi tidak ada endpoint maupun pengiriman email.
-- **A4:** padanan terdekat adalah `GET user/me` (`user.controller.ts`). Isinya `{ id, email, name, role, status, createdAt, updatedAt }`, tanpa `studentCode` (kolom DB `studentId` tidak dipilih).
+- **A3:** **[SELESAI 423918c]** `forgot-password` dan `reset-password` tersedia; pengiriman surel bergantung pada SMTP (SDD Open Item 6). Patokan lama: model `PasswordResetToken` ada di `schema.prisma`, tetapi tidak ada endpoint maupun pengiriman email.
+- **A4:** **[SELESAI 423918c]** `GET auth/me` tersedia dan memuat `studentCode`. Catatan: `authApi.getMe` kini memanggil `user/me` (perubahan Noval, T13). Patokan lama: padanan terdekat adalah `GET user/me` (`user.controller.ts`). Isinya `{ id, email, name, role, status, createdAt, updatedAt }`, tanpa `studentCode` (kolom DB `studentId` tidak dipilih).
 
 ### 2.2 Profile (`src/features/profile/api.ts`, `types.ts`)
 
@@ -148,7 +164,7 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | DELETE `profile/avatar` | Santri | — | 204 tanpa isi (PROPOSED, P-1) | pesan di dialog konfirmasi | revisi desain | **belum ada** |
 | PATCH `profile/password` | Santri | body `{ currentPassword, password, passwordConfirmation }` [ASUMSI] | tidak dibaca (`void`) | `errors[]` per kolom; `AUTH_WEAK_PASSWORD` → kolom password | SDD 5.7 (body [ASUMSI]) | **belum ada** |
 
-- **P-1:** backend `main` (`5014087`) punya `GET profile` dan `PATCH profile` (`profile/profile.controller.ts`). GET mengirim JSON mentah `{ id, studentId, email, name, role, status, createdAt, updatedAt }`: nama kolom `studentId`/`createdAt` beda dari `studentCode`/`joinedAt`, dan `phone`/`avatarUrl` belum ada (kolomnya juga belum ada di model `User`). PATCH hanya menerima `{ name }` (2–100 karakter; frontend 3–100, SDD 3.2.6). Endpoint `profile/avatar` dan `profile/password` belum ada.
+- **P-1:** **[TERBUKA 423918c]** `GET profile` kini memuat `studentCode` dan `joinedAt`, tetapi `PATCH profile` menolak `phone`, dan `POST`/`DELETE profile/avatar` belum ada. Patokan lama: backend `main` (`5014087`) punya `GET profile` dan `PATCH profile` (`profile/profile.controller.ts`). GET mengirim JSON mentah `{ id, studentId, email, name, role, status, createdAt, updatedAt }`: nama kolom `studentId`/`createdAt` beda dari `studentCode`/`joinedAt`, dan `phone`/`avatarUrl` belum ada (kolomnya juga belum ada di model `User`). PATCH hanya menerima `{ name }` (2–100 karakter; frontend 3–100, SDD 3.2.6). Endpoint `profile/avatar` dan `profile/password` belum ada.
 
 ### 2.3 Learning (`src/features/learning/api.ts`, `types.ts`)
 
@@ -160,12 +176,12 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | POST `learning/materials/:materialId/complete` | Santri | tanpa body | `CompleteMaterialResult { materialId, completedAt, progress { learningProgressPct, materialsCompleted, materialsTotal, tasksCompleted, tasksTotal }, stageUnlocked { id, code, title } \| null [ASUMSI] }` | pesan server | SDD 5.8, 5.23 | **beda** (L3) |
 | GET `learning/continue` | Santri | — | `{ materialId, materialTitle, stageTitle } \| null` [ASUMSI] | umum | SDD 5.8 (isi [ASUMSI]) | **belum ada** |
 
-- **L1:**
+- **L1:** **[SELESAI 423918c]** memuat `code`, `orderIndex`, `access`, `materialsTotal`, dan `materialsCompleted`; `lockReason` belum terlihat.
   - Respons berupa array `{ id, title, description, order, isUnlocked, materials[] { id, title, order, isRequired, status, isUnlocked, isCompleted } }`.
   - Tidak ada `code`, `orderIndex`, `access`, `lockReason`, `materialsTotal`, dan `materialsCompleted`.
   - `status` materi berisi status konten (`ACTIVE`), bukan status belajar.
-- **L2:** daftar materi saat ini hanya tersedia sebagai `materials[]` di dalam `learning/stages`.
-- **L3:**
+- **L2:** **[SELESAI 423918c]** `GET learning/stages/:stageId/materials` tersedia. Patokan lama: daftar materi saat ini hanya tersedia sebagai `materials[]` di dalam `learning/stages`.
+- **L3:** **[TERBUKA 423918c]** menyelesaikan materi kini mensyaratkan tugasnya selesai; galat 400 kehilangan pesan spesifik (T15); bentuk respons sukses belum diverifikasi.
   - Respons berupa baris `materialProgress` mentah (upsert). Tidak ada `progress` maupun `stageUnlocked`.
   - Materi terkunci: `403 'Material is locked'` tanpa kode.
   - Idempoten (upsert), tetapi `completedAt` ditimpa setiap kali dipanggil.
@@ -184,8 +200,8 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | POST `quiz/tasks/:taskId/submit` | Santri | body `{ answers: [{ questionId, optionId }] }`, semua soal sekaligus | `QuizSubmitResult { attemptId, attemptNo, score, correctCount, questionCount, feedbackCategory, results[] { questionId, isCorrect, selectedOptionId, correctOptionId }, progress { learningProgressPct, tasksCompleted } }` | pesan server (`QUIZ_ANSWERS_INCOMPLETE`, `QUIZ_OPTION_MISMATCH` tidak ditangani khusus) | SDD 5.9 | **beda** (Q2) |
 | GET `quiz/attempts/:attemptId` | Santri | — | `QuizAttempt` = `QuizSubmitResult` tanpa `progress` + `taskId`, `submittedAt`, `questions[]` snapshot `{ id, orderIndex, prompt, options }` [ASUMSI] | 404 → "Kembali ke riwayat", tanpa "coba lagi" | SDD 5.9 (isi [ASUMSI]) | **belum ada** |
 
-- **Q1:** padanan terdekat adalah `GET quiz/tasks` (daftar semua tugas QUIZ). Opsi berbentuk `{ id, text }` tanpa `label`/`arabicLabel`/`orderIndex`. Soal berisi `audioId`, bukan `audioUrl`. Tidak ada `instruction`, `attemptCount`, dan `bestScore`.
-- **Q2:**
+- **Q1:** **[SELESAI 423918c]** `GET quiz/tasks/:taskId` tersedia, tanpa kunci jawaban. Patokan lama: padanan terdekat adalah `GET quiz/tasks` (daftar semua tugas QUIZ). Opsi berbentuk `{ id, text }` tanpa `label`/`arabicLabel`/`orderIndex`. Soal berisi `audioId`, bukan `audioUrl`. Tidak ada `instruction`, `attemptCount`, dan `bestScore`.
+- **Q2:** **[SELESAI 423918c]** path `POST quiz/tasks/:taskId/submit` tersedia; bentuk respons sukses belum diverifikasi.
   - Path backend `POST quiz/tasks/:taskId/attempts`.
   - Body sama (`SubmitQuizDto { answers[] { questionId (UUID), optionId (UUID) } }`).
   - Respons `{ attemptId, score, correctAnswers, totalQuestions, completedAt }`. Tidak ada `attemptNo`, `feedbackCategory`, `results[]`, dan `progress`, padahal `results[]` dibutuhkan layar hasil.
@@ -200,13 +216,13 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `imitation/submissions/:id` | Santri | — | `SubmissionStatus`: pending `{ submissionId, evaluationStatus, score: null, feedbackCategory: null, submittedAt, processingStartedAt?, elapsedMs }` / evaluated `{ ..., score, feedbackCategory, feedbackLabel, evaluatedAt, attemptNo, bestScore, progress }` / failed `{ ..., score: null, failedAt, userMessage, canResend }` | 404 → "Kembali ke riwayat" (detail percobaan); galat polling diabaikan, jadwal lanjut | SDD 5.10 | **beda** (I3) |
 | GET `imitation/tasks/:taskId/submissions` | Santri | query `?page=&limit=` | `SubmissionHistoryItem[] { submissionId, attemptNo, evaluationStatus, score, feedbackCategory, submittedAt }` [ASUMSI] + `meta` | umum | SDD 5.10 (isi [ASUMSI]) | **beda** (I4) |
 
-- **I1:**
+- **I1:** **[SELESAI 423918c]** `constraints` (sesuai SRS FR-IMITATE-06), `instruction`, `arabicText`, `activeSubmission`, `attemptCount`, `bestScore`, dan `durationMs` tersedia.
   - Respons `{ id, title, order, stageId, materialId, referenceAudio { id, originalName, durationSeconds, url } }`.
   - Tidak ada `instruction`, `arabicText`, `constraints`, `activeSubmission`, `attemptCount`, dan `bestScore`.
   - Durasi dalam detik (`durationSeconds`), bukan `durationMs`.
   - Tanpa `constraints`, frontend menampilkan "tidak mendukung perekaman" karena tidak ada format yang bisa dipilih.
   - Peran: hanya JWT, tanpa `@Roles`.
-- **I2:**
+- **I2:** **[SELESAI 423918c]** field `audio_file` diterima; respons memuat `attemptNo`, `evaluationStatus`, dan `polling`. Status masih 201 (SDD 202), dan validasi isi berkas tampaknya baru berjalan di worker.
   - Nama field multipart backend **`audio`**, bukan `audio_file`.
   - Hanya menerima **WAV PCM 16-bit 16 kHz mono**, batas 10 MB, durasi 2–60 detik (konstanta di kode). Ini bertentangan dengan keputusan final SRS FR-IMITATE-06: WebM/Opus + cadangan MP4, 1–30 detik, 5 MB, format asli.
   - Header `Idempotency-Key` tidak dibaca.
@@ -215,13 +231,13 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
   - Semua galat audio 400 (bukan 413/422) tanpa kode.
   - 409/429 dikirim sebagai `{ message, error_code }`. Kodenya tidak terbaca (1.8). 429 tetap tertangani lewat status; 409 jatuh ke pesan umum, bukan ke tampilan DIPROSES.
   - `@Roles(SANTRI)` dengan `RolesGuard`.
-- **I3:**
+- **I3:** **[TERBUKA 423918c]** belum diverifikasi karena belum ada submission yang selesai dievaluasi; daftar submission (I4) sudah memakai `evaluationStatus` dan `feedbackCategory`.
   - Respons `{ submissionId, status, score, feedback, errorCode, submittedAt, evaluatedAt, failedAt }`.
   - Nama field berbeda: `status` ≠ `evaluationStatus`, `feedback` ≠ `feedbackCategory`.
   - Tidak ada `feedbackLabel`, `elapsedMs`, `attemptNo`, `bestScore`, `progress`, `userMessage`, dan `canResend`.
   - `errorCode` teknis ikut dikirim ke Santri; SDD 5.10/UI-IMITATE-03 melarang informasi teknis untuk Santri.
   - `score` bertipe Decimal Prisma, kemungkinan terserialisasi sebagai string: **tidak dapat dipastikan** tanpa menjalankan backend.
-- **I4:** array mentah tanpa pagination/`meta`, dengan nama field `status`/`feedback`. Ada `attemptNo`.
+- **I4:** **[SELESAI 423918c]** memakai `evaluationStatus`, `feedbackCategory`, dan `elapsedMs`; `errorCode` teknis masih ikut terkirim ke Santri. Patokan lama: array mentah tanpa pagination/`meta`, dengan nama field `status`/`feedback`. Ada `attemptNo`.
 
 ### 2.7 Progress dan riwayat (`src/features/progress/api.ts`, `types.ts`)
 
@@ -230,8 +246,8 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `progress` | Santri | — | `Progress { learningProgressPct, materials { completed, total, pct }, tasks { completed, total, pct }, stages[] { id, title, access, pct } }` | umum | SDD 5.11 | **beda** (P1) |
 | GET `progress/history` | Santri | query `?page=&limit=` | `HistoryItem[] { attemptId, taskId, taskTitle, materialTitle, taskType, attemptNo, score \| null, evaluationStatus \| null, displayStatus, submittedAt }` + `meta` | umum | SDD 5.11 | **belum ada** (P2) |
 
-- **P1:** respons `{ materials { completed, total }, tasks { completed, total }, progress }`. `progress` ≠ `learningProgressPct`; tidak ada `pct` per bagian dan tidak ada `stages[]`.
-- **P2:** padanan terdekat adalah `GET statistics/history` (lihat 2.10). Isinya hanya percobaan IMITATION yang EVALUATED, dengan field `{ submissionId, taskId, score, feedback, submittedAt, evaluatedAt }`. Tidak ada percobaan Dengar-Pilih, percobaan gagal, judul, `displayStatus`, dan pagination.
+- **P1:** **[SELESAI 423918c]** memuat `learningProgressPct`, `pct` per bagian, dan `stages[]`. Patokan lama: respons `{ materials { completed, total }, tasks { completed, total }, progress }`. `progress` ≠ `learningProgressPct`; tidak ada `pct` per bagian dan tidak ada `stages[]`.
+- **P2:** **[SELESAI 423918c]** `GET progress/history` tersedia dengan `meta`. Patokan lama: padanan terdekat adalah `GET statistics/history` (lihat 2.10). Isinya hanya percobaan IMITATION yang EVALUATED, dengan field `{ submissionId, taskId, score, feedback, submittedAt, evaluatedAt }`. Tidak ada percobaan Dengar-Pilih, percobaan gagal, judul, `displayStatus`, dan pagination.
 
 ### 2.8 Statistik (`src/features/statistics/api.ts`, `types.ts`)
 
@@ -240,7 +256,7 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `statistics` | Santri | — | `Statistics { materialsCompleted, tasksCompleted, averageScore \| null [ASUMSI], bestScore \| null, learningProgressPct, evaluatedAttempts, failedAttempts }` | umum | SDD 5.12 | **beda** (S1) |
 | GET `statistics/chart` | Santri | — | `StatisticsChart { points[] { sequence, attemptId, taskTitle, score, submittedAt }, trend: UP\|DOWN\|FLAT\|INSUFFICIENT_DATA }` | umum | SDD 5.12 | **belum ada** |
 
-- **S1:**
+- **S1:** **[SELESAI 423918c]** memuat `learningProgressPct`, `evaluatedAttempts`, dan `failedAttempts`.
   - Respons `{ materialsCompleted, tasksCompleted, progress, averageScore, bestScore, validEvaluationCount }`.
   - Beda nama: `progress` ≠ `learningProgressPct`, `validEvaluationCount` ≠ `evaluatedAttempts`. Tidak ada `failedAttempts`.
   - `averageScore`/`bestScore` sudah `null` bila belum ada hasil, sama dengan harapan frontend.
@@ -252,7 +268,7 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | --- | --- | --- | --- | --- | --- | --- |
 | GET `report/pdf` | Santri | — (tanpa parameter identitas) | `application/pdf` sebagai Blob; nama dari `Content-Disposition` (SDD: `Laporan-<studentCode>-<tanggal>.pdf`) | pesan galat ditampilkan (mis. 503 `REPORT_BUSY`); tidak dicoba ulang | SDD 5.13 | **beda** (R1) |
 
-- **R1:**
+- **R1:** **[TERBUKA 423918c]** menghasilkan 500 di lingkungan uji lokal, kemungkinan karena Chromium Puppeteer tidak terunduh.
   - Path, method, dan `Content-Type` cocok.
   - Nama berkas `yusro-report.pdf`, bukan pola SDD.
   - `enableCors()` tanpa `exposedHeaders`, sehingga untuk origin berbeda frontend tidak dapat membaca `Content-Disposition` dan memakai nama cadangan.
@@ -283,8 +299,8 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `admin/dashboard` | Admin | — | `AdminDashboard { totalStudents, activeStudents, attemptsTotal, averageScore \| null [ASUMSI], averageProgressPct, evaluation { queued, processing, failedLast24h, serviceStatus [ASUMSI], modelVersion } }` | umum (layar galat + coba lagi); 401 → login | SDD 5.18 | **belum ada** (D1) |
 | GET `admin/dashboard/attention` | Admin | — | `AttentionItem[] { studentId, studentCode, name, reasons[], learningProgressPct?, previousBest?, latestBest?, delta?, availableTasks? }` | umum; daftar kosong → pesan keadaan kosong | SDD 5.18, 3.17.3 | **belum ada** (D2) |
 
-- **D1:** tidak ada route `admin/dashboard`. Padanan terdekat untuk kondisi layanan adalah `GET monitoring` (`monitoring.service.ts`, `@Roles(ADMIN)`): `{ status: 'ok' | 'degraded', services { api, ml: 'ok' | 'unavailable' }, checkedAt }`, tanpa angka antrean, versi model, maupun ringkasan santri. Nilai `degraded` akan tampil "Terganggu" menurut AS16.
-- **D2:** tidak ada route `admin/dashboard/attention`. `StatisticsService.getStudentOverviewForAdmin()` menyediakan statistik per santri lewat `GET monitoring/students` (lihat 2.10 dan S2-1), tetapi tidak menghitung kriteria SDD 3.17.3. *(Koreksi A2: versi A1 dokumen ini keliru menulis fungsi itu tidak dipanggil route mana pun.)*
+- **D1:** **[SELESAI 423918c]** `GET admin/dashboard` tersedia. Patokan lama: tidak ada route `admin/dashboard`. Padanan terdekat untuk kondisi layanan adalah `GET monitoring` (`monitoring.service.ts`, `@Roles(ADMIN)`): `{ status: 'ok' | 'degraded', services { api, ml: 'ok' | 'unavailable' }, checkedAt }`, tanpa angka antrean, versi model, maupun ringkasan santri. Nilai `degraded` akan tampil "Terganggu" menurut AS16.
+- **D2:** **[SELESAI 423918c]** `GET admin/dashboard/attention` tersedia. Patokan lama: tidak ada route `admin/dashboard/attention`. `StatisticsService.getStudentOverviewForAdmin()` menyediakan statistik per santri lewat `GET monitoring/students` (lihat 2.10 dan S2-1), tetapi tidak menghitung kriteria SDD 3.17.3. *(Koreksi A2: versi A1 dokumen ini keliru menulis fungsi itu tidak dipanggil route mana pun.)*
 
 ### 2.12 Admin — Santri (`src/features/admin/students/api.ts`, `types.ts`; ditambahkan di A2)
 
@@ -299,8 +315,8 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `admin/students/:id/report/pdf` | Admin | — | `application/pdf` sebagai Blob; nama dari `Content-Disposition`, cadangan `Laporan-<studentCode>-<YYYY-MM-DD>.pdf` (tanggal lokal) | pesan galat ditampilkan | SDD 5.14, FR-REPORT-03 | **belum ada** |
 | GET `admin/stages` | Admin | — | `StageOption[] { id, code, title, orderIndex, status }` tanpa pagination [ASUMSI]; dipakai filter tahapan; kontrak lengkap di 2.14 | gagal → filter tahapan tidak tersedia, daftar tetap tampil | SDD 5.15 (isi [ASUMSI]) | **belum ada** (S2-2) |
 
-- **S2-1:** tidak ada route `admin/students`. Padanan terdekat `GET monitoring/students` (`@Roles(ADMIN)`) mengembalikan seluruh santri `{ id, studentId, name, email, status, statistics { materialsCompleted, tasksCompleted, progress, averageScore, bestScore, validEvaluationCount } }` tanpa pagination, pencarian, filter, urutan, tahapan, maupun aktivitas terakhir. Nama field berbeda: `studentId` ≠ `studentCode`, `statistics.progress` ≠ `learningProgressPct`. Statistik di sana hanya menghitung IMITATION (lihat AS15).
-- **S2-2:** tidak ada route `admin/stages`. Padanan terdekat `GET learning/stages` (lihat L1) hanya untuk konteks santri dan menyertakan status buka per pengguna.
+- **S2-1:** **[SELESAI 423918c]** `GET admin/students` tersedia dengan `meta`. Patokan lama: tidak ada route `admin/students`. Padanan terdekat `GET monitoring/students` (`@Roles(ADMIN)`) mengembalikan seluruh santri `{ id, studentId, name, email, status, statistics { materialsCompleted, tasksCompleted, progress, averageScore, bestScore, validEvaluationCount } }` tanpa pagination, pencarian, filter, urutan, tahapan, maupun aktivitas terakhir. Nama field berbeda: `studentId` ≠ `studentCode`, `statistics.progress` ≠ `learningProgressPct`. Statistik di sana hanya menghitung IMITATION (lihat AS15).
+- **S2-2:** **[SELESAI 423918c]** `GET admin/stages` tersedia. Patokan lama: tidak ada route `admin/stages`. Padanan terdekat `GET learning/stages` (lihat L1) hanya untuk konteks santri dan menyertakan status buka per pengguna.
 - Endpoint 5.14 lainnya tidak punya padanan; ubah status akun dan laporan per santri belum ada di backend.
 
 ### 2.13 Admin — Monitoring Evaluasi (`src/features/admin/monitoring/api.ts`, `types.ts`; ditambahkan di A3)
@@ -315,14 +331,14 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `admin/evaluation/health` | Admin | — | `{ serviceStatus, modelVersion \| null, modelLoaded, checkedAt }` [ASUMSI]; status dipetakan AS16 | galat bagian layanan terpisah | SDD 5.18, NFR-AVAIL-02 (bentuk [ASUMSI]) | **belum ada** (M6) |
 | GET `admin/tasks?type=IMITATION` | Admin | query `type` | `TaskOption[] { id, title, type, materialTitle, status }` tanpa pagination [ASUMSI]; filter tugas; bentuk lengkap di 2.16 | gagal → filter tugas tidak tersedia, daftar tetap tampil | SDD 5.17 (bentuk [ASUMSI]) | **belum ada** (M7) |
 
-- **M4:** route ada (`evaluation.controller.ts`, `@Roles(ADMIN)`), tetapi berbeda:
+- **M4:** **[TERBUKA 423918c]** endpoint tersedia dengan format 5.5, tetapi tombol "Coba lagi" tidak lagi dipakai di `MonitoringPage` sejak `502e5f4` (T14). Patokan lama: route ada (`evaluation.controller.ts`, `@Roles(ADMIN)`), tetapi berbeda:
   - respons `{ submissionId, jobId, status: SUBMITTED }`: tanpa `attemptNo` dan `isRetry`, dan memakai `status`, bukan `evaluationStatus`;
   - status 201 (bawaan NestJS POST), bukan 202;
   - galat 409 dikirim sebagai `ConflictException('EVAL_RETRY_NOT_ALLOWED')`: kode ada di `message`, bukan `errorCode`, sehingga frontend menampilkan pesan umum 409 (lihat 1.8). Penanganan "muat ulang setelah 409" tetap berjalan karena berdasarkan status.
   - Perilaku sudah sesuai SDD 3.11.7: hanya FAILED, membuat job baru `isRetry`, tidak membuat percobaan baru, dan dicatat di audit_logs.
-- **M5:** route ada (`@Roles(ADMIN)`) dengan respons `{ jobs: [...], counts }`, tetapi `counts` dikelompokkan per **status job** (`QUEUED`, `RUNNING`, `DONE`, `FAILED`), bukan per status evaluasi submission seperti yang diminta UI-ADMIN-MONITOR-02. Tidak ada batas 24 jam dan tidak ada `oldestWaitingSince`. Respons juga memuat seluruh job aktif/gagal beserta id santri, yang tidak dipakai frontend.
-- **M6:** tidak ada route `admin/evaluation/health`. Padanan terdekat: `GET monitoring` (`{ status: ok \| degraded, services { api, ml }, checkedAt }`), `GET evaluation` (`{ status: 'ready', evaluator }`, galat bila ML mati), dan `GET ml-client/health`. Tidak ada yang mengirim `modelVersion`.
-- **M7:** tidak ada route `admin/tasks`; `task.controller.ts` hanya stub `GET task` 501. Daftar tugas QUIZ ada di `GET quiz/tasks` (lihat Q1), tetapi tidak untuk tugas IMITATION.
+- **M5:** **[SELESAI 423918c]** `counts` kini per status evaluasi, ditambah `oldestWaitingSince`. Patokan lama: route ada (`@Roles(ADMIN)`) dengan respons `{ jobs: [...], counts }`, tetapi `counts` dikelompokkan per **status job** (`QUEUED`, `RUNNING`, `DONE`, `FAILED`), bukan per status evaluasi submission seperti yang diminta UI-ADMIN-MONITOR-02. Tidak ada batas 24 jam dan tidak ada `oldestWaitingSince`. Respons juga memuat seluruh job aktif/gagal beserta id santri, yang tidak dipakai frontend.
+- **M6:** **[SELESAI 423918c]** `GET admin/evaluation/health` tersedia. Patokan lama: tidak ada route `admin/evaluation/health`. Padanan terdekat: `GET monitoring` (`{ status: ok \| degraded, services { api, ml }, checkedAt }`), `GET evaluation` (`{ status: 'ready', evaluator }`, galat bila ML mati), dan `GET ml-client/health`. Tidak ada yang mengirim `modelVersion`.
+- **M7:** **[SELESAI 423918c]** `GET admin/tasks?type=` tersedia dengan bentuk minimal AS30. Patokan lama: tidak ada route `admin/tasks`; `task.controller.ts` hanya stub `GET task` 501. Daftar tugas QUIZ ada di `GET quiz/tasks` (lihat Q1), tetapi tidak untuk tugas IMITATION.
 - `GET admin/submissions`, `/:id`, dan `/:id/recording-url` belum ada sama sekali.
 
 ### 2.14 Admin — Konten (`src/features/admin/content/api.ts`, `types.ts`; ditambahkan di A4)
@@ -346,8 +362,8 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | GET `admin/audio?kind=LEARNING` | Admin | query `kind` | `AudioAsset[] { id, kind, originalName, durationMs, status }` tanpa pagination; versi minimal [ASUMSI AS38]; bentuk lengkap di 2.15 | gagal → pilihan audio tidak tersedia | SDD 5.16 (isi [ASUMSI]) | **belum ada** (K2) |
 | GET `admin/audio/:id/url` | Admin | — (diminta saat pratinjau diputar) | `{ url, expiresInSeconds }` [ASUMSI AS38] | pesan di bawah tombol; URL kedaluwarsa → minta ulang sekali | SDD 5.16, NFR-PRIV-02 | **belum ada** (K2) |
 
-- **K1:** `backend/src/modules/content/content.controller.ts` hanya stub `GET content` → 501. Tidak ada route `admin/stages`, `admin/materials`, maupun blok. Padanan baca terdekat tetap `GET learning/stages` (S2-2, L1).
-- **K2:** `backend/src/modules/audio/audio.controller.ts` hanya stub `GET audio` → 501.
+- **K1:** **[SELESAI 423918c]** endpoint konten admin tersedia; hanya `GET admin/stages/:id` yang belum ada, dan UI tidak memanggilnya. Patokan lama: `backend/src/modules/content/content.controller.ts` hanya stub `GET content` → 501. Tidak ada route `admin/stages`, `admin/materials`, maupun blok. Padanan baca terdekat tetap `GET learning/stages` (S2-2, L1).
+- **K2:** **[SELESAI 423918c]** `GET admin/audio?kind=` dan `GET admin/audio/:id/url` tersedia. Patokan lama: `backend/src/modules/audio/audio.controller.ts` hanya stub `GET audio` → 501.
 - Baris `GET admin/stages` di 2.12 kini menjadi bagian dari kontrak lengkap di atas; field yang dipakai filter Daftar Santri tidak berubah.
 - Aturan sisi Santri yang ditiru mock [ASUMSI AS39]: tahapan/materi DRAFT tidak tampil; materi INACTIVE tidak tampil di daftar, bila dibuka langsung ditolak (`LEARNING_MATERIAL_INACTIVE`) dan tugasnya ditolak (`TASK_INACTIVE`), tetapi riwayat dan percobaan lamanya tetap tersimpan; urutan baru langsung berlaku di daftar Santri.
 
@@ -362,7 +378,7 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | POST `admin/audio/:id/archive` | Admin | — | `AdminAudio` berstatus ARCHIVED | 409 `AUDIO_IN_USE_BY_SUBMISSION` (referensi sudah dipakai), 409 `AUDIO_IN_USE_BY_TASK` (referensi berlaku pada tugas AKTIF) [ASUMSI AS43], 409 `AUDIO_ARCHIVED`; pesan di dialog konfirmasi | SDD 5.16, 7.7.19 | **belum ada** |
 | GET `admin/audio/:id/url` | Admin | — | `{ url, expiresInSeconds }` (AS38) | pesan di bawah tombol Putar | SDD 5.16, NFR-PRIV-02 | **beda** (K3) |
 
-- **K3:** backend `main` (`5014087`) punya `audio/audio.controller.ts` dengan path tanpa `admin/`: `GET audio?type=`, `GET audio/:audioId/url`, dan `POST audio` (multipart field `audio` + `type`, batas 25 MB). Nama query dan field berbeda dari SDD 5.16 (`kind`, `file`), dan batasnya berbeda dari SDD 5.20 (12 MB). Detail, `replace`, dan `archive` belum ada.
+- **K3:** **[TERBUKA 423918c]** path sudah `admin/audio`, `replace` dan `archive` tersedia; `GET admin/audio/:id` (riwayat versi) belum ada, dan daftar belum memuat `version`, `replacesId`, `usedBySubmission`, `usage`, `mimeType`. Patokan lama: backend `main` (`5014087`) punya `audio/audio.controller.ts` dengan path tanpa `admin/`: `GET audio?type=`, `GET audio/:audioId/url`, dan `POST audio` (multipart field `audio` + `type`, batas 25 MB). Nama query dan field berbeda dari SDD 5.16 (`kind`, `file`), dan batasnya berbeda dari SDD 5.20 (12 MB). Detail, `replace`, dan `archive` belum ada.
 - Aturan aksi di UI (SDD 7.7.19): tidak ada tombol hapus; Ganti Versi hanya untuk referensi AKTIF; Arsipkan untuk audio AKTIF yang belum dipakai submission (`src/features/admin/audio/view.ts`).
 - [TBD] Daftar tanpa pagination; bila jumlah audio di backend besar, perlu pagination SDD 1.4.
 
@@ -382,7 +398,7 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 | PATCH `admin/questions/:id` | Admin | body sama dengan POST (mengganti seluruh pilihan) [ASUMSI AS49] | `AdminQuestion` | sama dengan POST | SDD 5.17, 3.7.5 | **belum ada** |
 | DELETE `admin/questions/:id` | Admin | — | sukses tanpa data | 422 `TASK_INCOMPLETE` bila soal terakhir pada tugas AKTIF [ASUMSI AS49]; pesan di dialog | SDD 5.17, BR-DELETE-02 | **belum ada** |
 
-- **K4:** backend `main` (`5014087`) punya `task/task.controller.ts` dengan path tanpa `admin/`: `GET task`, `GET task/admin`, `POST task`, `PATCH task/:taskId`. Tidak ada detail, hapus, publish, reorder, maupun endpoint soal. Bentuk respons belum dicocokkan.
+- **K4:** **[TERBUKA 423918c]** path sudah `admin/tasks`, publish/reorder/soal (POST, PATCH, DELETE) tersedia; `GET admin/tasks/:id/questions` belum ada, daftar tugas hanya `{ id, title, type, materialTitle, status }`, dan detail memakai `order` serta menyertakan soal di dalamnya. Patokan lama: backend `main` (`5014087`) punya `task/task.controller.ts` dengan path tanpa `admin/`: `GET task`, `GET task/admin`, `POST task`, `PATCH task/:taskId`. Tidak ada detail, hapus, publish, reorder, maupun endpoint soal. Bentuk respons belum dicocokkan.
 - Aksi status memakai aturan konten SDD 3.5.3 (`availableActions` di `content/view.ts`): mengaktifkan dan mengaktifkan kembali selalu lewat publish agar kelengkapan diperiksa (`src/features/admin/tasks/view.ts`).
 - Sisi Santri yang ditiru mock: tugas DRAFT tidak tampil (404 bila dibuka langsung), tugas NONAKTIF tidak tampil dan ditolak 409 `TASK_INACTIVE`, urutan tugas mengikuti `orderIndex`; detail percobaan Dengar-Pilih memakai snapshot soal saat dikerjakan (SDD 3.7.5).
 
@@ -478,7 +494,7 @@ Id di route diteruskan apa adanya ke path API (`encodeURIComponent`). Backend-no
 
 | # | Temuan | Lokasi |
 | --- | --- | --- |
-| T1 | Penyimpanan token di `sessionStorage` dan tidak adanya pemanggilan `POST auth/refresh` menyimpang dari SDD 6.3/5.6. Sudah ditandai `TODO(SDD 6.3)`. **Keputusan: penyimpangan sementara yang disetujui sampai backend menyediakan refresh token** (tercatat di CLAUDE.md). | `src/lib/auth/tokenStore.ts` |
+| T1 | **[STATUS 423918c]** Refresh token kini tersedia: `POST auth/refresh` dengan cookie, dan `client.ts` mencoba refresh sekali saat 401 (perubahan Noval `502e5f4`), sehingga keputusan "penyimpangan sementara" di bawah perlu ditinjau ulang. Penyimpanan token di `sessionStorage` dan tidak adanya pemanggilan `POST auth/refresh` menyimpang dari SDD 6.3/5.6. Sudah ditandai `TODO(SDD 6.3)`. **Keputusan: penyimpangan sementara yang disetujui sampai backend menyediakan refresh token** (tercatat di CLAUDE.md). | `src/lib/auth/tokenStore.ts` |
 | T2 | AS13 dan AS14 belum diberi label `[ASUMSI]` di kode, padahal CLAUDE.md mewajibkannya. **Diperbaiki:** label `[ASUMSI]` sudah ditambahkan. | `src/features/progress/view.ts`, `src/features/auth/ResetPasswordPage.tsx` |
 | T3 | Rekaman diunggah dalam format asli tanpa keadaan CONVERTING. Ini menyimpang dari SDD 7.6.2 dan DD-03 ("konversi audio ke WAV di sisi klien", SDD 12.6), sesuai keputusan final berbasis SRS FR-IMITATE-06. Contoh galat SDD 5.5 ("Hanya berkas WAV yang diterima", field `recording`) juga masih mengacu WAV. Penyimpangan ini disetujui, tetapi di kode belum ada komentar yang menyebut DD-03. | `src/features/imitation/recorder.ts`, `ImitationTaskPage.tsx` |
 | T4 | Pesan "tidak mendukung perekaman" mengikuti SDD 7.9 ("Chrome, Edge, atau Firefox"). SRS revisi 2 menambahkan Safari sebagai target browser (NFR-COMP-01). Kalimat SDD belum mengikuti SRS. **Keputusan:** pesan menjadi "Perangkat atau browser Anda tidak mendukung perekaman suara. Coba gunakan Chrome, Edge, Firefox, atau Safari versi terbaru." (SRS berlaku atas SDD); penyimpangan dari SDD 7.9 diberi komentar di kode. | `src/features/imitation/ImitationTaskPage.tsx` |
@@ -490,3 +506,6 @@ Id di route diteruskan apa adanya ke path API (`encodeURIComponent`). Backend-no
 | T10 | SRS FR-DASH-A-01 meminta kartu "jumlah tugas yang dikerjakan", tetapi API SDD 5.18 hanya menyediakan `attemptsTotal` (jumlah percobaan). **Keputusan:** kartu berlabel "PERCOBAAN TUGAS" dengan nilai `attemptsTotal`, diberi komentar [TBD]; perlu diselaraskan di SDD/API. | `src/features/admin/dashboard/AdminDashboardPage.tsx` |
 | T11 | Backend-noval menolak akun nonaktif dengan `ForbiddenException('Account is inactive')` (403 tanpa `errorCode`) di banyak service. Tanpa kode `AUTH_ACCOUNT_INACTIVE`, frontend tidak mengakhiri sesi dan hanya menampilkan pesan umum 403 (AS32). | `src/lib/api/client.ts` |
 | T12 | Rail kanan 300 px (SDD 7.5.1, "bila diperlukan") tidak dipakai di Monitoring: tabel 8 kolom hanya tersisa ±780 px di 1440 dan ±360 px di 1024. Panel status ditaruh di atas tabel selebar penuh. Di lebar 768–1023 px tabel admin tetap dapat digulir mendatar, sesuai SDD 7.5.1 untuk layar administrasi. | `src/features/admin/monitoring/MonitoringPage.tsx` |
+| T13 | `authApi.getMe` diubah ke `GET user/me` oleh Noval (commit `502e5f4`), padahal backend `423918c` sudah menyediakan `GET auth/me` yang sesuai SDD 5.6 dan isinya sama (termasuk `studentCode`). **Usulan:** kembalikan ke `auth/me` agar frontend mengikuti kontrak SDD; kode belum diubah, menunggu persetujuan Noval. | `src/features/auth/api.ts` |
+| T14 | Tombol "Coba lagi" (retry evaluasi, SDD 3.11.7) tidak lagi dipakai di halaman Monitoring sejak commit `502e5f4` (diganti GradeModal untuk penilaian manual). Hook `useRetrySubmission` dan endpoint `POST admin/submissions/:id/retry` masih ada. Sisa variabel yang tidak terpakai dihapus pada perbaikan lint `390a13d` tanpa mengubah perilaku. **Menunggu konfirmasi Noval** apakah penghapusan disengaja. | `src/features/admin/monitoring/MonitoringPage.tsx` |
+| T15 | Filter galat global backend mengganti pesan service untuk galat 400 dengan pesan umum "Data yang dikirim belum lengkap atau tidak valid.", misalnya "Selesaikan kuis/tugas pada materi ini terlebih dahulu …" saat menyelesaikan materi. Santri tidak tahu langkah berikutnya. | backend (filter galat global), L3 |
