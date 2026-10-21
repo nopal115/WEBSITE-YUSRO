@@ -20,6 +20,12 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Profil', to: '/profil', icon: User },
 ];
 
+/**
+ * Menu teks navbar desktop Santri: lima butir tanpa Profil, yang menjadi tombol ikon di ujung kanan
+ * (revisi desain pembimbing). Laci navigasi mobile tetap memakai NAV_ITEMS lengkap.
+ */
+export const TOP_NAV_ITEMS: NavItem[] = NAV_ITEMS.filter((item) => item.to !== '/profil');
+
 export function isPathActive(pathname: string, to: string): boolean {
   // "/" hanya aktif untuk beranda itu sendiri.
   if (to === '/') return pathname === '/';

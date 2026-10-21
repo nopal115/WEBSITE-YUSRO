@@ -6,18 +6,22 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { useProfile } from '../../features/profile/hooks';
 import { useAuth } from '../../lib/hooks/useAuth';
-import { isNavItemActive, NAV_ITEMS, pageTitle } from './navigation';
+import { isNavItemActive, isPathActive, NAV_ITEMS, pageTitle, TOP_NAV_ITEMS } from './navigation';
 import { NavDrawer } from './NavDrawer';
 
 const iconButton = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-neutral-surface-alt';
+// Indikator aktif dan cincin fokus yang sama untuk menu teks dan tombol Profil.
+const activeItem = 'border-brand-primary-line bg-brand-primary-soft font-semibold text-brand-primary';
+const inactiveItem = 'border-transparent text-text-secondary hover:bg-neutral-surface-alt';
+const focusRing = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary';
 
 /**
- * Tata letak Santri: satu navbar atas (logo, menu, avatar, Keluar) dan konten selebar layar.
+ * Tata letak Santri: satu navbar atas (logo, lima menu teks, Keluar, tombol ikon Profil) dan konten selebar layar.
  * [TBD] Revisi desain pembimbing: menggantikan sidebar kiri dan bilah bawah mobile SDD 7.5; SDD 7.5 perlu direvisi.
- * Di bawah 1024 px enam butir menu tidak muat, jadi menu dan Keluar dilipat ke laci (NavDrawer).
+ * Di bawah 1024 px menu tidak muat, jadi menu (termasuk Profil) dan Keluar dilipat ke laci (NavDrawer).
  */
 export function AppLayout(): JSX.Element {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   // Foto profil diambil dari cache profil yang sama dengan halaman Profil, jadi perubahan langsung tampil di sini.
@@ -29,6 +33,7 @@ export function AppLayout(): JSX.Element {
   const logoutButtonRef = useRef<HTMLButtonElement>(null);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
   const title = pageTitle(pathname);
+  const profileActive = isPathActive(pathname, '/profil');
 
   const openLogout = (fromDrawer: boolean) => {
     if (fromDrawer) setDrawerOpen(false);
@@ -74,14 +79,14 @@ export function AppLayout(): JSX.Element {
           </Link>
           <nav className="hidden min-w-0 flex-1 justify-center lg:flex" aria-label="Navigasi utama">
             <ul className="flex items-center gap-1">
-              {NAV_ITEMS.map((item) => {
+              {TOP_NAV_ITEMS.map((item) => {
                 const active = isNavItemActive(pathname, item);
                 return (
                   <li key={item.to}>
                     <Link
                       to={item.to}
                       aria-current={active ? 'page' : undefined}
-                      className={`flex min-h-11 items-center whitespace-nowrap rounded-md border px-3 text-body transition ${active ? 'border-brand-primary-line bg-brand-primary-soft font-semibold text-brand-primary' : 'border-transparent text-text-secondary hover:bg-neutral-surface-alt'}`}
+                      className={`flex min-h-11 items-center whitespace-nowrap rounded-md border px-3 text-body transition ${focusRing} ${active ? activeItem : inactiveItem}`}
                     >
                       {item.label}
                     </Link>
@@ -92,19 +97,24 @@ export function AppLayout(): JSX.Element {
           </nav>
           <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
             <ThemeToggle />
-            <Link to="/profil" className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2 text-body text-text-secondary hover:bg-neutral-surface-alt" aria-label={`Profil ${user?.name ?? ''}`.trim()}>
-              <Avatar name={user?.name ?? ''} src={profile.data?.avatarUrl} />
-              <span className="hidden max-w-40 truncate xl:inline">{user?.name ?? 'Profil'}</span>
-            </Link>
             <button
               ref={logoutButtonRef}
               type="button"
               onClick={() => openLogout(false)}
-              className="hidden min-h-11 items-center gap-2 rounded-md px-3 text-body text-text-secondary hover:bg-neutral-surface-alt lg:flex"
+              className={`hidden min-h-11 items-center gap-2 rounded-md px-3 text-body text-text-secondary hover:bg-neutral-surface-alt lg:flex ${focusRing}`}
             >
               <LogOut size={20} aria-hidden="true" />
               Keluar
             </button>
+            {/* Profil sebagai tombol ikon paling kanan, juga di mobile (muat di 375 px); foto bila ada, selain itu ikon orang. */}
+            <Link
+              to="/profil"
+              aria-label="Profil"
+              aria-current={profileActive ? 'page' : undefined}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border transition ${focusRing} ${profileActive ? activeItem : inactiveItem}`}
+            >
+              <Avatar src={profile.data?.avatarUrl} fallback="icon" />
+            </Link>
           </div>
         </div>
       </header>
