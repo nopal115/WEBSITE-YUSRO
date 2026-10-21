@@ -1,5 +1,6 @@
-import { User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { Avatar } from '../../components/ui/Avatar';
+import { useProfile } from '../../features/profile/hooks';
 import { useAuth } from '../../lib/hooks/useAuth';
 import { AppShell } from './AppShell';
 import { BOTTOM_NAV_ITEMS, isNavItemActive, isPathActive, NAV_ITEMS, pageTitle } from './navigation';
@@ -8,6 +9,8 @@ import { BOTTOM_NAV_ITEMS, isNavItemActive, isPathActive, NAV_ITEMS, pageTitle }
 export function AppLayout(): JSX.Element {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  // Foto profil diambil dari cache profil yang sama dengan halaman Profil, jadi perubahan langsung tampil di sini.
+  const profile = useProfile();
 
   return (
     <AppShell
@@ -16,7 +19,7 @@ export function AppLayout(): JSX.Element {
       title={pageTitle(pathname)}
       headerEnd={
         <Link to="/profil" className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2 text-body text-text-secondary hover:bg-neutral-surface-alt">
-          <User size={24} aria-hidden="true" />
+          <Avatar name={user?.name ?? ''} src={profile.data?.avatarUrl} />
           <span className="max-w-40 truncate">{user?.name ?? 'Profil'}</span>
         </Link>
       }
