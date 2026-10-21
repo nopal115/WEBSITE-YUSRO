@@ -6,6 +6,28 @@ on:
     branches: [main]
 
 jobs:
+  # Frontend: dikelola Bagas. Job mandiri karena node_modules tidak dibagi antar job.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+        env:
+          VITE_USE_MOCK: "true"
+      - run: npm run build
+
+  # Job di bawah ini (backend dan ML) adalah bagian Noval; langkah frontend sudah dipindah ke job frontend.
   install:
     runs-on: ubuntu-latest
     steps:
@@ -14,20 +36,20 @@ jobs:
         with:
           node-version: 22
       - run: npm install --prefix frontend
-      - run: npm install --prefix backend
+      - run: npm install --prefix backend # bagian Noval
       - run: python -m pip install -r ml-service/requirements.txt
   lint-typecheck:
     needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "TODO: lint and type check"
+      - run: 'echo "TODO: lint and type check backend dan ML (bagian Noval)"'
   unit-test:
     needs: lint-typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "TODO: backend, frontend, and ML unit tests"
+      - run: 'echo "TODO: unit test backend dan ML (bagian Noval); frontend di job frontend"'
   integration-test:
     needs: unit-test
     runs-on: ubuntu-latest
@@ -38,13 +60,13 @@ jobs:
         ports: [5432:5432]
     steps:
       - uses: actions/checkout@v4
-      - run: echo "TODO: integration tests"
+      - run: 'echo "TODO: integration tests (bagian Noval)"'
   build:
     needs: integration-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "TODO: build frontend and backend"
+      - run: 'echo "TODO: build backend (bagian Noval); frontend di job frontend"'
   vulnerability-scan:
     needs: build
     runs-on: ubuntu-latest
