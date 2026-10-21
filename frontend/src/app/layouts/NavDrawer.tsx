@@ -1,7 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { InstallPwaButton } from '../../components/pwa/InstallPwaButton';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import type { NavItem } from './navigation';
 
@@ -87,7 +86,6 @@ export function NavDrawer({ open, onClose, returnFocusRef, items, isActive, foot
         </nav>
         <div className="mt-auto flex flex-col gap-3 pt-4">
           <ThemeToggle showLabel className="w-full justify-start border border-neutral-border" />
-          <InstallPwaButton className="w-full justify-center" />
           {footer}
         </div>
       </div>

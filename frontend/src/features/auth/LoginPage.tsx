@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation } from 'react-router-dom';
-import { InstallPwaButton } from '../../components/pwa/InstallPwaButton';
 import { Button } from '../../components/ui/Button';
 import { TextField } from '../../components/ui/TextField';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
@@ -125,9 +124,6 @@ export function LoginPage(): JSX.Element {
                 Registrasi
               </Link>
             </div>
-
-            {/* Tombol Install PWA untuk pengguna di HP */}
-            <InstallPwaButton className="mt-2 w-full justify-center" />
           </form>
         </div>
       </main>
