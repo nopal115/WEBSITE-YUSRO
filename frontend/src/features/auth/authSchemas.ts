@@ -51,10 +51,6 @@ export const resetPasswordSchema = z
 
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
-export const profileNameSchema = z.object({ name: nameSchema });
-
-export type ProfileNameFormValues = z.infer<typeof profileNameSchema>;
-
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, 'Password lama wajib diisi.'),

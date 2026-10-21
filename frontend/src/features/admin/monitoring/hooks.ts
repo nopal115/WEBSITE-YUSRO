@@ -38,32 +38,6 @@ export function useImitationTasks() {
   return useQuery({ queryKey: adminMonitoringKeys.tasks, queryFn: ({ signal }) => adminMonitoringApi.getTasks('IMITATION', signal), staleTime: 5 * 60 * 1000 });
 }
 
-/**
- * Proses Ulang (SDD 7.7.20): setelah 202, baris di cache langsung menjadi SUBMITTED; antrean, dashboard,
- * dan data santri dimuat ulang. Nomor percobaan tidak berubah (BR-ML-07).
- */
-export function useRetrySubmission() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (submission: AdminSubmission) => adminMonitoringApi.retry(submission.submissionId),
-    onSuccess: (result) => {
-      queryClient.setQueriesData<Paginated<AdminSubmission>>({ queryKey: adminMonitoringKeys.submissions }, (current) =>
-        current
-          ? {
-              ...current,
-              data: current.data.map((item) =>
-                item.submissionId === result.submissionId ? { ...item, evaluationStatus: result.evaluationStatus, score: null, feedbackCategory: null, evaluatedAt: null, failedAt: null } : item,
-              ),
-            }
-          : current,
-      );
-      void queryClient.invalidateQueries({ queryKey: adminMonitoringKeys.queue });
-      void queryClient.invalidateQueries({ queryKey: adminDashboardKeys.summary, refetchType: 'all' });
-      void queryClient.invalidateQueries({ queryKey: adminStudentKeys.all, refetchType: 'all' });
-    },
-  });
-}
-
 export function useGradeSubmission() {
   const queryClient = useQueryClient();
   return useMutation({
