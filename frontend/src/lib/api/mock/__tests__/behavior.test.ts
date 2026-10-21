@@ -663,5 +663,37 @@ describe('admin tugas dan soal (SDD 5.17, 3.7) dan dampaknya ke Santri', () => {
     const created = (await call('POST', 'admin/audio/ref-l001m002/replace', form)).body.data as { id: string };
     const task = (await call('GET', 'admin/tasks/tsk-l001m002-imitation')).body.data as Task & { referenceAudioId: string };
     expect(task.referenceAudioId).toBe(created.id);
+describe('profil: telepon dan foto (PROPOSED API CONTRACT)', () => {
+  const photo = (type = 'image/png', bytes = 1000) => {
+    const form = new FormData();
+    form.append('file', new File([new Uint8Array(bytes)], 'foto.png', { type }));
+    return form;
+  };
+
+  it('GET profile memuat phone dan avatarUrl null pada awalnya', async () => {
+    expect((await call('GET', 'profile')).body.data).toMatchObject({ id: 'usr-santri', phone: null, avatarUrl: null, email: 'santri@yusro.mock' });
+  });
+
+  it('PATCH menyimpan nama dan telepon sekaligus; telepon null menghapusnya', async () => {
+    const saved = await call('PATCH', 'profile', { name: 'Santri Baru', phone: '0812-3456-7890' });
+    expect(saved.body.data).toMatchObject({ name: 'Santri Baru', phone: '081234567890' });
+    expect((await call('GET', 'profile')).body.data.phone).toBe('081234567890');
+    expect((await call('PATCH', 'profile', { name: 'Santri Baru', phone: null })).body.data.phone).toBeNull();
+  });
+
+  it('PATCH menolak telepon tidak valid dan field yang tidak dapat diubah', async () => {
+    expect((await call('PATCH', 'profile', { name: 'Santri Baru', phone: '12345' })).body.errors[0].field).toBe('phone');
+    expect((await call('PATCH', 'profile', { name: 'Santri Baru', phone: null, email: 'x@y.z' })).body.errors[0].field).toBe('email');
+  });
+
+  it('unggah foto memvalidasi berkas, lalu hapus foto menjawab 204', async () => {
+    expect((await call('POST', 'profile/avatar', photo('image/gif'))).status).toBe(422);
+    expect((await call('POST', 'profile/avatar', photo('image/png', 2 * 1024 * 1024 + 1))).status).toBe(422);
+    const uploaded = await call('POST', 'profile/avatar', photo());
+    expect(uploaded.status).toBe(201);
+    expect((await call('GET', 'profile')).body.data.avatarUrl).toBe(uploaded.body.data.avatarUrl);
+    const response = await mockFetch('DELETE', 'profile/avatar', { headers: { Authorization: `Bearer ${token}` }, body: undefined });
+    expect(response.status).toBe(204);
+    expect((await call('GET', 'profile')).body.data.avatarUrl).toBeNull();
   });
 });

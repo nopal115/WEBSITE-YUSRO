@@ -142,9 +142,13 @@ Kolom Peran mengikuti SDD/route frontend. Guard backend dibahas di kolom Backend
 
 | Method + path | Peran | Request | Respons yang diharapkan | Galat yang ditangani frontend | Sumber | Backend |
 | --- | --- | --- | --- | --- | --- | --- |
-| GET `profile` | Santri | — | `Profile { studentCode, name, email, status, joinedAt }` (`joinedAt` tidak ditampilkan) | umum (layar galat + coba lagi) | SDD 5.7 | **belum ada** (stub `501`) |
-| PATCH `profile` | Santri | body `{ name }` saja | `Profile` terbaru [ASUMSI] | `errors[]` field `name`; pesan server | SDD 5.7 | **belum ada** |
+| GET `profile` | Santri | — | `Profile { id, studentCode, name, email, phone \| null, avatarUrl \| null, status, joinedAt }` (`joinedAt` tidak ditampilkan); `id`, `phone`, `avatarUrl` = PROPOSED API CONTRACT (P-1) | umum (layar galat + coba lagi) | SDD 5.7 + revisi desain pembimbing | **beda** (P-1) |
+| PATCH `profile` | Santri | body `{ name, phone: string \| null }` (PROPOSED, P-1); telepon kosong dikirim `null`, tanpa spasi/tanda hubung | `Profile` terbaru [ASUMSI] | `errors[]` field `name`/`phone`; pesan server | SDD 5.7 + revisi desain | **beda** (P-1) |
+| POST `profile/avatar` | Santri | multipart field `file` (JPG/PNG/WebP, maks 2 MB [TBD]) | `{ avatarUrl }` (PROPOSED, P-1) | pesan di bawah tombol foto | revisi desain | **belum ada** |
+| DELETE `profile/avatar` | Santri | — | 204 tanpa isi (PROPOSED, P-1) | pesan di dialog konfirmasi | revisi desain | **belum ada** |
 | PATCH `profile/password` | Santri | body `{ currentPassword, password, passwordConfirmation }` [ASUMSI] | tidak dibaca (`void`) | `errors[]` per kolom; `AUTH_WEAK_PASSWORD` → kolom password | SDD 5.7 (body [ASUMSI]) | **belum ada** |
+
+- **P-1:** backend `main` (`5014087`) punya `GET profile` dan `PATCH profile` (`profile/profile.controller.ts`). GET mengirim JSON mentah `{ id, studentId, email, name, role, status, createdAt, updatedAt }`: nama kolom `studentId`/`createdAt` beda dari `studentCode`/`joinedAt`, dan `phone`/`avatarUrl` belum ada (kolomnya juga belum ada di model `User`). PATCH hanya menerima `{ name }` (2–100 karakter; frontend 3–100, SDD 3.2.6). Endpoint `profile/avatar` dan `profile/password` belum ada.
 
 ### 2.3 Learning (`src/features/learning/api.ts`, `types.ts`)
 

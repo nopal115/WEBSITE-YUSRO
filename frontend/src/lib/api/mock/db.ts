@@ -17,6 +17,9 @@ export interface MockUser {
   role: UserRole;
   status: AccountStatus;
   joinedAt: string;
+  /** PROPOSED API CONTRACT - sinkronkan dengan backend (kolom belum ada di tabel User). */
+  phone?: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface QuizAttemptRecord {
